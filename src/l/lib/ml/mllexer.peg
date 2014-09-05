@@ -1,0 +1,66 @@
+//////////////////////////////////////////////////////////////////////////////
+//
+//   OpenMBase
+//
+// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
+// This file is distributed under the terms of the Q Public License version 1.0.
+//
+//////////////////////////////////////////////////////////////////////////////
+
+.peg:
+
+parser mbasemlcore (
+ ignoring Spaces;
+
+ mbasemlcore := 'nop';
+
+ define cslist<a,b> := 
+                        {a:head b cslist:tail => $cons(head,tail)}
+                      / {a:head => $wrap(head)};
+
+ define slist<a> := {a:head slist:tail => $cons(head,tail)}
+                  / {a:head => $wrap(head)};
+
+ NEWLINE := 10;
+ CR := 13;
+ TAB := 9;
+ QUOTE := 0x27;
+ token tQUOTE := 0x27;
+
+ LCLetter := [a-z];
+ UCLetter := [A-Z];
+ Letter := [a-z]/[A-Z];
+ Digit  := [0-9];
+ Digits  := Digit+;
+ Space  := ' ' / TAB / CR / NEWLINE / SingleLineComment / MultiLineComment;
+ Spaces := Space+;
+ 
+ MultiLineComment  := '(*' ((!('*)')) . )* '*)' => {state=comment};
+ SingleLineComment := '//' (!(NEWLINE) .)* NEWLINE => {state=comment};
+
+ KeywordI := 'let'/'rec'/'in'/'match'/'with'/'function'/'type'/'and'/'true'/
+             'false'/'as'/'of'/
+             'fun'/'foreign'/'begin'/'end'/'lisp'/'include'/'val'/
+             'if'/'then'/'else'/'export'/'lazy';
+
+ Keyword := KeywordI !(IdentRest) ;
+
+ iIdent := LCLetter (IdentRest *) ;
+ IdentRest := (Letter / Digit / '_') ;
+
+ token Ident := !(Keyword) iIdent => {ctoken = ident} ;
+ token CapIdent := UCLetter IdentRest*  => {ctoken = keyword} ;
+ infixInner := (Letter / Digit / '@'/'$'/'#'/'?'/'_'/'-'/
+                          '+'/'!'/'.'/','/
+                          '/'/'%'/'&'/'|'/'=');
+ token InfixIdent := ('<' infixInner * '>') => {ctoken = ident} ;
+ term tInfixIdent := {InfixIdent:i => $sval(i)} 
+                   / {"`" Ident:i "`" => $sval(i) }
+                   / {Ident:i check(ml_check_infix) => $sval(i)};
+
+ token Char := 39 . 39 => {ctoken = const} ; 
+ token String := '"' ( !'"' . ) * '"' => {ctoken = const} ; 
+ token Int := '-'? Digits => {ctoken = const} ;
+)
+
+

@@ -1,0 +1,939 @@
+% literate:
+\section{Introduction}
+
+ PFront is one of the MBase 
+programming languages. A typical MBase language adds new functionality to 
+MBase framework, new semantic features which can be re--used within any other 
+MBase language. PFront is different, it does not add any new semantic blocks,
+but instead it is an extensible syntax front-end to all of the existing and 
+possible MBase languages. It is intended to be a common base for designing 
+user--friendly DSLs with an arbitrary syntax.
+
+ As any other MBase component, PFront is highly extensible. Here we will
+describe its core and some of the default extensions.
+
+\section{Expressions}
+
+ PFront functional core is mostly expression--based. It means that constructions
+like ``{\tt if} something {\tt then} something'', which are dedicated ``statements'' in a majority of modern programming 
+languages, are of the same sort as constructions like ``\pfqode{a + b}''. 
+Expressions always yields a value, while statement performs an action.
+
+ There are several groups of expressions in PFront:
+\begin{itemize}
+\item {\sl Constants}: symbols, numbers, strings, characters, etc.
+
+ \begin{itemize}
+ \item Symbols: \pfqode{'a'}, \pfqode{'a-b-c'}, \pfqode{'+'}, \pfqode{'a123-456'}
+ \item Numbers: \pfqode{123}, \pfqode{-600}
+ \item Strings: \pfqode{"Hello, World"}
+ \item Characters: \pfqode{'A'c}, \pfqode{7c}, \pfqode{' 'c}
+ \item Nil: \pfqode{[]}
+ \item Logical: \pfqode{true}, \pfqode{false}
+ \end{itemize}
+
+\item {\sl Variables}: \pfqode{abc}, \pfqode{ACamelCaseVariable}, \pfqode{%L[;-mbase-*-variable-;]}
+
+\item {\sl Constructors}:
+  \begin{itemize}
+  \item list constructor: \pfqode{[1;2;3]}
+  \item single cons: \pfqode{1 : []}
+  \item lists concatenation: \pfqode{[1;2;3] :: [4;5;6]}
+  \item integer range: \pfqode{[1 .. n]}
+  \end{itemize}
+
+\item {\sl Binary operators} with precedence: \pfqode{1 + 2}, \pfqode{a*b+c*d}, \pfqode{1 < 2}
+
+\item {\sl Explicit precedence}: \pfqode{(2+2)*2}
+
+\item {\sl Function application}: \pfqode{print("Hello, World!")}, \pfqode{nth(2,[1;2;3;4])}, \pfqode{quit()}
+
+\item {\sl Return expression}: \pfqode{return x}
+
+ {\it Please note that it is for a better source code formatting only. Return expression yields a value of its argument, and it does not break the execution of the current code block --- it is different from the behaviour of {\tt return} in languages like C\#}
+
+\item {\sl Binding} (makes sense within a sequence only): \pfqode{str = "Hello, World!"}
+
+\item {\sl Sequence}: \pfqode{{a = 2; b = 2; return a*b}}
+
+\item {\sl Functional abstraction}: \pfqode{fun(a,b) {a*a+b*b}}
+
+\item {\sl Selection}: \pfqode{if(a>b) print("A!") else print("B!")}
+
+\item {\sl Local recursive function}\footnote{This is the same concept as the Scheme ``named let'' construction}: \pfqode{do fact(n = 5) {if (n>0) n*fact(n-1) else 1}}
+
+\end{itemize}
+
+ A normal evaluation order for expressions is left to right.
+
+ There is also a number of compound expressions pre--defined in the PFront core.
+Some of them will be discussed later.
+
+ {\bf N.B.:} Please see the MBase documentation for a reference on all the standard functions and macros.
+
+
+\section{Top--level statements}
+
+ PFront is {\sl mostly} expression--based, but there is a number of 
+constructions that are only valid in a top--level context. These constructions
+includes function and macro definitions, syntax declarations, parsers, 
+AST specifications.
+
+ A function definition is similar to the functional abstraction, with the 
+only difference that it binds a function to a given name:
+
+\pfqode{function add(a,b) { return a + b; }}
+
+ Function defined this way is globally visible. It is, however, possible to 
+define a locally--scoped function. One way is to use local recursive function
+syntax, another is to bind a value of a functional abstraction to a variable.
+
+ For example:
+
+\pfqode{
+function test(n) {
+  f1 = fun(a,b) { return a*a+b*b;};
+  f2 = fun(x) { return f1(x,x); };
+  return f2(n);
+}
+}
+
+ Top--level expressions can be grouped, which is useful for code generation:
+\pfqode{
+{
+ function a() { print("A"); }
+ {
+   function b() { print("B"); }
+   function c() { print("C"); }
+ }
+}
+}
+
+\section{Lists}
+
+ PFront, as well as the underlying MBase core, is a dynamically typed language.
+In practice it means that variables, function arguments and list elements could
+be of any object type. Value types are wrapped into objects. Several types
+are specifically supported by the language: strings, symbols 
+({\tt Meta.Scripting.Symbol} instances), integer numbers ({\tt System.Int32}), 
+cons cells ({\tt Meta.Scripting.Pair} instances). The latter forms so called
+``lists'', data structures common to all the languages descending from the 
+Lisp origin. Syntax for representing lists in PFront is different from the
+standard S--expressions\footnote{But of course it is possible to use the
+S--expressions syntax as well}.
+
+ ``Lists'' in PFront are trees made of binary cons cells, or ``pairs''. The most
+basic operation is constructing a pair: \pfqode{head : tail}. Head is the left
+element of a pair, and tail is the right element of a pair. By convention, a
+``flat'' list is made of a sequence of tail--attached pairs with list elements
+attached to pairs heads. For example, a list \pfqode{[1;2;3]} can be generated
+as \pfqode{ 1 : ( 2 : ( 3 : [])) }. Here, \pfqode{[]} denotes a null pointer, 
+or ``nil'' in a Lisp terminology. 
+
+ Special case list constructor for lists starting with a symbol has the 
+following syntax: \pfqode{'tag'(1,2,@rest)}. Values of special case 
+constructor arguments are substituted
+as flat list elements. If a value is prefixed with \verb#@#, the value is 
+appended. For example,
+\pfqode{{l = [1;2;3]; 'abc'(0,@l,4)}} will give the list \pfqode{['abc';0;1;2;3;4]}.
+
+ Lists are very flexible, so most data structures used by PFront are actually
+represented as lists. Most important use of lists in PFront is representing
+Abstract Syntax Trees and similar intermediate structures.
+
+ Lists are constructed (e.g. by parsers, or during AST transforms) and 
+deconstructed (when an access to specific list element is needed). In following
+sections we will introduce PFront special features for dealing with lists in
+an easy and efficient way.
+ 
+
+\section{Pattern matching}
+
+ One form of list deconstruction is pattern matching. For example, for
+a list \pfqode{l = ['add';2;2]} we can get second and third elements using the
+following construction:
+
+\pfqode{match l with ['add';a;b] -> a + b}
+
+Here values of second and third elements of a list was bound to variables \pfqode{a} 
+and \pfqode{b} and used within expression \pfqode{a + b}.
+
+For this special kind of lists, where the first element is a symbol, there is
+a somewhat shorter form of patterns available:
+
+\pfqode{match l with add(a,b) -> a + b}
+
+ It is possible to match against a number of patterns. For example, the 
+following code iterates over a flat list elements and performs some action with
+each of them, and stops once it meets a symbol \pfqode{'stop'}:
+
+\pfqode{
+do my_iter ( l = lst )
+  match l with
+    [] -> []
+  | 'stop' : tail -> []
+  | head : tail -> { dosomething(head); my_iter(tail) }
+}
+
+ Valid patterns are: pairs and lists constructors, variables, symbols, strings
+and numbers.
+
+ There is a special syntax defined for matching against a single pattern (``format''):
+
+\pfqode{format ( l : [a;[b;c]]) do_something(a,b,c)}
+
+ Another syntax for the same construction is a format binding:
+
+\pfqode{
+{
+ <[a;[b;c]]> = l;
+ do_something(a,b,c);
+}}
+
+\section{ASTs}
+
+ The main purpose of MBase framework in general and PFront language in
+particular is in implementing programming languages. Almost all
+compilers and interpreters deals internally with abstract syntax
+trees, and most of the operations with trees are quite
+typical. There is a rich set of special constructions for defining
+abstract syntax trees structure and implementing transformations over
+these trees.
+
+ ASTs in MBase are somewhat similar to algebraic data types in
+languages like ML and Haskell.
+
+\pfqode{
+ast calc {
+  expr =
+      plus(expr:a,expr:b) | minus(expr:a,expr:b) | mul(expr:a,expr:b) 
+    | div(expr:a,expr:b) | const(number:v);
+}
+}
+
+Here, {\tt expr} is a recursive data structure. AST nodes are
+represented as lists. For example, the following list conforms to the
+``calc'' AST structure:
+
+\pfqode{['plus';['const';2];['const';2]]}
+
+This sort of structure may originate from an expression parser, or be
+generated from some other structure via transformation.
+
+One may wonder, why the precise structure definition for such a
+dynamically typed language? These definitions are used by {\sl
+  visitors} and {\sl iterators} --- constructions needed to implement
+AST transformations.
+
+ For example, a simple interpreter for the ``calc'' AST defined above
+will look like this:
+
+\pfqode{
+visit:calc(expr: c) {
+    deep expr {
+      plus -> a + b
+    | minus -> a - b
+    | div -> a / b
+    | mul -> a * b
+    | const -> v
+    | else 0
+    }
+  }
+}
+
+This solution is quite different from what would be typical for a
+language like ML. This evaluator is obviously recursive, but the
+recursion is implicit. PFront compiler knows the structure of ``calc''
+AST nodes, and implicitly inserts depth--first recursion wherever
+``expr'' node recursively refers to itself. The very same behaviour is
+present for a multitude of node types (e.g., if there are separate
+expression and statement nodes), which allows to write much more dense
+and readable code than the explicit recursive pattern matching against
+algebraic data types.
+
+Of course, sometimes an explicit recursion is necessary. For example,
+if we modify the AST above as follows:
+
+\pfqode{
+ast calc {
+  expr =
+      plus(expr:a,expr:b) | minus(expr:a,expr:b) | mul(expr:a,expr:b) 
+    | div(expr:a,expr:b) | const(number:v) 
+    | var(ident:nm) 
+    | let(ident:varnm,expr:v, expr:body);
+}
+}
+
+Here, ``let'' nodes introduces a context --- a variable is bound to a
+value, so, this context is propagated upside down, whereas the default
+``deep'' behaviour of PFront AST visitors is to traverse the tree 
+downside up.
+
+We have to rewrite our interpreter as follows:
+\pfqode{
+do interpreter ( c = expr, env = [] )
+  visit:calc (expr : c) {
+    once expr {
+     | let -> { newenv = [varnm;interpreter(v, env)]:env;
+                interpreter(body, newenv);
+              }
+     | deep ->
+       {
+         var -> %L[;lookup-env-car;](env,nm)
+      |  plus -> a + b
+      |  minus -> a - b
+      |  div -> a / b
+      |  mul -> a * b
+      |  const -> v
+      |  else 0
+        }
+    }
+  }
+}
+
+Here, we added an explicit recursion only where it is needed, where an
+additional argument must be passed to the current visiting
+environment.
+
+``once'' visiting strategy does not go into any sub--nodes of the
+current node, which is different from the ``deep'' strategy. But it is
+possible to have ``once'' strategy for only a selection of node
+variants, and proceed with the ``deep'' way with all the rest --- this
+is precisely what the construction \verb#| deep -> { ... }# does.
+
+Please note --- due to this syntax, variant tags can't be neither {\tt else} nor {\tt
+  deep}. All other symbols are valid.
+
+There are several standard patterns of tree transformations, and
+majority of interpretation and compilation tasks falls into a
+combination of them. Most common patterns are explained in the appendix.
+
+\subsection{AST definitions}
+
+ AST definition is a top--level statement. The syntax is following:
+
+\verb|ast name [(inheritance-map, ...)] { node; ... }|
+
+ Node definition is either a structure or a variant. Structures are defined as follows:
+
+\verb|nodename is (format...)|
+
+ Variant definition syntax is following:
+
+\verb#nodename = var1(format...) | var2(format...) | ...#
+
+ Format is:
+ 
+\verb|element, format| or \verb|element , . format|
+
+ Element is:
+
+\verb| [*] nodetype:name|
+
+ Here, $*$ stands for 0-or-more nodes of a given type. Nodetype may be a 
+reference to a node defined in this AST, or any other symbol.
+
+\section{Quasiquotation}
+
+In PFront most ASTs ends up in a generated PFront or lower level
+MBase code. To simplify the generation of PFront (and all the derived
+languages) ASTs, there is a special syntax for quasiquotation.
+
+For example, the expression \pfqode{`a + b`} has a value
+\pfqode{['binop';'+';['var';'a'];['var';'b']]}. This is a PFront core AST,
+which is consequently translated into an underlying MBase representation. 
+
+It is possible to substitute a value of a variable at certain placeholders
+within a quasiquotation expression. The interpreter above can be
+turned into a compiler easily:
+
+\pfqode{
+  visit:calc(expr: c) {
+    deep expr {
+      plus -> `\a\ + \b\`
+    | minus -> `\a\ - \b\`
+    | div -> `\a\ / \b\`
+    | mul -> `\a\ * \b\`
+    | const -> 'number'(v)
+    | var -> 'var'(nm)
+    | let -> `{ \varnm\ = \v\; return \body\ }`
+    | else { `0` }
+    }
+  }
+}
+
+It is even easier than the interpreter --- since we can use
+``deep''--only strategy again.
+
+This compiler generates a PFront core AST. Next sections will give a
+hint on what to do with this ASTs further.
+
+\section{Parsers}
+
+ PFront mainly focus on syntax, whereas the rest of MBase is
+responsible for semantics. Parsing in PFront
+is implemented on top of Parsing Expression
+Grammars. The most appealing property of PEGs is the absence of a separate
+lexing stage, which means that it is possible to mix languages with 
+incompatible sets of lexemes.
+
+\subsection{One--line syntax extensions}
+
+ PFront syntax is extensible. There is a number of entries in the core
+ syntax where additional parsers may be plugged in.
+
+ For example, we want to define a string concatenation binary
+ operator. It should be plugged into the ``expr'', section ``bin2'',
+ which is the same precedence as arithmetic operators \verb|*| and \verb|/|. The definition is as follows:
+
+\pfcode{
+syntax in expr, bin2: ' [basicexpr]:a "++" [eterm]:b '
+{
+ return `%L[;string-append;]( \a\ , \b\ )`
+}
+}
+
+ Here we can see another benefit of not having a separate lexing pass:
+ a new operator ``++'' can co--exist with the previously defined
+ operator ``+''. Now we can use expressions like 
+\pfqode{"Hello, world" ++ "!"}.
+
+ An obligatory factorial example:
+
+\pfcode{
+function fact(x) {do loop (n = x, c = 1) if(n>0) loop(n-1,n*c) else c}
+}
+
+\pfcode{
+syntax in expr, bin2: ' [basicexpr]:e "!" '
+{
+  match e with
+   |  number(n) -> fact(n)
+   |  x -> `fact( \x\ )`
+}
+}
+
+Now we can use expressions like \pfqode{x!} or \pfqode{10!}. The
+latter would be evaluated in compilation time.
+
+
+\subsection{Mini--PEG language}
+
+ Expressions between single quotes in those ``syntax in'' examples above belong
+to the miniPEG language, which is a detached part of PFront.
+
+ All the standard PEG expressions are supported:
+
+\begin{itemize}
+\item \verb|e+| --- one ore more
+\item \verb|e*| --- some
+\item \verb|e?| --- none or one
+\item \verb|!e| --- not
+\item \verb|&e| --- and the rest is
+\item \verb|e1 e2| --- sequence
+\item \verb|e1 / e2| --- ordered alternative
+\item \verb|( e )| --- grouping
+\end{itemize}
+
+ Specific syntax elements are:
+
+\begin{itemize}
+\item \verb|[node]| --- a reference to a named node (token, terminal or 
+ a regular expression)
+\item \verb|e : name| --- bind the value of \verb|e| to a variable \verb|name|.
+  An expression here can only be a node reference or a macro application.
+\item \verb|macro<e1, e2, ...>| --- substitute a macro. Argument 
+  expressions should not contain any bindings and anonymous nodes
+\item \verb|{ e => constr }| --- anonymous node with constructor. Anonymous 
+nodes are always of a ``terminal'' type, with all the rules applied.
+\end{itemize}
+
+ Atomic (or ``trivial'') expressions are:
+
+\begin{itemize}
+\item \verb|.| --- any character
+\item {\it number} --- an ASCII code for a character
+\item \verb|[A-Z]| --- a character range (from character A to character Z inclusive)
+\item \verb|"string"| --- a sequence of characters, if inside a terminal node --- a ``lexical'' rule is applied
+\item \verb|ident| --- a sequence of characters, with a ``keyword'' rule 
+  applied if in a terminal node
+\item \verb|[rule : "string"]| --- a sequence of characters with a given rule applied
+\end{itemize}
+
+ And finally, top level definitions --- nodes, rules and macros:
+
+\begin{itemize}
+\item \ppcode{[rulename:] := expr => constr;}
+
+  Defines a rule. Expression template must contain at least one reference to
+a node, which name is {\tt rulename}. Every new string which falls under a 
+given rule will generate a new node, formed of a given template.
+
+ It is important to define at least two built--in rules --- 
+{\tt lexical}, which applies to all the simple strings found inside terminal nodes, 
+and {\tt keyword}, which applies to all the identifier--like entries 
+found inside terminal nodes. ``One--line'' syntax extending expressions 
+are always treated as terminals.
+
+ A typical example of a keyword rule definition is following:
+\ppcode{[keyword:] := [keyword] ![IdentRest] => {ctoken = keyword};}
+
+ Here, \verb|IdentRest| should recognise any character which may be found 
+within an identifier lexeme. This rule means that, for example, if we generate 
+a keyword {\tt int} as a part of some syntax, a string \verb|"integer"| won't be
+recognised as keyword \verb|int| followed by identifier \verb|eger|. A 
+constructor part in this example hints the syntax highlighting of all the 
+keywords for text editor and literate programming tools.
+
+Nodes raised by rules are always of a ``token'' type, which means they're
+skipping the currently defined ignorance node instances in the beginning.
+
+\item \verb|!!Nodename;|
+
+Defines a node to be ignored at a beginning of all the {\sl tokens}. 
+Typically, it would be something like \verb|!!WhiteSpacesOrComments|.
+
+\item \verb|&Nodename;|
+
+Defines an empty placeholder node. This sort of nodes is necessary for dynamic
+extensions.
+
+\item \verb|Nodename<arg1,arg2,...> := expr => constr;|
+
+Defines a macro with a given name and a list of arguments. Template expression
+may contain references to either {\tt Nodename}, which will be a recursive 
+self--reference for any macro instantiation, or to its arguments, which will be
+substituted on instantiation.
+
+A typical usage example:
+
+\ppcode{cslist<e,s> := { [e]:head [b] [cslist]:tail => $cons(head,tail) }
+            /  { [e]:head => $wrap(head) };
+}
+
+This macro can be used to define a something--separated--list of elements,
+for example, in a following syntax: 
+
+\ppcode{function [ident]:name "(" cslist<[ident],",">:args ")"}
+
+Please note that only the value of the whole macro is bound to the {\tt args} 
+variable, not the individual arguments.
+
+\item \verb|@@Nodename := expr;|
+\item \verb|@@Nodename := expr => annotation;|
+
+Defines a ``regular expression'' node. It does not construct any value, so only
+annotation part of a constructor is allowed. No rules are applied, strings and
+identifiers are treated as is. Nodes of this type are not memoised by the 
+Packrat parser backend.
+
+\item \verb|@Nodename := expr;|
+\item \verb|@Nodename := expr => annotation;|
+
+Defines a ``token'' node. Token nodes always construct tagged string values, so
+no specific constructors are allowed, annotations only. No rules are applied 
+inside token nodes. Ignoration rule is applied.
+
+\item \verb|Nodename := expr;|
+\item \verb|Nodename := expr => constr;|
+
+Defines a ``terminal'' node, which may or may not contain constructors. 
+Terminal nodes values are memoised by the Packrat backend by default.
+
+\item \verb$binary Nodename := binexpr | binexpr ...;$
+
+Defines a Pratt binary expressions parser node. Please note that the delimiter
+is "\verb$|$", instead of "\verb$/$", to stress the difference between a Pratt
+node and a normal PEG sequence.
+
+Here, \verb|binexpr| is one of the following:
+\begin{itemize}
+\item \verb| ( Precedence Associativity ) BinNode OpExpr BinNode => constr;|
+
+Adds a binary expression with a given numeric precedence and associativity
+(\verb|left|, \verb|right| or nothing, defaults to left). \verb|BinNode| must
+always refer to the \verb|Nodename| of the same binary parser node. \verb|OpExpr| can be any PEG expression.
+
+\item \verb|expr|
+
+A single expression must be given at the end of the list of binary variants.
+
+\end{itemize}
+
+\end{itemize}
+
+ Annotations are simply pairs of names and values (both conforming to 
+identifier syntax), like in \verb|{ctoken = keyword}|. This pairs guides syntax
+highlighting, identation, autocompletion, etc. Annotations does not affect 
+parsing (i.e., values constructed by a parser).
+
+
+ Constructor syntax is following:
+\begin{itemize}
+\item \verb|tag ( constr, constr, etc...)|
+
+  Construct an AST node with a given tag and values.
+
+\item \verb|$fun(constr, constr, etc...)|
+
+  Apply a special two--way function to given values. See the predefined list 
+of constructor functions below.
+
+\item \verb|tag ...|
+\item \verb|tag(...)|
+
+  Create a constructor with a given tag, with all the named pattern arguments listed in an order of appearence. For example:
+
+\verb|[expr]:a "+" [expr]:b => plus ...|
+
+ is the same as 
+
+\verb|[expr]:a "+" [expr]:b => plus(a,b)|
+
+\item \verb|...|
+
+ Same as the one above, with a constructor tag taken from the name of a 
+containing terminal node.
+
+\item \verb|`tag|
+
+  Create a constant symbol
+
+\item \verb|ident|
+
+  Substitute a value of a variable
+\end{itemize}
+
+ Tags here are either identifiers or \verb|"strings"|, both are treated as 
+symbols.
+
+
+\subsubsection{Extended one--line parsers}
+
+ The \verb|syntax in ...| construction with one--line parsers is
+ powerful enough for most syntax extensions, but in some cases
+ additional nodes should be defined. For example, if we need a small
+ embedded regular expressions language, it can be defined as follows:
+
+\pfqode{
+syntax in expr, start: ' "<" r ":" [regexp]:rgxp ">" '
++ {
+    @reganychar := ![regspecchar] .;
+    @@regspecchar := "("/")"/">"/"<"/"+"/"*"/"."/"["/"|";
+    regexp :=
+              { [regatom]:l [regexp]:r     => seq(l,r) }
+           /  { [regatom]:a "+"            => plus(a) }
+           /  { [regatom]:a "*"            => star(a) }
+           /  { [regatom]:l "|" [regexp]:r => or(l,r) }
+           /  { [regatom]:a                => a }
+           => { qstate = pattern }
+           ;
+    regatom :=
+              { "(" [regexp]:r ")"     => r }
+           /  { [charrange]:r          => r }
+           /  { "."                    => any() }
+           /  { [reganychar]:c         => char(c) }
+           ;
+  }
+{
+  return 'lisp'('compile_static_regexp'(rgxp));
+}
+}
+
+ Here, a one--line syntax is backed by a complex parser with two
+terminal, one token and one regular expression nodes.
+ 
+
+
+\subsubsection{Pre--defined functions}
+
+ Constructor functions are special. They must be reversible, in order to 
+generate pretty--printers automatically out of parsers. That's why not all the
+MBase and PFront functions are available.
+
+\begin{itemize}
+\item \verb|$cons(a,b)| --- same as \pfqode{a : b}
+\item \verb|$wrap(a)| --- same as \pfqode{[a]}
+\item \verb|$nil()| --- same as \pfqode{[]}
+\item \verb|$list(a1, a2, ...)| --- same as \verb|[a1;a2;...]|
+\item \verb|$symbol(str)| --- convert a string to a symbol
+\item \verb|$val(a)| --- detach a value from a tagged token, convert it into 
+a symbol. This one is specifically handled by the PEG compiler, in order to 
+infere a possible tag
+\item \verb|$sval(a)| --- same as previous, but leaves a value as a string
+\item \verb|$charcode(s)| --- returns an integer ASCII code of a given character
+\end{itemize}
+
+\subsection{Writing complex parsers}
+
+ We've only discussed ``syntax in'' parsers before. But there is a
+generic PEG definition available as well, like in a following example:
+
+\pfqode{
+parser helloworld  ( ) {
+  !!spaces;
+  
+  @@spaces := ([space] / [cr]) +;
+  @@space := " "/[tab];
+  @@cr := 13;
+  @@tab := 9;
+
+  name := ([A-Z]/[a-z]) ([a-z]+);
+
+  @tkname := [name];
+
+  helloworld := Hello "," [tkname]:nm "!" => nm;
+}
+}
+
+And then, an expression \pfqode{parse "Hello, world!" as helloworld}
+will return a value \verb|(tkname . "world")|.
+
+\subsubsection{Left recursion}
+
+Left recursion is allowed in PEG, both direct and indirect. The obvious
+limitation is that only the node which is already left--recursive may be 
+dynamically extended with a new left--recursive rule.
+
+An example of a left recursive syntax:
+
+\pfqode{
+parser calc (pfcommon) {
+   !!Spaces;
+   &expr_more; &term_more;
+   expr := {[expr]:l "+" [expr]:r => plus(...)}
+        /  {[expr]:l "-" [expr]:r => minus(...)}
+        /  {[expr]:l "*" [expr]:r => mul(...)}
+        /  {[expr]:l "/" [expr]:r => div(...)}
+        /  [expr_more]
+        /  { "(" [expr]:e ")" => e }
+        /  [term]
+        ;
+   term := {[ident]:v => var(v)} / {[number]:n => const(n)}
+        /  [term_more]
+        ;
+}
+}
+
+Here, {\tt expr} is left--recursive already, and so we can extend this parser
+with additional left--recursive entries:
+
+\pfqode{
+syntax of calc in expr, more: '[expr]:l "!"' { 'factorial'(l) }
+}
+
+\section{Code generation}
+
+ In order to utilise PFront to its maximum power, it is important to 
+understand the way it is being translated into MBase, and how both 
+languages interacts.
+
+ Essentialy, MBase is a dialect of Lisp programming language. It is more akin to the Scheme 
+family, with several subtle differences: only integer arithmetics supported, no first class 
+continuations, no enforced hygiene for macro expansion. A precise language definition is out
+of the scope of this document, so only the parts relevant to PFront interaction will be
+described here.
+
+ PFront language core is defined by three usual parts: an abstract syntax tree, a parser and a
+code generator, which is, basically, a transformation from the AST into MBase expressions. One have to understand all three parts in order to implement syntax and semantic extensions for PFront. The complete source code is provided for reference:
+
+\begin{itemize}
+\item {\tt pcommon.peg}, {\tt pfront.peg}, {\tt minipeg.peg} --- PFront parser components
+\item {\tt ast.al} --- an AST definition for PFront
+\item {\tt codegen.al} --- PFront $\to${} MBase code generator implementation
+\item {\tt notnet.hl} --- Not.NET language extension
+\item {\tt extensions.hl} --- a collection of useful PFront and Not.NET extensions
+\end{itemize}
+
+The code is mostly declarative and self--documented. The most important entry points are:
+
+\begin{itemize}
+\item \verb|pfront_top| function: translates top level AST statement into MBase
+\item \verb|pfront_expr| function: translates simple expression AST into MBase
+\item \verb|hlevel| AST definition: the core PFront AST
+\item \verb|topexpr| AST entry: top level PFront statements
+\item \verb|expr| AST entry: normal PFront expressions
+\item \verb|lisp| variant of \verb|expr| AST entry: an MBase code to be passed verbatim through 
+  the code generation.
+\item \verb|expr| term of \verb|pfront| parser: a generic expression entry.
+\item \verb|qident| term: an unquotable identifier.
+\item \verb|bexpr| term: lowest priority binary operations, contains \verb|expr_bin1| dynamic
+   entry.
+\item \verb|eterm| term: higher priority binary operations, contains \verb|expr_bin2| dynamic
+   entry.
+\item \verb|basicexpr| term: all the normal expression entries. Contains \verb|expr_start|, \verb|expr_preatom| and \verb|expr_end| dynamic entries.
+\item \verb|topexpr| term: top level PFront statements (global definitions, etc.). Contains \verb|top_start| and \verb|top_middle| dynamic entries.
+\end{itemize}
+
+ There are two main techniques which should help in understanding the AST structure and code 
+generation. First is to use the quasiquotation to obtain a genuine AST for a given expression. 
+For example, \pfqode{`map a in [1..10] do a*a`} will give {\tt (map a (range (number 1) (number 10)) (binop * (var a) (var a)))}. Second technique is to apply the appropriate code generation 
+function to see the actual MBase code: \pfqode{pfront_expr(`map a in [1..10] do a*a`)} will give
+\pfqode{#(foreach-map (a (fromto 1 10)) (* a a))}.
+
+ Any combination of a PFront AST, a verbatim MBase code and an explicit compilation of an AST into MBase can be used within syntax extensions. For a  better performance and cleaner code, it is
+recommended to separate any complicated processing from the parsing pass, which means construction
+of an MBase macro application code from the syntax extension, and then dealing with its contents
+from the macro definition. Here is an example:
+
+\pfcode{
+syntax in top, start: ' regexp [qident]:nm "=" [miniexpr]:e ";"? '
+{
+  return 'expr'('lisp'('my_peg_regexp'(nm,e)))
+}
+}
+
+Here, a verbatim MBase \verb|my_peg_regexp| macro application was
+constructed, without doing anything to the contents of expression
+\verb|e|. The actual expression is processed by the macro, still trivial
+in this case, but it can be of an arbitrary complexity, whereas a
+syntax extension should only construct simple lists out of its input:
+
+\pfcode{
+macro my_peg_regexp(nm, e)
+{
+  symbols(nn,nn1,nn2) {
+   #`(top-begin
+       (packrat-ast ,nm ( )
+          (terminal normal ,nn ,e (() ()))
+          (terminal normal ,nn1 (star (seq (notp (terminal ,nn))
+                                           (trivial (anychar)))) (()()))
+          (terminal token  ,nn2 (terminal ,nn) (() ()))
+          (terminal term   ,nm (star (seq (terminal ,nn1)
+                                          (bind ret (terminal ,nn2))))
+                                          (() (var ret)))
+                                          )
+       (function ,nm (str) (reverse (map cdr (pfront:easyparse ,nm str)))))
+  }
+}
+}
+
+The example above shows another useful feature of PFront: a fallback S--expressions syntax. It
+is possible to use such a syntax after the '\verb|#|' character wherever \verb|expr| is allowed.
+
+S--expressions syntax is fully compatible with the core MBase parser, with one addition --- a 
+PFront expression (or even a top--level statement) may follow the
+\verb|=pf:| prefix, as in this example:
+
+\pfqode{#(let ((a =pf: 2+2) (b 3)) =pf: a*a+b*b)}
+
+The most appropriate and obvious use of this feature is in macros, including the kind of syntax 
+extension support macros discussed above. Of course it is possible to construct MBase code using
+only the core PFront list constructing syntax, but a native Lisp quasiquotation in many cases is
+more readable. And of course, fallback syntax should not be abused, misused and overused.
+
+\section{Not.NET extension}
+
+MBase is tightly integrated with .NET. The most basic form of
+integration is the embedded IL code\footnote{{\tt (n.asm ...)} construction} --- a powerful but
+complicated way of generating a low level code. There is a higher level 
+replacement available --- Not.NET embeddable programming
+language. When used with PFront syntax it looks pretty much like C\#.
+
+\subsection{Gluing up .NET code}
+
+Because of PFront's syntax extensibility it was possible to add a language designed specifically for 
+interacting with the .NET world.
+It is achieved through a special {\tt .net:} quotation construct. The value returned back from quotation is a first class citizen both for MBase and PFront 
+language so it can be used anywhere where a value is expected:
+
+\pfqode{
+function today() return .net: System.Date.get_Now();
+}
+
+Please note that there is no syntax sugar in Not.NET language for C\# properties.
+
+To make this bidirectional interaction possible, however, we need to introduce a context, which is a list of bound variables that will be allowed into the Not.NET code block. So a slightly more complex example may look like this:
+
+\pfqode{
+function file_size(fname) 
+  return .net(fname): { 
+    file = new System.IO.File((string)fname); 
+    leave file.get_FileSize(); 
+  }
+}
+
+It is worth mentioning that nothing like a ``duck-typing''' found in many dynamic languages happens here,
+the variable types are known in the compilation time, so the appropriate CIL method call can be generated,
+and the resulting code is that efficient as CIL allows. Internally, a type propagation scheme is used to 
+infer the actual type. It is very similar, in nature, to well known C\# `var' construct, however, with a 
+smaller syntax overhead.
+
+ All the variables passed into Not.NET code are considered to be of a System.Object type, unless the exact
+type is given. If it is a value type, a variable value is unboxed prior to casting.
+
+ For example: \pfqode{notnet(int x, double y) { leave (double)x + Math.Sin(y);}}
+
+
+ One of the obvious uses for Not.NET language is a performance optimisation. 
+The code written in Not.NET is executed as fast as a C\# code, whereas a raw 
+MBase can be somewhat slower due to the dynamic typing and boxing.
+
+\subsubsection{{\tt .net} vs. {\tt notnet}}
+
+ There are two different constructions in PFront for embedding the 
+Not.Net language. The first one, {\tt .net(...): ...}, is for embedding 
+expressions, and it allows only capturing the {\tt System.Object} type 
+variables. The more heavyweight construction is {\tt notnet(...) \{ ... \}}, 
+which captures variables of arbitrary types and embeds a statement instead of
+an expression.
+
+ One significant difference between C\# and Not.NET is that the latter allows a
+sort of ``statement--expressions'', or ``begin--expressions''. These 
+expressions looks like normal code blocks which ends with a {\tt leave} 
+construction. For example:
+
+\pfqode{
+notnet(double a, double b, double len) 
+ { if({x = a*a; y = b*b; leave (Math.Sqrt(x+y));} < len) 
+      { leave 1;} else {leave 0;} }
+}
+
+Here we can see a code block in a place where an expression syntax is expected. 
+It allows to partially leverage the damage of separating statements from 
+expressions, and it is especially useful for code generation, where otherwise 
+a complicated declarations lifting will be required.
+
+Another special language feature in Not.NET is a class--level declarations 
+explicit lifting. It is the only way to add something to the current class 
+from the Not.NET code embedded into a PFront expression.
+
+For example:
+
+\parse[pfront:expr]{
+  .net: {
+    lift: static int counter;
+    lift: static int inc() {
+              this.counter = this.counter + 1;
+              return this.counter;
+          };
+    leave this.inc();
+  }
+}
+
+\subsubsection{Not.NET quasiquotation and syntax extensions}
+
+ Not.NET language is as extensible as PFront itself. There is a special 
+quasiquotation syntax that allows to form Not.NET AST. For example:
+
+\pfqode{.net-statement `System.Console.WriteLine( \exp\ );`}
+
+\pfqode{.net-expr `Math.Cos( \a\ )+Math.Sin( \b\ )`}
+
+The other quasiquotation prefixes are {\tt .net-member} and {\tt .net-class}.
+
+ Several syntax extentions entries are available in the default Not.NET parser.
+It is possible to plug in a new syntax:
+
+\pfcode{
+syntax of pfnotnet in nnstmt, start: ' [pfexpr]:r "=>" [pfexpr]:l ";" '
+{
+ return .net-statement `\l\ = \r\;`
+}}
+
+And from now on, we can use this new syntax in Not.NET code:
+
+\pfcode{
+.net: {2 => x; 3 => y; leave x*y;}
+}
+

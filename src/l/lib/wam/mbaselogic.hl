@@ -1,0 +1,8 @@
+#(include "../../version.al")
+#(n.module MBaseLogic)
+
+include "./lib.hl";
+
+#(force-class-flush)
+
+#(n.save)

@@ -1,0 +1,4 @@
+litinclude ("./prolog") "./prolog.hl";
+litinclude ("./prolog_backend") "./prolog_backend.hl";
+litinclude ("./prolog_backend_lib") "./prolog_backend_lib.hl";
+

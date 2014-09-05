@@ -1,0 +1,444 @@
+% literate:
+
+
+\section{A reference (inefficient) backend implementation}
+\pfcode{
+function prolog_backend_dynamic_wrapper(id)
+{
+   return '_prolog_get_dynamic_function'('prolog_environment','prolog_continuation',
+       'quote'(%Sm<<("_prolog_function_",id)))
+}
+
+function prolog_codegen(b)
+   visit:pbackend(top:b) {
+      deep ctor {
+        new -> 'prolog_alloc_struct'('prolog_environment',
+                                     'quote'(id),'list'(@args))
+      | const -> 'prolog_const'(v)
+      | var -> id
+      | arg -> id
+      };
+      deep expr {
+        intros -> 'let'(map v in vars do 
+                         [v;'prolog_alloc_cell'('prolog_environment')],
+                        body)
+      | unify -> 'if'('prolog_unify'('prolog_environment',a,b),tr,
+                      'prolog_failure'('prolog_environment'))
+      | choose -> 
+         'prolog_choice_point'('prolog_environment',
+                               'prolog_continuation',
+                               'list'(@map e in es do
+                                      'fun'(['prolog_environment';
+                                             'prolog_continuation'],
+                                            e)))
+      | call_with -> t('fun'(['prolog_environment'],cnt))
+      | tailcall -> t('prolog_continuation')
+      | proceed -> '_prolog_call_wrapper'('prolog_continuation'('prolog_environment'))
+      };
+      deep calltgt: fun(next) {
+        [ '_prolog_call_function'; %Sm<<("_prolog_function_", fn);
+          'prolog_environment'; next ;@a ]
+      };
+      deep callarg {
+        var -> id
+      | arg -> id
+      | const -> 'prolog_const'(v)
+      };
+      deep top {
+        define_prolog_function -> 
+           '_prolog_toplevl_function'(%Sm<<("_prolog_function_",id),
+                         ['prolog_environment';
+                          'prolog_continuation';@args], 
+                         body)
+      | define_prolog_dynamic_function ->
+          '_prolog_toplevl_function'(%Sm<<("_prolog_function_",id),
+                         ['prolog_environment';
+                          'prolog_continuation';@args],
+                   prolog_backend_dynamic_wrapper(id))
+      }}}
+
+\subsection{Backend functions implementation}
+
+\pfcode{
+function %_prolog_call_function_cps(v)
+  match v with
+   [id;fnm;@fargs] -> 
+      if(shashget(getfuncenv(), fnm))
+           #`(cons 'CPS (fun () (,fnm ,@fargs)))
+      else #`(let ((ff (ohashget *PROLOGENV* ',fnm)))
+                (cons 'CPS (fun () (ff ,@fargs))))
+
+define PROLOG_GLOBENV = mkref(mkhash())
+
+function %_prolog_get_dynamic_function(env, cnt, id)
+{
+   fn = ohashget(^PROLOG_GLOBENV, id);
+   return fn
+}
+
+function %_prolog_toplevl_function_cps(v)
+  match v with
+   [id;nm;args;@body] -> #`(ohashput *PROLOGENV* ',nm (fun ,args ,@body))
+function %_prolog_failure_cps(v)
+  match v with
+   [id;@rest] -> #`(cons 'CPS (fun () (prolog_failure_f ,@rest)))
+function %_prolog_call_wrapper_cps(v)
+  match v with
+   [id;c] -> #`(cons 'CPS (fun () ,c))
+}
+
+\pfcode{
+#(function _prolog_minicps (tmpenv v)
+   (let* ((code
+           `(lambda (*PROLOGENV*)
+               (with-macros ((_prolog_call_function _prolog_call_function_cps)
+                   (prolog_failure _prolog_failure_cps)
+                   (_prolog_call_wrapper _prolog_call_wrapper_cps)
+                   (_prolog_toplevl_function _prolog_toplevl_function_cps))
+                 ,v)))
+          (ccode (read-int-eval code))
+          (ecode (ccode tmpenv)))
+       ecode))}
+
+\pfcode{
+#(macro prolog_failure rest `(prolog_failure_f ,@rest))
+#(macro _prolog_call_function rest rest)
+#(macro _prolog_call_wrapper (rest) rest)
+#(macro _prolog_toplevl_function (nm args . rest) 
+   `(recfunction ,nm ,args ,@rest))
+}
+
+\pfcode{
+function prolog_remember_cell(env, cell) {
+   chp = prolog_last_chpoint(env);
+   if(chp) {
+      <[env;prev;cont;cnts;vars]> = ^chp;
+       vars := cell : ^vars;
+   }
+}
+function prolog_alloc_cell(env) cons('var',[])
+function prolog_alloc_struct(env, id, args) { return ['str';id;@args] }
+function prolog_const(c) cons('const',c)
+function prolog_save_chpoint(env, c) { %set-cdr!(env, c)}
+function prolog_last_chpoint(env) { cdr(env) }
+function prolog_deref(v) // Fall through constraint
+   match v with 
+      'ref':x -> prolog_deref(x)
+    | 'constraint':x:c -> prolog_deref(x)
+    | else -> v
+function prolog_deref_c(v) // Stop at constraint
+   match v with 
+      'ref':x -> prolog_deref_c(x)
+    | else -> v
+function prolog_failure_f(env) {
+    chp =  deref(prolog_last_chpoint(env));
+    if(chp) {
+      <[env;prev;cont;cnts;vars]> = chp;
+       iter v in ^vars do {
+          %set-car!(v,'var');%set-cdr!(v,[]);
+       }; vars := [];
+    };
+    prolog_next_choice_point(prolog_last_chpoint(env))
+}
+function prolog_query_wrapper(v) {
+   match v with
+     'CPS':n -> prolog_query_wrapper(n())
+   | else -> v
+}
+function prolog_next_choice_point(chp)
+{
+   <[env;prev;cont;cnts;vars]> = deref(chp);
+    if(cnts) {
+      chp := [env;prev;cont;cdr(cnts);vars];
+      (car(cnts))(env, cont);
+    } else if (prev) { prolog_save_chpoint(env, prev); prolog_failure_f(env); } 
+    else []
+}
+function prolog_choice_point(env, cont, cnts) {
+  prevchp = prolog_last_chpoint(env);
+  chp = mkref([env;prevchp;cont;cnts;mkref([])]);
+  prolog_save_chpoint(env, chp);
+  prolog_next_choice_point(chp);
+}
+function prolog_set_var(env, dst, src) {
+   prolog_remember_cell(env,dst);
+   %set-car!(dst,'ref'); %set-cdr!(dst, src);
+}
+function prolog_unify_structs(env, a, b) {
+  <[str;ida;@argsa]> = a;
+  <[str;idb;@argsb]> = b;
+  if (ida === idb) {
+    do loop (aa = argsa, ab = argsb) {
+      match [aa;ab] with
+         [(hd:tl);(hdb:tlb)] ->
+             if (prolog_unify_inner(env, hd, hdb)) loop(tl, tlb) 
+             else []
+       | else -> true
+    }
+  } else []
+}
+function prolog_is_var(a) match a with 'var':x -> true | else -> []
+function prolog_is_struct(a) match a with 'str':x -> true | else -> []
+function prolog_is_const(a)  match a with 'const':x -> true | else -> []
+function prolog_unify_inner(env, a, b) {
+   da = prolog_deref(a); db = prolog_deref(b);
+   if (da === db) true
+   else if (prolog_is_var(a)) {prolog_set_var(env, a, b);true}
+   else if (prolog_is_var(b)) {prolog_set_var(env, b, a);true}
+   else if (prolog_is_struct(da) && prolog_is_struct(db)) {
+     prolog_unify_structs(env, da,db)
+   } else if (prolog_is_const(da) && prolog_is_const(db)) {
+     cdr(da) == cdr(db)
+   } else []
+}
+function prolog_unify(env, a, b) {
+  ret = prolog_unify_inner(env, a,b);
+  return ret;}
+
+% "Translate the backend internal term representation 
+   into the source AST form"
+function prolog_decode_result(varenv, v) {
+  dv = prolog_deref(v);
+  match dv with
+     str(id,@args) -> 'term'(id,@map a in args do 
+                                   prolog_decode_result(varenv, a))
+   | 'const':v -> if(%string?(v)) 'string'(v) else 'number'(v)
+   | 'var':x -> { chk = ohashget(varenv, dv);
+         if (chk) 'var'(chk) else {
+            nm = gensym(); ohashput(varenv, dv, nm);
+            return 'var'(nm)}
+         }
+   | else -> [] // error?
+  }
+function prolog_default_continuation(env) env
+}
+
+\subsection{Prolog core functions}
+
+\pfcode{
+function %_prolog_function_cut/0 (env, cnt) {
+    chp =  deref(prolog_last_chpoint(env));
+    if(chp) {
+      <[env;prev;cont;cnts;vars]> = chp;
+       if (prev) {
+         <[penv;pprev;pcont;pcnts;pvars]> = deref(prev);
+          pvars := ^vars :: ^pvars;
+       };
+       prolog_save_chpoint(env, prev);
+    };
+    cnt(env)}}
+
+\pfcode{
+function %_prolog_function_call/1 (env, cnt, term) {
+   dt = prolog_deref(term);
+   if (not(prolog_is_struct(dt))) {
+      prolog_failure(env)
+   } else {
+     <[str;id;@args]> = dt;
+      nm = %Sm<<("_prolog_function_", id);
+      fn = shashget(getfuncenv(), nm);
+      if (fn) {
+        apply(fn, [env; cnt; @args]);
+      } else prolog_failure(env)}}}
+
+\pfcode{
+function %_prolog_make_isfun (op)
+ fun(env, cnt, dst, a, b) {
+  da = prolog_deref(a); db = prolog_deref(b);
+  dd = prolog_deref(dst);
+  if (prolog_is_const(da) && prolog_is_const(db) && prolog_is_var(dd)) {
+    ca = cdr(da); cb = cdr(db);
+    if (prolog_unify(env, dst, prolog_const(op(ca, cb))))
+      cnt(env)
+    else prolog_failure(env)
+  } else prolog_failure(env);}}
+
+\pfcode{
+define %_prolog_function_isadd/3 = 
+   %_prolog_make_isfun (fun(a,b) a+b)
+define %_prolog_function_issub/3 = 
+   %_prolog_make_isfun (fun(a,b) a-b)
+define %_prolog_function_ismul/3 = 
+   %_prolog_make_isfun (fun(a,b) a*b)
+define %_prolog_function_isdiv/3 = 
+   %_prolog_make_isfun (fun(a,b) a/b)
+}
+
+\pfcode{
+function %_prolog_make_cmp (op)
+  fun(env, cnt, a, b) {
+    da = prolog_deref(a); db = prolog_deref(b);
+    if (prolog_is_const(da) && prolog_is_const(db)) {
+      ca = cdr(da); cb = cdr(db);
+      if (op(ca, cb)) cnt(env) else prolog_failure(env)
+    } else prolog_failure(env)}}
+  
+
+\pfcode{
+define %_prolog_function_gr/2 = 
+  %_prolog_make_cmp (fun(a, b) a>b)
+define %_prolog_function_lt/2 = 
+  %_prolog_make_cmp (fun(a, b) a<b)
+define %_prolog_function_ge/2 = 
+  %_prolog_make_cmp (fun(a, b) a>=b)
+define %_prolog_function_le/2 = 
+  %_prolog_make_cmp (fun(a, b) a<=b)
+}
+
+\pfcode{
+function %_prolog_function_fail/0 (env, cnt)
+  prolog_failure(env)}
+
+\pfcode{
+function %_prolog_function_debug/1 (env, cnt, v) {
+  writeline(v);
+  cnt(env);
+}}
+
+\pfcode{
+function %_prolog_function_print/1 (env, cnt, v) {
+  println(prolog_term_to_string(prolog_decode_result(mkhash(), v)));
+  cnt(env);
+}}
+
+\subsection{Backend-specific query compilation}
+
+\pfcode{
+function prolog_backend_driver_generic(parsed, exec, getexec, failure, outp) {
+  flush(c, queryp, prev) = symbols(qname) if(c) {
+    cc = reverse(c);
+    app0 = map a in cc do prolog_parse_fix_arity_clause(a);
+    qstat = mkref([]);
+    app = prolog_sanitise_queries(app0, qname, qstat);
+    capp = prolog_compile(app);
+    if (shashget(getfuncenv(), 'debug-prolog-compile'))
+       writeline('PROLOG_COMPILED'(@capp));
+    cgen = %map(prolog_codegen, capp);
+    if (shashget(getfuncenv(), 'debug-prolog-codegen'))
+       writeline('PROLOG_CODEGEN'(@cgen));
+    exec('begin'(@cgen));
+
+    if (queryp) {
+      qargs = deref(qstat);
+      venv = mkhash();
+      vars = map q in qargs do {
+         v = 'var':[];
+         ohashput(venv, v, q);
+         return v};
+      qnamescreen = %Sm<<("_prolog_function_",qname);
+      env0 = 'env':[];
+      cnt0 = fun(env) env;
+      result = 
+         prolog_query_wrapper(apply(getexec(qnamescreen), env0:cnt0:vars));
+
+      if (result) {
+        if (outp) {
+          do printloop(res = result, resnum = 0) {
+            if (res) {
+             println(%S<<("Solution N",resnum,":"));
+             iter [n;v] in zip(qargs, vars) do {
+                nv = prolog_decode_result(venv, v);
+                println(%S<<(n, " = ", prolog_term_to_string(nv)))
+             };
+             printloop(prolog_query_wrapper(failure(res)), resnum+1)}}
+        } else
+          do resultloop(res = result, resnum = 0) {
+            if (res) {
+             resmap = map [n;v] in zip(qargs, vars) do {
+                nv = prolog_decode_result(venv, v);
+                [n; nv]
+             };
+             return resnum : resmap : fun() 
+                { resultloop(failure(res), resnum+1) }
+            } else return []
+          }
+      } else return []} else return prev} else prev;
+  do loop(i = parsed, c = [], prev = []) {
+     match i with
+        ['query';@x]:rest -> {
+              nquery = car(i);
+              nxt = flush(nquery:c, true, prev); loop(rest, [], nxt)}
+      | [] -> flush(c, [], prev)
+      | hd : tl -> loop(tl, hd : c, prev)}}}
+
+\pfcode{
+function prolog_backend_driver(parsed, exec, outp)
+  prolog_backend_driver_generic(parsed, exec, 
+       fun(nm) shashget(getfuncenv(), nm), prolog_failure_f, outp)}
+
+
+\section{PFront integration}
+
+\pfcode{
+syntax in top, start (prolog): ' ".prolog" ":" "{" [prolog]:px "}" '
+{
+   app0 = map a in px do prolog_parse_fix_arity_clause(a);
+   capp = prolog_compile(app0);
+   cgen = %map(prolog_codegen, capp);
+   return 'expr'('lisp'('begin'(@cgen)))
+}}
+
+\pfcode{
+function prolog_sanitise_evars(a)
+collector(add, get) {
+   ev = mkhash();
+   na = visit:prolog(clauses:a) {
+      deep term {
+        evar -> {
+           chk = ohashget(ev, id); 
+           if (chk) [] else {ohashput(ev,id,id); add(id)};
+           return 'var'(id)
+        }
+      | else -> node
+      }
+   };
+   return na:get()
+}}
+
+\pfcode{
+syntax in expr, start (prolog): 
+   ' [qident]:nm "<-?" cslist<[plgterm],",">:ts "." '
+{
+   app0 = [prolog_parse_fix_arity_clause('query'(@ts))];
+   qstat = mkref([]); qname = gensym();
+  <app01:evars> = prolog_sanitise_evars(app0);
+   app = prolog_sanitise_queries(app01, qname, qstat);
+   newvars = %set-substr(^qstat, evars);
+   capp = prolog_compile(app);
+   cgen = %map(prolog_codegen, capp); // expecting single recfunction
+  <['_prolog_toplevl_function'(id,args,body)]> = cgen;
+   env0 = gensym();
+   lcode = 
+      ['flatbegin-inside-begin-with-defs';
+             ['inblock-def';qname;'fun'(args,body)];
+             ['inblock-def';env0;'cons'('quote'('env'),'nil')];
+            @map v in newvars do {
+               ['inblock-def';v;'cons'('quote'('var'),'nil')]
+             }; 
+             ['inblock-def';nm;
+                ['prolog_loop_results';
+                    [qname;env0; 'prolog_default_continuation';@(^qstat)];
+                    ^qstat]]];
+   return 'lisp'(lcode)}}
+
+\pfcode{
+function prolog_loop_results_fun(res,qargs,venv)
+  do loop(r = res, i = 0) {
+    if (r) {
+      nargs = map [nv;@v] in qargs do {
+         [nv; prolog_decode_result(venv, v)]};
+      return (i:venv):nargs:fun() {
+         loop(prolog_failure(res), i+1)}
+    } else []}}
+
+\pfcode{
+#(macro prolog_loop_results (res args)
+   (with-syms (venv qargs)
+     `(let ((,venv (mkhash))
+            (,qargs (list ,@(foreach-map (v args)
+                               `(cons (quote ,v) ,v)))))
+         ,@(foreach-map (v args)
+              `(ohashput ,venv ,v (quote ,v)))
+         (prolog_loop_results_fun ,res ,qargs ,venv))))}
+
+%%%%////////////////

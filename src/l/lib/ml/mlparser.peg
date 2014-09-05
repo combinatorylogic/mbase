@@ -1,0 +1,163 @@
+//////////////////////////////////////////////////////////////////////////////
+//
+//   OpenMBase
+//
+// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
+// This file is distributed under the terms of the Q Public License version 1.0.
+//
+//////////////////////////////////////////////////////////////////////////////
+
+.peg:
+
+parser mbaseml extends mbasemlcore (
+
+  ignoring Spaces;
+  rule keyword := keyword (!IdentRest) => {ctoken=keyword};
+  rule lexical := lexical => {ctoken = lexic};
+
+  term expr "expr" :=
+     { ccexpr:l '::' expr:e => append(l,e) }
+   / { ccexpr:l ':' expr:e => cons(l,e) }
+   / { ccexpr:l ',' cslist<expr,','>:r => tuple(l ,@ r) }
+   / { '$' expr:e => constr(`Deref , e) }
+   / ccexpr ;
+
+  term ccexpr :=
+     { CapIdent:nm slist<cexpr>:r => constr($sval(nm) ,@ r) }
+   / { Ident:nm slist<cexpr>:r => apply0(var($sval(nm)) ,@ r) }
+   / { cexpr:e slist<cexpr>:r => apply0(e ,@ r) }
+   / cexpr ;
+
+  term cexpr "cexpr" :=
+      { eterm:l tInfixIdent:fn cexpr:r => apply0(var(fn),l,r) }
+   /  { eterm:l '-' cexpr:r => apply0(var(`mlminus), l, r) }
+   /  { eterm:l '+' cexpr:r => apply0(var(`mlplus), l, r) }
+   /  eterm ;
+
+  term eterm "term" :=
+      { efact:l '*' eterm:r => apply0(var(`mlmult), l, r) }
+   /  { efact:l '/' eterm:r => apply0(var(`mldiv), l, r) }
+   /  efact;
+
+  term efact "fact" :=
+      { |'begin'| cslist<expr,';'>:es ';'? |'end'| => begin( @es ) }
+   /  { |'function'| matchpattern:p => matchfun(p) }
+   /  { |'fun'| slist<SIdent>:args '->' expr:v => uncurriedfun(args,v) }
+   /  { |'let'| letdef:df |'in'| expr:body => let(@df, body) }
+   /  { |'let'| |'rec'| cslist<letdef,|'and'|>:df |'in'| expr:body
+        => letrecr(df, body) }
+   /  { |'match'| expr:v |'with'| matchpattern:p => match(v,@p) }
+   /  { |'if'| expr:v |'then'| expr:tr |'else'| expr:fl
+        => if3(v,tr,fl) }
+   /  { |'if'| expr:v |'then'| expr:tr 
+        => if2(v,tr) }
+   /  { '[' ']' => constr(`Nil) }
+   /  { '[' cslist<expr,';'>:es ']' => makelist(@es) }
+   /  { '(' tInfixIdent:v ')' => var(v) }
+   /  { '(' '+' ')' => var(`mlplus) }
+   /  { '(' '-' ')' => var(`mlminus) }
+   /  { '(' '*' ')' => var(`mlmul) }
+   /  { '(' '/' ')' => var(`mldiv) }
+   /  { '(' expr:e ')' => e }
+   /  { |'true'| => bool(`true) }
+   /  { |'false'| => bool(`false) }
+   /  { CapIdent:nm => constr($sval(nm)) }
+   /  { Ident:nm => var($sval(nm)) }
+   /  { Int:i => number($nval(i)) }
+   /  { Char:c => char($val(c)) }
+   /  { String:s => string($stripval(s)) }
+   /  { '(' ')' => unit() };
+
+  term nvar := { Ident:i => $sval(i) }
+             / { '(' tInfixIdent:i ')' => i }
+             ;
+
+  term matchpattern := cslist<mpattern,'|'>;
+
+  term mpattern := pattern:p '->' expr:e => $list(p,e);
+
+  term pattern :=
+             { pterm:pt ',' cslist<pterm,','>:rest => tuple(pt,@rest) }
+          /  pterm;
+
+  term pterm :=
+             { pfact:hd ':' pterm:rest => cons(hd,rest) }
+          /  { CapIdent:ctr '(' cslist<pterm,','>:args ')' =>
+                      constr($sval(ctr),@args) }
+          /  { CapIdent:ctr => constr($sval(ctr)) }
+          /  pfact;
+
+  term pfact :=
+             { patom:at |'as'| Ident:nm => bind($sval(nm), at) }
+          /  patom;
+
+  term patom :=
+             { '$' pattern:p => constr(`Deref, p) }
+          /  { '(' pattern:p ')' => p }
+          /  { |'true'| => bool(`true) }
+          /  { |'false'| => bool(`false) }
+          /  { Ident:id => bindany($sval(id)) }
+          /  { Int:i => number($nval(i)) }
+          /  { Char:c => char($val(c)) }
+          /  { String:s => string($stripval(s)) }
+          /  { '(' ')' => unit() }
+          /  { '[' cslist<pattern,';'>:lst ']' => list(@lst) }
+          /  { '[' ']' => constr(`Nil) }
+          /  { '_' => any() };
+
+  term mbaseml_e := topexpr:e ';;'? Spaces* => e;
+
+  term mbaseml := slist<mbaseml_e>:l => l;
+
+  term letdef := 
+      { nvar:nm '=' expr:v => $list(nm, v) }
+   /  { nvar:nm slist<SIdent>:args '=' expr:v => $list(nm, uncurriedfun(args, v)) };
+
+  term SIdent := Ident:i => $sval(i);
+
+  /* Top level expressions */
+
+  term IdentOrString := {Ident:i => $sval(i)} / {String:s => $symbol($stripval(s))};
+  term topexpr :=
+      {  expr:e => mlexpr(e) }
+    / { |'let'| letdef:ld => mllet(@ld) }
+    / { |'let'| |'rec'| cslist<letdef,|'and'|>:df  => mlletrecr(@df) }
+    / { |'type'| typedefs:df => mltype(@df) }
+    / { |'foreign'| SIdent:nm '(' typef:tp ')' '->' IdentOrString:ffi
+        => mlffi(nm,tp,ffi) }
+    / { |'export'| SIdent:nm '(' Int:na ')' '->' String:nn 
+        => mlexport(nm,$nval(na),nn) }
+    / { |'val'| SIdent:nm ':' typef:tp => mlannotate(nm,tp) }
+    / { |'lisp'| String:s => mbinclude($stripval(s)) }
+    / { |'include'| String:s => mlinclude($stripval(s)) }
+    ;
+
+  /* Type declarations */
+  term typedefs := cslist<typedef,|'and'|>;
+  term typedef := 
+       { typet:nm '=' variatype:t => variant($mltypename(nm),@t) }
+     / { typet:nm '=' typetuple:t => tuplealias($mltypename(nm), t) }
+     ;
+  term variatype := cslist<variantt,'|'>;
+  term variantt := {CapIdent:nm |'of'| typetuple:t => $cons($sval(nm), t) } 
+                 / {CapIdent:nm => $wrap($sval(nm)) }
+                 ; 
+  term typetuple := cslist<typef, '*'>;
+  term typef := 
+        { typet:t '->' typef:fn => F(t,fn) }
+     /  typet
+     ;
+  term typet :=
+        { typeatom:a typeargs:rest => $mlmaketype(a,rest) }
+     /  typeatom;
+  term typeatom :=
+        { '(' typef:t ')' => t }
+     /  { tQUOTE Ident:nm => V($sval(nm)) }
+     /  { Ident:nm => T($sval(nm)) }
+     ;
+  term typeargs :=
+        { typeatom:a typeargs:rest => $cons(a,rest) }
+     /  { typeatom:a => $mltypeargcheck(a) }
+     ;
+
+)

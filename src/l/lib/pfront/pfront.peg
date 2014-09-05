@@ -1,0 +1,295 @@
+//////////////////////////////////////////////////////////////////////////////
+//
+//   OpenMBase
+//
+// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
+// This file is distributed under the terms of the Q Public License version 1.0.
+//
+//////////////////////////////////////////////////////////////////////////////
+
+/*
+
+ The core PFront syntax is defined here. See pcommon.peg and minipeg.peg for
+ more information.
+
+ */
+
+.peg:
+
+parser pfront extends minipeg (
+  /* Dynamic hooks */
+  dynhook expr_bintop;
+  dynhook expr_bin1;
+  dynhook expr_bin2;
+  dynhook expr_start;
+  dynhook expr_preatom;
+  dynhook expr_end;
+
+  dynhook top_start;
+  dynhook top_middle;
+
+  ignoring Spaces;
+
+  token tflush := '-----' '-'* => {ctoken = lexic};
+
+  token tTO "->" := '->' => {ctoken = to};
+
+  term tAPPEND "::" := '::' => {ctoken = append};
+  term tFUN "fun" := |'fun'| => {ctoken = lambda};
+  term tFORALL "forall" := |'forall'| => {ctoken = forall};
+
+  token tdottype := ((Letter IdentRest*) '.'?)+;
+  term dottype := tdottype:t => $sval(t);
+
+  rule keyword := keyword (!IdentRest) => {ctoken=keyword};
+  rule lexical := lexical => {ctoken = lexic};
+
+  term pfront := atopexpr:e Spaces* => e;
+  term atopexpr := topexpr:e ';'? => e;
+
+  term qident "<ID>" :=
+        {'::id' '\' ident:i '\' => {qstate = unquote} unquote(i)}
+    /   {'\' ident:i '\' => {qstate = unquote} unquote(i)}
+    /   ident
+    ;
+
+  term expr "Expression" := 
+             { zzexpr:a binop0:o expr:b => leftass(binop(o,a,b)) }
+          /  { zzexpr:a => stopfix(a) }
+          ;
+
+  term zzexpr := 
+             { bexpr:a tAPPEND zzexpr:b => append(a,b) }
+          /  { bexpr:a ':' zzexpr:b => cons(a,b) }
+          /  { bexpr:a binop3:o zzexpr:b => leftass(binop(o,a,b)) }
+          /  expr_bintop
+          /  { bexpr:a => stopfix(a) }
+          ;
+
+  term bexpr := { eterm:a binop1:o bexpr:b => leftass(binop(o,a,b)) }
+            / expr_bin1
+            / { eterm:a => stopfix(a) }
+            ;
+  term eterm := { basicexpr:a binop2:o eterm:b => leftass(binop(o,a,b)) }
+            / expr_bin2
+            /  { basicexpr:a => stopfix(a) }
+            ;
+
+  term casepair "<case pair>" := cslist<qsymbol,'|'>:ss tTO exprwrap:e 
+       => $cons(ss,$cons(e,$nil()));
+
+  term condpair "<cond pair>" := (!|'else'| exprwrap:pred) tTO exprwrap:e 
+       => $cons(pred,$cons(e,$nil()));
+
+  term itercount "count <id>" := |'count'| qident:id => id;
+
+  term exprwrap := expr:e => {mode=expr} $makelocbegin(e);
+
+  term qidentorptn := impattern:p => $fixpattern(p);
+
+  term docstring := '%' string:s => s;
+
+  term basicexpr :=
+    expr_start 
+  / { '{' %indent(push,tab) ecslist<exprwrap,';'>:body ';'? %indent(pop,tab) '}' => {mode=expr}
+             begin(@$makeloc(),@body) }
+  / { '<' %indent(push,firsttab) mpattern:fm %indent(pop,firsttab) '>' '=' exprwrap:e =>
+          {mode=expr} defformat(fm, $makelocbegin(e)) }
+  / { '(' exprwrap:e ')' '(' %indent(push,firsttab) cslist<expr,','>:args %indent(pop,firsttab) ')' =>
+           {mode=expr} $makelocbegin(call(e,@args)) }
+  / { '(' exprwrap:e ')' '('  ')' => {mode=expr} $makelocbegin(call(e)) }
+  / { '(' exprwrap:e ')' => unleft(e) }
+  / { |'collector'| '(' %indent(push,firsttab) qident:addname ',' qident:getname %indent(pop,firsttab) ')' exprwrap:body =>
+      {mode=expr} collector(addname,getname, begin(@$makeloc(), body)) }
+  / { |'try'| exprwrap:e |'catch'| '(' dottype:tp qident:nm ')' %indent(push,tab) exprwrap:proc %indent(pop,tab) =>
+      pftry(e,nm,tp,proc) }
+  / { |'match'| %indent(push,firsttab) exprwrap:e |'with'| matchbody:b %indent(pop,firsttab) => match(e,@b) }
+  / { |'case'| %indent(push,firsttab) exprwrap:e '{' '|'? cslist<casepair,'|'>:opts ('|' |'else'|
+       tTO exprwrap:els)? '}' %indent(pop,firsttab) => case(e,opts,els) }
+  / { |'cond'|  %indent(push,firsttab) '|'? cslist<condpair,'|'>:opts ('|' |'else'|
+       tTO exprwrap:els)? %indent(pop,firsttab) => cond(opts,els) }
+  / { |'visit'| ':' ident:ast '(' ident:top ':' exprwrap:e ')' '{' %indent(push,tab) visitbody:b %indent(pop,tab) '}' 
+      => visit(ast,top,e,@b) }
+  / { |'iter'| ':' ident:ast '(' ident:top ':' exprwrap:e ')' '{' %indent(push,tab) visitbody:b %indent(pop,tab) '}' 
+      => viter(ast,top,e,@b) }
+  / { |'mk'| ':' |'node'| '(' %indent(push,firsttab) cslist<argpair,','>:args %indent(pop,firsttab) ')' => mknode(@args) }
+  / { |'if'| exprwrap:e |'then'|? %indent(push,tab) exprwrap:tr ';'? %indent(pop,tab) |'else'| %indent(push,tab) exprwrap:fl %indent(pop,tab)
+      => if3(e,tr,fl) }
+  / { |'if'| exprwrap:e |'then'|? %indent(push,tab) exprwrap:tr %indent(pop,tab)
+      => if2(e,tr) }
+  / { docstring:ds? tFUN '(' %indent(push,firsttab) ecslist<qident,','>:args %indent(pop,firsttab) ')' tTO? %indent(push,tab) expr:b %indent(pop,tab) =>
+      {color = lambdabody} lambda(args,b) }
+  / { |'do'| qident:nm '(' %indent(push,firsttab) ecslist<argpair,','>:args %indent(pop,firsttab) ')' expr:b =>
+      { color = doloop }
+      letloop(nm,args,b) }
+  / { |'return'| %indent(push,tab) expr:e %indent(pop,tab) => {mode=expr} begin(@$makeloc(),e) }
+  / { |'filter'| qidentorptn:nm |'in'| expr:e |'as'| %indent(push,tab) expr:b %indent(pop,tab) =>
+      filter(nm,e,b) }
+  / { |'filter'| qident:nm |'as'| %indent(push,tab) expr:b %indent(pop,tab) =>
+      filter(var(nm),var(nm),b) }
+  / { |'map'| |'append'| qidentorptn:nm |'in'| expr:e itercount:cn? |'do'| expr:b =>
+      mappend(nm,e,b,cn) }
+  / { |'map'| |'append'| qident:nm itercount:cn? |'do'| expr:b =>
+      mappend(var(nm),var(nm),b,cn) }
+  / { |'map'| qidentorptn:nm |'in'| expr:e itercount:cn? |'do'| expr:b =>
+      map(nm,e,b,cn) }
+  / { |'map'| qident:nm itercount:cn? |'do'| expr:b =>
+      map(var(nm),var(nm),b,cn) }
+  / { |'iter'|  qidentorptn:nm |'in'| expr:e itercount:cn? |'do'| expr:b  =>
+      iter(nm,e,b,cn) }
+  / { |'iter'|  qident:nm itercount:cn? |'do'| expr:b  =>
+      iter(var(nm),var(nm),b,cn) }
+  / { |'true'| => true() }
+  / { |'false'| => false() }
+  / expr_preatom
+  / { '[' ']' => {color = list} {ctoken = emptyset} var(`nil) }
+  / { '[' expr:a '..' expr:b ']' => range(a,b) }
+  / { '[' cslist<ecexpr,';'>:lst ']' => list(@lst) }
+  / { '`' expr:e '`' => {qstate = quote} qquote(e) }
+  / { qident:nm '.>' qident:nm1 => accelement(nm, nm1) }
+  / { qident:fn '(' ')' => {mode=expr} begin(@$makeloc(),call(var(fn))) }
+  / { qident:fn '(' cslist<expr,','>:args ')' => 
+                {mode=expr} begin(@$makeloc(),call(var(fn),@args)) }
+  / { qident:nm '=' expr:e => {mode=expr} $makelocbegin(def(nm,e)) }
+  / { pfchar:ch => char(ch) } 
+  / { qsymbol:s '(' ecslist<ecexpr,','>:args ')' => easyconstr(s,@args) }
+  / { qsymbol:s => vquote(s) }
+  / { ident:e => var(e) }
+  / { number:n => number(n) }
+  / { string:s => string(s) }
+  / { '::expr' '\' ident:i '\' => {qstate = unquote} unquote(i) }
+  / { '\' ident:i '\' => {qstate = unquote} unquote(i) }
+  / expr_end
+  ;
+
+  term ecexpr "expr | @expr" := { '@' expr:e => append(e) }
+                             /  { expr:e => normal(e) }
+			     ;
+
+  term argpair "'nm' = 'value'" := qident:nm '=' expr:e => $list(nm,e);
+
+  term matchbody := '|'? cslist<matchbodyel,'|'>:bs => bs;
+  term matchbodyel "<match pair>" := mpattern:p tTO exprwrap:e =>
+             {mode=expr} $list(p,  $makelocbegin(e));
+
+  term mpattern "Match pattern" :=
+     { impattern:a ':' mpattern:p=>cons(a,p)}
+   / { impattern:a |'as'| ident:id => bindas(id,a) }
+   / impattern
+   =>
+   {state = pattern}
+   ;
+
+  term impattern "Match pattern" :=
+     { '[' ']' => { ctoken = emptyset } nil() }
+   / { '[' cslist<lmpattern,';'>:lst ']' => list(@lst) }
+   / { '(' mpattern:p ')' => p }     
+   / { '=' ident:i => eq(i) }
+   / { '::ptn' '\' ident:i '\' => {qstate = unquote} unquote(i) }
+   / { qsymbol:i '(' ecslist<lmpattern,','>:args ')' => alist(i,@args) }
+   / { qsymbol:s => quote(s) }
+   / { ident:i '(' ecslist<lmpattern,','>:args ')' => alist(i,@args) }
+   / { ident:i => binding(i) }
+   / { '_' => any() }
+   / { number:n => number(n) }
+   / { string:s => string(s) }
+   ;
+
+  term lmpattern "Match pattern" :=
+     { '@' mpattern:p => append(p) }
+   / { mpattern:p => normal(p) }
+   ;
+
+  term visitbody := cslist<visitbodyel,';'>:es ';'? => es;
+  term visitbodyel "<visit node>" := 
+     { visitype:tp ident:id
+        '{' '|'? cslist<visitpattern,'|'>:ps 
+            (visielse:ee)?
+        '}' => 
+       many(tp,id,ps,ee) }
+   / { visitype:tp ident:id ':' tFORALL exprwrap:e => forall(tp,id,e) }
+   / { visitype:tp ident:id ':' exprwrap:e => single(tp,id,e) }
+   / { '::visit' '\' ident:i '\' => {qstate = unquote} unquote(i) }
+   ;
+
+  term visitpattern "<visit pattern>" := ident:p tTO exprwrap:e => $list(p,e);
+
+  term visielse "<visit else>" := 
+      { '|'? |'else'| tTO? exprwrap:e => velse(e) }
+   /  { '|'? |'deep'| tTO? '{' '|'? cslist<visitpattern,'|'>:ps 
+            (visielse:ee)?
+       '}' => elsedeep(ps,ee) }; 
+
+  term visitype "<visitor type>" := { tvisitype:t => id($sval(t)) }
+                /  { ident:i |'as'| |'once'| => asonce(i) }
+                /  { ident:i |'as'| => as(i) }
+		;
+
+  token tvisitype := 'deep'/'once' => {ctoken = keyword};
+
+  term addborrow := { '(' cslist<ident,','>:is ')' => is } / {!'(' => $nil() /* ) */ };
+
+  term topexpr "Top level expression" :=
+     top_start
+   / { '{' %indent(push,tab) eslist<topexpr>:es %indent(pop,tab) '}' =>  {mode=top} begin(@es) }
+   / { |'using'| '(' cslist<dnetns,','>:us ')' ';'? slist<topexpr>:es
+        => using(us,@es) }
+   / { tflush => topflush() }
+   / { |'module'| ident:nm |'exe'| ';'? => exemodule(nm) }
+   / { |'module'| ident:nm ';'? => module(nm) }
+   / { |'parser'| miniparser:p => p }
+   / { |'syntax'| |'in'| ident:nm ',' ident:pos addborrow:ab ':' mpeg:c expr:body
+        => topsyntax($list(nm,pos),ab, c, body) }
+   / { |'syntax'| |'of'| ident:synt |'in'| ident:nm ',' ident:pos addborrow:ab ':' mpeg:c expr:body
+        => othersyntax(synt,$list(nm,pos),ab, c, body) }
+   / { |'syntax'| |'in'| ident:nm ',' ident:pos addborrow:ab ':' minipeg:c expr:body
+        => topmacro($list(nm,pos),ab, c, body) }
+   / { docstring:ds? |'function'| qident:nm '(' %indent(push,firsttab)  ecslist<qident,','>:args %indent(pop,firsttab) ')' expr:b
+      => { mode=topexpr } topfunction(nm, args, $makelocbegin(b)) }
+   / { |'define'| qident:nm %indent(push,firsttab) '=' exprwrap:v %indent(pop,firsttab) => { mode=topexpr } topdefine(nm, $makelocbegin(v)) }
+   / { |'ast'| ident:nm ':' cslist<astparent,','>:pars '{' %indent(push,tab)
+       cslist<astdef,';'>:defs ';'? %indent(pop,tab) '}' => ast3(nm, pars, defs) }
+   / { |'ast'| ident:nm  '{'
+         cslist<astdef,';'>:defs ';'? '}'
+        => ast2(nm, defs) }
+   / { |'include'| string:nm ';'? => hlinclude(nm) }
+   / { |'litinclude'| '(' string:texnm ')' string:nm ';'? => litinclude(texnm, nm) }
+   / { |'litinclude'| string:nm ';'? => litinclude(nm, nm) }
+   / { |'lispinclude'| string:nm ';'? => lispinclude(nm) }
+   / { |'macro'| qident:nm '(' %indent(push,firsttab) ecslist<mqident,','>:args %indent(pop,firsttab) ')' expr:b =>
+       lispmacro(nm,args,b) }
+   / { '::top' '\' ident:i '\' => {qstate = unquote} unquote(i) }
+   / top_middle
+   / { expr:e => expr(e) }
+   ;
+
+  term mqident "Macro argument" :=
+     { '@' qident:i => a(i) }
+   / { qident:i => i(i) }
+   ;
+
+  term astparent "<ast parent>" := ident:nm '(' ecslist<astparpair,','>:tmap ')' 
+     => $cons(nm,tmap);
+
+  term astparpair "<ast par pair>" := ident:a tTO ident:b => $list(a,b);
+
+  term astdef "<ast def>"
+              := { ident:nm '=' '|'? cslist<aststruct,'|'>:alts => alt(nm,@alts) }
+               / { ident:nm '+' '=' '|'? cslist<aststruct,'|'>:alts => addalt(nm,@alts) }
+               / { ident:nm |'is'| aststrucx:s => struct(nm,s) };
+
+  term aststruct "<ast struct>" := 
+      { ident:nm '(' ecslist<astsarg,','>:args ')' => withargs(nm,args) }
+    / { ident:nm => single(nm) };
+
+  term aststrucx "<ast struct>" :=
+      { '(' cslist<astsarg,','>:args ')' => many(args) }
+    / { astsarg:a => single(a) };
+
+  term astsarg "<ast struct element>" := { '*' ident:tp ':' ident:nm => bindmany(tp,nm) }
+               /  { '?' ident:tp ':' ident:nm => bindopt(tp, nm) }
+               /  { ident:tp ':' ident:nm => bindone(tp,nm) }
+	       /  { '.' astsarg:as => dot(as) }
+	       /  { '(' ecslist<astsarg,','>:args ')' => list(@args) }
+	       ;
+)

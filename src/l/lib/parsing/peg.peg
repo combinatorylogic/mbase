@@ -1,0 +1,163 @@
+//////////////////////////////////////////////////////////////////////////////
+//
+//   OpenMBase
+//
+// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
+// This file is distributed under the terms of the Q Public License version 1.0.
+//
+//////////////////////////////////////////////////////////////////////////////
+
+.peg:
+
+parser pegparser extends pegbasics (
+   ignoring Spaces;
+
+   rule lexical := lexical => {ctoken = lexic};
+   rule keyword := keyword (!IdentRest) => {ctoken=keyword};
+
+   term pegparser := ('.peg' ':')? decl:t Spaces* => t;
+
+   token tkhexnumber := '0x' ( [a-f]/[A-F]/[0-9] )+;
+  
+   term hexnumber := tkhexnumber:n => {ctoken=const} $hexval(n);
+   token tNumber := '-'? digit+;
+   term number := tNumber:v => {ctoken = const} $nval(v);
+   token tsinglechar := '"' . '"';
+   term char := tsinglechar:c => $stripval(c);
+
+   token singlone := ( . ) ;
+   term charrange := '[' singlone:a '-' singlone:b ']' => 
+          range($charcode($val(a)),$charcode($val(b)));
+
+   term decl := 
+        { |'parser'| ident:nm |'extends'| cslist<ident,','>:a
+          '(' slist<expr>:es ')' =>
+          [[packrat-ast]](nm,a,@es) }
+     /  { |'parser'| ident:nm '(' slist<expr>:es ')' 
+          => [[packrat-ast]](nm,$nil(),@es) };
+   term expr :=
+        { |'token'| ident:n report:r ':=' peg:p '=>' annots:a ';'
+          => terminal(`[[token]], n, p, $list(a,$nil()),@r) }
+     /  { |'token'| ident:n report:r ':=' peg:p ';'
+          => terminal(`[[token]], n, p, $list($nil(),$nil()),@r) }
+     /  { |'term'| ident:n report:r ':=' peg:p '=>' constrtop:ctr ';'
+          => terminal(`[[term]],n,p,ctr,@r) }
+     /  { |'term'| ident:n report:r ':=' peg:p ';'
+          => terminal(`[[term]],n,p, $list($nil(),$nil()),@r) }
+     /  { |'ignoring'| ident:igname ';'
+          => [[with-ignore]](igname) }
+     /  { |'define'| ident:defname '<' cslist<ident,','>:as '>'
+          report:r ':=' peg:p '=>' constrtop:ctr ';'
+          => [[define]](defname,as,p,ctr,@r) }
+     /  { |'define'| ident:defname '<' cslist<ident,','>:as '>' 
+          report:r ':=' peg:p ';' 
+          => [[define]](defname,as,p,$list($nil(),$nil()),@r) }
+     /  { |'rule'| ident:name ':=' peg:p '=>' constrtop:ctr ';'
+          => [[rule]](name,p,ctr) }
+     /  { |'rule'| ident:name ':=' peg:p ';'
+          => [[rule]](name,p,$list($nil(),$nil())) }
+     /  { |'binary'| ident:name report:r ':='
+              cslist<pegbin,'|'>:bins =>
+          [[src-binaries]](`[[term]],name,bins,@r) }
+     /  { |'dynhook'| ident:name ';'
+          => [[dynahook]](name)}
+
+     /  { ident:n report:r ':=' peg:p '=>' annots:a ';'
+          =>terminal(`[[normal]],n,p,$list(a,$nil()),@r) }
+     /  { ident:n report:r ':=' peg:p ';'
+          => terminal(`[[normal]],n,p,$list($nil(),$nil()),@r) }
+
+     ;
+
+  term pegbin :=
+      { '(' number:prec pegassoc:assoc ')'
+            peg:e '=>' constrtop:ctr =>
+         binary(prec, assoc, e, ctr) }
+    / { peg:e => e }
+    ;
+
+  term pegassoc :=
+       { 'left' => `[[left]] }
+    /  { 'right' => `[[right]] }
+    /  { empty => `[[left]] }
+    ;
+    
+  term report :=
+      { tcomment:s => $wrap(s) }
+    / { empty => $nil() }
+    ;
+
+  term constrtop :=
+      { annots:a constr:b => $list(a,b) }
+    / { annots:a => $list(a,$nil()) }
+    / { constr:b => $list($nil(),b) }
+    ;
+
+  term constr :=
+      { '`' ident:id => [[const]](id) }
+    / { '$' ident:id '(' ecslist<constr,','>:as ')' 
+        => fcall(id,@as) }
+    / { ident:id '(' ecslist<constrarg,','>:al ')'
+        => constr(id,@al) }
+    / { ident:id => [[var]](id) }
+    / { '...' '(' ident:id ')' => [[auto]](id) }
+    / { '...' => [[auto]]() }
+    => {state = constr}
+    ;
+
+   term constrarg :=
+      { ident:field '<-' constr:a => [[set]](field,a) }
+    / { constr:a
+        => set($gensym(),a) }
+    / { '@' constrarg:a => append($cadr(a),$caddr(a)) }
+    ;
+
+   term peg :=
+      { patom:a '/$' cslist<patom,'/$'>:ls => merge(a,@ls) }
+    / { patom:a '/' cslist<patom,'/'>:ls => palt(a,@ls) }
+    / { patom:a slist<patom>:ls => seq(a,@ls) }
+    / patom
+    ;
+
+   term patom :=
+      { '&' psimple:a => {state=pattern} andp(a) }
+    / { '!' psimple:a => {state=pattern} notp(a) }
+    / { psimple:a '+' => {state=pattern} plus(a) }
+    / { psimple:a '*' => {state=pattern} star(a) }
+    / { psimple:a '?' => {state=pattern} maybe(a) }
+    / psimple;
+
+   term psimple :=
+      { patomx:a ':' ident:n => bind(n,a) }
+    / patomx;
+
+   term patomx :=
+      { '{' peg:a '=>' constrtop:ctr report:r '}'
+        => lift(a,ctr,@r) }
+    / { '{' peg:a report:r '}' => lift(a,$list($nil(),$nil()),@r) }
+    / psimplex;
+
+   term psimplex :=
+      { '(' peg:a ')' => a }
+    / { '~' ident:nm '(' ecslist<constrarg,','>:args ')' => [[action]](nm, args) }
+    / { '#' ident:nm '<' cslist<ident,','>:args '>' => [[highorder]](args,nm) }
+    / { '|' ident:nm ':' string:s '|' => [[rule]](nm,s) }
+    / { '|' string:s '|' => [[rule]](`[[keyword]],s) }
+    / { '%' ident:nm '(' ecslist<constrarg,','>:args ')' => [[hint]](nm,args) }
+    / { |'check'| '(' ident:nm ')' => [[check]](nm) }
+    / { string:s => trivial(sstring(s)) }
+    / { charrange:a => trivial(a) }
+    / { char:ch => trivial(char($charcode(ch))) }
+    / { '..' => trivial(fail()) }
+    / { '.' => trivial(anychar()) }
+    / { hexnumber:n => trivial(char(n)) }
+    / { number:n => trivial(char(n)) }
+    / { ident:t '<' cslist<peg,','>:args '>' => macroapp(t,@args) }
+    / { ident:t => terminal(t) }
+    => {state=pattern}
+    ;
+
+   term annots := slist<annot>;
+   term annot := '{' ident:nm '=' ident:v '}' => $list(nm,v);
+
+)

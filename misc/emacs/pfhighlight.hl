@@ -1,0 +1,304 @@
+#(recfunction ploop-11 (env str p fn fst ini)
+  (let* ((res (p env (deref str)))
+         (s (if (peg-success? (car res)) res nil)))
+    (if s
+        (begin
+          (fn (car res))
+          (if (peg-alldead? (cdr res)) nil
+              (begin
+                (r! str (cdr res))
+                (ploop-11 env str p fn fst ini))))
+        (let* ((f (PegEnv.failure env))
+               (fpos (if (null? f) (cons (cdr res) "<ERROR>")
+                        (format f (loc pos names) 
+                                   (cons pos (S<< names))))))
+          (if fst 
+             (begin
+               (peg_cleanse_stream (cdr res) fst)
+               (ploop-11 env (mkref ini) p fn nil nil)
+               )
+             (begin
+;;               (println (S<< `(FAILMESSAGE ,(sposloc (cdr res)) ,(sposloc (car fpos))
+ ;;                             ) "|"))
+               (println (S<< `(FAILURE-POSITION  
+                            ,(peg:decode-pos (sposloc (car fpos)))
+                            ,(cdr fpos)
+                            ) "|"))))))))
+
+#(function hlevl-consume-1 (env parser dstream rfun pos)
+  (let* ((flush (fun () nil))
+         (cadd (fun (x) nil))
+         (xfun (rfun cadd flush)))
+    (ploop-11 env dstream parser xfun pos (deref dstream))
+    ))
+
+#(function test-parse (env fps pos)
+       (let* (
+	      (r
+	       (hlevl-consume-1 env peg_pfront
+				fps
+				(fun (cadd flush)
+				  (fun (x) (if x (cadd x))))
+                                pos)))
+	 r))
+
+#(define __nline (ascii #\Newline))
+
+#(function __peg:makepos1 (fline fchar)
+   (not.neth ((int fline) (int fchar))
+     (leave ((object)(+ fchar (* fline 65536))))))
+
+#(function __peg:mkstream1 (ntotal fline fchar)
+  (let* ((p0 (StreamEntry.new1 nil nil 0 -1 nil)))
+    (let loop ((n 0) (i (__peg:makepos1 fline fchar)) (c p0) (p p0))
+      (cond
+       ((= n ntotal)
+	(alet lst (StreamEntry.new1 nil nil i -1 nil)
+	      (StreamEntry.next! c lst)
+	      (StreamEntry.chknext p)))
+       (else ;; otherwise it's a continuation fun
+	(let* ((l =pf: .net(): Console.Read() )
+	       (n1 (StreamEntry.new1 nil nil i l nil)))
+	      (StreamEntry.next! c n1)
+	      (loop (+ n 1)
+		    (if (eq? __nline l) (__peg:newline i) (+ i 1))
+		    n1 p)))
+       ))))
+
+function peg_find_beg(s1, l1)
+  do loop(x = s1, prv = []) {
+    pos = %StreamEntry.idx(x);
+    nxt = %StreamEntry.next(x);
+    pl = car(%peg:decode-pos(pos));
+    if(%eq?(pl, l1)) {
+      return prv
+    } else loop(nxt, x)
+  }
+
+function peg_find_end(s1, l3)
+  return peg_find_beg(s1, l3) // should be similar
+
+function peg_patch_overlapping(f, l)
+{
+  m = %StreamEntry.memos(f);
+  lpos = %StreamEntry.idx(l);
+  nxt = %StreamEntry.next(f);
+  rmostpos = mkref(%StreamEntry.idx(nxt));
+  rmost = mkref(nxt);
+  m1 = collector(add,get) {
+    iter m do {
+      cm = cdr(m);
+      if (not(%eqv?(%__peg-epic-fail__ , %__peg:memo-entry.ans(cm)))) {
+       r = %__peg:memo-entry.pos(cm);
+       i = %StreamEntry.idx(r);
+       if (%<(i, lpos)) {
+         add(m);
+	 if(%<(^rmostpos, i)) {
+	    rmostpos := i;
+	    rmost := r;
+	 }
+       }
+      }
+    };
+    get();
+  };
+  %StreamEntry.memos!(f, m1);
+  return ^rmost
+}
+
+function peg_cleanse_stream(from, to)
+{
+  do loop(s = from, t = to) {
+    if(s) {
+       %StreamEntry.memos!(s, []);
+       if(not(%eqv?(s,t))) 
+          loop(%StreamEntry.next(s),t);
+    }
+  }
+}
+
+function peg_patch_stream(s1, s1prev, s2, s1rest, delta)
+{
+  s1prim = mkref(s1);
+  // Segment 1: for all in s1 to s1prev, remove overlapping memoes
+  if(s1prev) {
+   do loop(s = s1, n = s1prev) {
+     if(s) {
+       nxt = peg_patch_overlapping(s, n);
+       if(not(%eqv?(s, n))) loop(nxt, n)
+     }
+   };
+   %StreamEntry.next!(s1prev, s2);
+  } else s1prim := s2;
+  // Segment 2: add s2 to s1prev
+  // Segment 3: add s1rest to the end of s2
+  do loop(s = s2) {
+    if(s) {
+      nxt = %StreamEntry.next(s);
+      if(%null?(nxt)) {%StreamEntry.next!(s, s1rest)}
+      else {
+       nxt1 = %StreamEntry.next(nxt);
+       if(%null?(nxt1)) {%StreamEntry.next!(s, s1rest)} else
+         loop(nxt)
+      }
+    }
+  };
+  // Segment 3: if there is a delta, update positions in s1rest
+  if(not(%eq?(delta, 0)))
+    do loop(s = s1rest, d = delta) {
+      <[l;p]> = %peg:decode-pos(%StreamEntry.idx(s));
+       nl = l + d;
+       np = #(not.neth ((int nl) (int p))
+               (leave ((object)(+ p (* nl 65536)))));
+       %StreamEntry.idx!(s, np);
+       nxt = %StreamEntry.next(s);
+       if(nxt) loop(nxt, d);
+    };
+  // Return a modified s1:
+  return ^s1prim
+}
+
+function peg_merge_streams(s1, s2, l1, l2, l3)
+{
+  // Navigate to the beginning of s2 in s1;
+  // Here we assume that s2 starts at a beginning of a line
+  s1prev = peg_find_beg(s1, l1);
+  // Extract the remaining lines after s2 chunk in s1
+  s1rest = %StreamEntry.next(peg_find_end(if(s1prev) s1prev else s1, l3));
+  // Patch s1 - remove the overlapping memoes, insert s2
+  return peg_patch_stream(s1, s1prev, s2, s1rest, l2 - l3);
+}
+
+function ptestint(logfile)
+{
+  str = .net(): Console.ReadLine();
+  fprintlnf(logfile, %S<<("Expecting int, got: [", str, "]"));
+  return .net(str): Int32.Parse((string)str);
+}
+
+// Protocol:
+//  nm = buffer name
+//  n1 = Number of bytes
+//  n2 = First line
+//  n3 = First character
+//  n4 = Last line
+//  n5 = Last previous line
+//  [exactly n1 bytes]
+function %make-stream-inner (lf, ps, ipos)
+{
+  n1 = ptestint(lf);
+  n2 = ptestint(lf);
+  n3 = ptestint(lf);
+  n4 = ptestint(lf);
+  n5 = ptestint(lf);
+  s2 = %__peg:mkstream1(n1, n2, n3);
+  ipos := s2;
+  eoba = .net(): Console.ReadLine(); // Skip the [:EOB:] marker
+//fprintlnf(lf, %S<<("EOBA=[",eoba,"]"));
+  .net(): Console.ReadLine(); // Skip more
+  //println(%S<<(#`(NEW-STREAM ,n2 ,n4 ,n5),"|"));
+  if(and(n2>0,ps)) {
+    return peg_merge_streams(ps, s2, n2, n4, n5)
+  } else s2
+}
+
+function %make-stream (lf, pshash, ipos) 
+{
+  nm = .net(): Console.ReadLine();
+  if (%<(length(%string->list(nm)), 3)) ccerror("0")
+  else {
+    s = %make-stream-inner (lf, ohashget(pshash, nm), ipos);
+    ohashput(pshash, nm, s);
+    return s
+  }
+}
+
+function fprintlnf(f, s)
+{
+   if(f) {
+     fprintln(f,s); .net(f): ((System.IO.StreamWriter)f).Flush();
+   }
+}
+
+function mainloop_inner(logf)
+{
+  do loop(pshash = mkhash()) {
+    fprintlnf(logf, "READING STREAM"); 
+    pss = mkref([]); ipos = mkref([]);
+    try {
+      pss := %make-stream(logf,pshash,ipos);
+    } catch (t_Exception e) {
+      fprintlnf(logf,%S<<("ERROR: ",%->s(e)));
+      pss := [];
+    };
+    ss = ^pss;
+    if (ss) {
+      src = mkref(ss);
+      env = #(PegEnv.new nil
+			(fun (tag first last signal)
+                          (alet msg (S<< `((,(peg:decode-pos (sposloc first)) 
+			                    ,(peg:decode-pos (sposloc last))) ,signal) "|")
+                           (fprintlnf logf msg)
+	 	 	   (println msg)
+			  ))
+			nil
+			nil
+			);
+			fprintlnf(logf, %S<<(env));
+      %test-parse(env, src, ^ipos);
+//      fprintlnf(logf, %__peg:get-ndelta(ss, 500));
+//      fprintlnf(logf, "-----------");
+//      %__peg:streamprint1(logf, ss);
+//      fprintlnf(logf, "-----------");
+      loop( pshash )
+    } else loop(pshash)
+  }
+}
+
+function mainloop(logf)
+{
+  try {
+    try {
+      mainloop_inner(logf)
+    } catch (t_MBaseException e) {
+      fprintlnf(logf,%S<<("MBase exception: ", mbaseerror(e)));
+      fprintlnf(logf,%S<<(e));
+    }
+  } catch (t_Exception e) {
+      fprintlnf(logf,%S<<(e));
+  }
+}
+
+
+function pmemos11(b, mm) {
+  foldl(%string-append , "", 
+    map mm do {
+      cm = cdr(mm);
+      ma = %__peg:memo-entry.ans(cm);
+      if(or(%__peg:is-lr?(ma), 
+            %eqv?(%__peg-epic-fail__ , ma))) {
+        "" //%S<<("!",car(mm)," ")
+      } else {
+        %S<<(car(mm), ": [", %__peg:get-delta(b, %__peg:memo-entry.pos(cm)),
+                      "] ")
+      }
+    }
+  )
+}
+
+#(function __peg:streamprint1 (fl shit)
+  (let loop ((s shit))
+    (if (null? s) nil
+        (let* ((idx (StreamEntry.idx s))
+               (ch (StreamEntry.char s))
+               (mm (StreamEntry.memos s)))
+          (fprintlnf fl (S<< (peg:decode-pos idx) ": " (if (> ch 0) (n2s ch) "EOF")  ": " (pmemos11 s mm)
+            ))
+          (loop (StreamEntry.chknext s))))))
+
+function main()
+{
+//  logfile = %S<<("pfront-",.net(): DateTime.Now.Ticks.ToString() ,".log");
+//  %call-with-output-file(logfile, mainloop)
+  mainloop([])
+}

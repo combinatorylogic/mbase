@@ -1,0 +1,131 @@
+//////////////////////////////////////////////////////////////////////////////
+//
+//   OpenMBase
+//
+// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
+// This file is distributed under the terms of the Q Public License version 1.0.
+//
+//////////////////////////////////////////////////////////////////////////////
+
+/*
+
+ This is a collection of basic definitions for PFront syntax. It is written in
+ the language defined by the MBasePackrat library, and it is somewhat different
+ from MiniPEG language embedded into PFront itself. See the MBasePackrat 
+ documentation for reference.
+
+*/
+
+.peg:
+
+parser pfcommon (
+ ignoring Spaces;
+ Letter := [a-z]/[A-Z];
+ Digit  := [0-9];
+ Digits  := Digit+;
+
+ EOF := -1;
+
+ Space  := ' ' / TAB / CR / NEWLINE / TexComment 
+         / SingleLineComment / MultiLineComment;
+ Spaces := Space+;
+ MultiLineComment  := '/*' (MultiLineComment/((!('*/')) . ))* '*/' => {state=comment};
+ SingleLineComment := '//' (!(NEWLINE) .)* NEWLINE => {state=comment};
+ TexComment := (TexCommentBegin TexCommentRest) / 
+               (TexComment2Begin TexComment2Rest TexComment2End);
+ TexCommentBegin := '///' => {state=empty};
+ TexCommentRest := (!(NEWLINE) .)* NEWLINE => {screen = none} {state=texcomment};
+
+ TexComment2Begin := '/***' => {state = empty};
+ TexComment2End := '***/' => {state = empty};
+ TexComment2Rest := (!'***/' .)* => {screen = none} {state=texcomment};
+
+ IdentRest := Letter/Digit/'_';
+
+ Ident1pfx := '%L[;'; Ident1tail := ';]';
+ token Ident1 := (!';' .)+ ;
+
+ token Ident2 := (!'%literate:') '%' (!(Space/'('/'{'/'[') .)+ ;
+
+ iIdent := Letter IdentRest*;
+ token Ident := !pfKeyword iIdent;
+ token tIdent := iIdent;
+
+ pfKeywordI := 
+               'function'
+            /  'ast'
+            /  'parser'
+            /  'syntax'
+            /  'macro'
+            ;
+
+ pfKeyword := pfKeywordI !iIdent;
+
+
+ QUOTE := 0x27;
+ token tQUOTE := 0x27;
+ BSLASH := 0x5c;
+
+ NEWLINE := 10;
+ CR := 13;
+ TAB := 9;
+
+
+ define cslist<a,b> := 
+                        {a:head b cslist:tail => $cons(head,tail)}
+                      / {a:head => $wrap(head)};
+
+ define ecslist<a,b> := 
+                        {a:head b cslist<a,b>:tail => $cons(head,tail)}
+                      / {a:head => $wrap(head)}
+                      / {!a => $nil() };
+
+ define slist<a> := {a:head slist:tail => $cons(head,tail)}
+                  / {a:head => $wrap(head)};
+
+
+ define eslist<a> := {a:head eslist:tail => $cons(head,tail)}
+                   / {!a => $nil() };
+
+ term ident := {Ident:i => {ctoken = ident} $sval(i)}
+            /  {Ident1pfx Ident1:i Ident1tail => {ctoken = ident} $sval(i)}
+	    /  {Ident2:i => {ctoken = ident} $sccval(i)}
+	    ;
+
+ token dnetnstk := (Letter IdentRest* '.'?)+;
+ term dnetns := dnetnstk:s => $sval(s); 
+
+ token tNumber := '-'? Digit+;
+ term number := tNumber:v => {ctoken = const} $nval(v);
+ token tString0 := '"' ( !'"' . ) * '"';
+ token tString := '"' ( (BSLASH '"')/( !'"' . ) ) * '"';
+ token tSymbol := QUOTE (!QUOTE . )+ QUOTE;
+ term string := tString:t => {ctoken = const} $stringdescreen($stripval(t));
+ term string0 := tString0:t => {ctoken = const} $stripval(t);
+
+ token tchar0 := Digit+ 'c';
+ token tchar1 := QUOTE . QUOTE 'c';
+ term pfchar := {tchar0:n => $charval(n)}
+              / {tchar1:n => $cadr($stringtolist($val(n)))}
+              => {ctoken = const}
+              ;
+
+ token tLogAnd := '&&' => {ctoken = logand};
+ token tLogOr := '||' => {ctoken = logor};
+ token tBinEq := '==' => {ctoken = eq};
+ token tBinNeq := '!=' => {ctoken = neq};
+
+ token tBinOp0 := tLogAnd/tLogOr;
+ token tBinOp1 := '+.'/'+'/'-.'/'-' => {ctoken = lexic};
+ token tBinOp2 := '*.'/'*'/'/.'/'/'/'mod' => {ctoken = lexic};
+ token tBinOp3R := '$=='/'==='/'!=='/'>='
+                 /'<='/'<'/'>' => {ctoken = lexic};
+ token tBinOp3 := tBinOp3R/tBinEq/tBinNeq;
+ term binop0 := tBinOp0:b => $sval(b);
+ term binop1 := tBinOp1:b => $sval(b);
+ term binop2 := tBinOp2:b => $sval(b);
+ term binop3 := tBinOp3:b => $sval(b);
+ term symbol := Ident:i => {ctoken = symbol} $sval(i);
+ term qsymbol := tSymbol:i => {ctoken = symbol} $sstripval(i);
+)
+

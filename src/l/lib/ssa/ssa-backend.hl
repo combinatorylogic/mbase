@@ -1,0 +1,1401 @@
+% literate:
+
+\section{SSA-enabled layer for the core compiler}
+
+The original flat representation is not suitable for any optimisations and analysis.
+
+Here we're converting it into an SSA format, in a way which must be suitable even for the contents of the "Asm" nodes.
+An alternative approach is to generate this SSA--friendly IR straight from the Core AST, but then there will be a significant
+semantic mismatch between an IR and a .NET asm code. Since there are plans to deconstruct .Net parts as well, the chosen
+approach makes more sense in a long run.
+
+\subsection{Explicit basic blocks version of the "flat" AST}
+
+The first stage of transformation is the same flat AST with explicit basic blocks added. The same AST is used for several steps with
+seriously different semantics.
+
+First step produces basic blocks with still all the same stack operations. Second step will fuse stack moves
+within basic block bounaries, by replacing the stack instructions with a new 'Set' node and stack expressions with 'VPop'.
+
+After this step, stack is still used in between basic blocks, therefore a third step annotates each basic block with its
+'arguments' (used stack slots) and 'return values' --- values left on stack after this basic block.
+
+Catch blocks are special, they're expecing an argument on top of stack which is not explicitly pushed there anywhere else.
+
+Once basic blocks are annotated, a CFG is analysed, and all the matching arguments and return values are paired. Then, in
+a fourth transformation step, paired pushes are replaced with local variables sets, and uses ('VPop') are
+replaced with local variable reads ('Var'). These redundant local variables are going to be eliminated anyway by a
+consequent SSA transform.
+
+\pfcode{
+#(include "../../core/cc-ast-flat.al")
+#(def:ast cc_flatast ( (cc:flatast) )
+    (label <labelident:id>)
+ ) // rename for PFront
+}
+
+\pfcode{
+ast cc_flat_bb: cc_flatast () {
+  block is (.*bbcode:cd);
+  bbcode = bb(label:name, *stackident:args, *stackident:rets,
+              *code:cd,
+              code:t, .*tryregion:rs)
+         | nop()
+         ;
+
+  expr += VPop(stackident:nm)
+       ;
+
+  label is lblident:id;
+  useident is (ident:n, expr:v);
+
+  code = Local(ident:name)
+       | FixLocal(ident:name, ident:oldname)
+       | DebugPoint(.*debugdata:d)
+       | Setlocal(ident:id, expr:value)
+       | Setglobal(ident:nm, expr:value)
+       | Setnewglobal(ident:nm, expr:value)
+       | Push(expr:value)
+       | Patchclosure(ident:id, ident:liftid, .*patcharg:args)
+
+       | Pushapp(expr:fn, .*expr:args)
+       | Setlocapp(ident:nm, expr:fn, . *expr:args) 
+       | Retapp(expr:fn, .*expr:args)
+       | Dropapp(expr:fn, .*expr:args)
+       // We assume that Asm does not do any external control flow
+       // Register allocator follows the same assumption, so it is
+       // pretty safe.
+       | Asm(atarget:tgt, *useident:use, .any:body)
+
+       | ClosureDummy()
+
+       | InitGlobalVar(expr:a1, expr:a2, expr:a3)
+       | InitGlobalFun(expr:a1, expr:a2, expr:a3)
+       | InitGlobalMac(expr:a1, expr:a2)
+
+       | Car(expr:arg)
+       | Cdr(expr:arg)
+       | Cons(expr:a, expr:b)
+
+       | BinOp(arith:op, expr:left, expr:right)
+       | IntBox(expr:arg)
+       | IntUnbox(expr:arg)
+
+       | Pop(expr:arg)
+       | Nop()
+
+       | Set(stackident:id, code:c)
+
+       // Terminals are still under the same node, to simplify
+       // the stack analysis passes.
+       // They will be separated in a later stage IR.
+
+        | Goto(label:lbl)
+        | Switch(expr:val, .*label:labels)
+        | GotoNull(expr:a, label:lbl, label:next)
+        | GotoPairP(expr:a, label:lbl, label:next)
+        | GotoEqv(expr:a, expr:b, label:lbl, label:next)
+        | Return(expr:value)
+        | Gotoif(label:lbl, expr:cnd, label:next)
+        | Gotoifnot(label:lbl, expr:cnd, label:next)
+        ;
+}
+}
+
+\subsection{Preparing flat code for SSA}
+
+\pfcode{
+% "Desugar Asm((local ID), ...) nodes"
+function cc_flat_asm_desugar(code)
+  map append c in code do
+    match c with
+      'Asm'('local'(id),@rest) ->
+         ['Asm'('push',@rest);'Setlocal'(id, 'Pop'())]
+    | else -> [c]
+}
+
+\pfcode{
+% "Fuse redundant labels"
+function cc_flat_fuse(code)
+{ ren = mkhash();
+  fuse(a, b) = {
+    if(b) {
+      ohashput(ren, a, b); return b;
+    } else return a;
+  };
+  do loop(c = code, p = []) {
+    if(c) 
+     match car(c) with
+       'Label'(id) -> {np = fuse(id, p); loop(cdr(c),np)}
+     | 'Iflabel'(id) -> {np = fuse(id, p); loop(cdr(c),np)}
+     | else -> loop(cdr(c),[])
+  };
+  visit:cc_flatast(block: code) {
+     deep label : {chk = ohashget(ren, node); if(chk) chk else node}}}
+}
+
+\pfcode{
+% "Transform a flat AST into a bb'ed AST"
+function cc_flat_ssa_bblocks(code)
+collector(bbadd, bbget) {
+  // Assuming equivalent labels are fused already
+  bbuilder(bbuilder, lbl, tryenv) = {
+    collector(iadd, iget) 
+      fun(self, flatinst) {
+         // Classify an instruction: new label, terminal or a special case: tail call
+         tp0 = case(car(flatinst)) {
+          | 'Last' -> 'new'
+          | 'Iflabel' | 'Label' -> 'new'
+          | 'Return'  | 'Goto' | 'Switch' -> 'term'
+          | 'GotoNull' | 'GotoPairP' 
+          | 'GotoEqv'  | 'Gotoif' | 'Gotoifnot' -> 'cterm'
+          | 'Retapp' -> 'tcall' | else -> 'norm'
+         };
+         tp = match flatinst with
+               'Asm'('tail',@_) -> 'tcall' | else -> tp0;
+         // Act upon an instruction class: either carry on adding or flush an make a new bb
+         case(tp) {
+           'new' -> {
+              g = iget();
+              if (g) {
+                bb = 'bb'(lbl, [], [], g, 'Goto'(cadr(flatinst)), @tryenv);
+                bbadd(bb);
+              };
+              return bbuilder(bbuilder, cadr(flatinst), tryenv) // new label, new bblock
+           }
+         | 'term' -> {
+              bb = 'bb'(lbl, [], [], iget(), flatinst, @tryenv);
+              bbadd(bb);
+              return bbuilder(bbuilder, 'void', tryenv)
+           }
+         | 'cterm' -> symbols(nxt) {
+              bb = 'bb'(lbl, [], [], iget(), flatinst :: [nxt], @tryenv);
+              bbadd(bb);
+              return bbuilder(bbuilder, nxt, tryenv)
+           }
+         | 'tcall' -> {
+              iadd(flatinst);
+              bb = 'bb'(lbl, [], [], iget(), 'Return'('Pop'()), @tryenv);
+              bbadd(bb);
+              return bbuilder(bbuilder, 'void', tryenv)
+            }
+         | 'norm' -> {iadd(flatinst); return self}
+         }
+      }
+  };
+  // Stack for try environments
+  trystate = mkref([]);
+  // Push a try environment, prepare a holder label for its catch block
+  push_try(state) = symbols(lbl) {
+     state(state, 'Goto'(lbl));
+     lbl1 = %Sm<<(lbl, "_Catch");
+     trystate := (lbl1:[]): ^trystate;
+     return bbuilder(bbuilder, lbl, ^trystate);
+  };
+  // Flush try block, start filling its catch block
+  set_catch(state, inst) = {
+     typ = cadr(inst);
+     %set-cdr!(car(^trystate), typ);
+     lbl = %Sm<<(caar(^trystate), "_End");
+     state(state,'Goto'(lbl)); // may be unneccessary - all 'void' bbs will be eradicated anyway
+     return bbuilder(bbuilder, caar(^trystate), cdr(^trystate));
+  };
+  // Flush catch block, pop try stack, start a continuation block
+  pop_try(state) = {
+     lbl =  %Sm<<(caar(^trystate), "_End");
+     state(state, 'Goto'(lbl));
+     trystate := cdr(^trystate);
+     return bbuilder(bbuilder, lbl, ^trystate);
+  };
+  // Dispatch instructions: try-catch control vs. everything else
+  proc(state, inst) = {
+     case(car(inst)) {
+       'TryBegin' -> push_try(state)
+     | 'CatchBegin' -> set_catch(state, inst)
+     | 'TryEnd' -> pop_try(state)
+     | else -> state(state,inst)
+     }
+  };
+  // Apply dispatch function to all the instructions in the stream
+  foldl(proc, bbuilder(bbuilder, '*Entry*', []), code::['Last'('*End*')]);
+  // Collect the basic blocks, discarding the void temporary entries
+  return map append b in bbget() do match b with 'bb'('void', @_) -> [] | else -> [b]
+}}
+
+\subsection{Popping the stack}
+
+Quite a few flat instructions are pushing values into a stack. Here is a list of all such instructions:
+
+\pfcode{
+% "Explicitly name all the pushes"
+function cc_ssa_touch_stack(code) {
+  appeler(n) = 'Set'(gensym(), n);
+  visit:cc_flat_bb(block: code) {
+    deep code {
+      Push -> appeler(node)
+    | Pushapp -> appeler(node)
+    | Retapp -> appeler(node)
+    | Asm -> {if(tgt && (tgt == 'push' || tgt == 'tail'))
+               appeler(node) else node}
+    | Car -> appeler(node)
+    | Cdr -> appeler(node)
+    | Cons -> appeler(node)
+    | BinOp -> appeler(node)
+    | IntBox -> appeler(node)
+    | IntUnbox -> appeler(node)
+    | ClosureDummy -> appeler(node)
+    | else -> node
+    }}}
+}
+
+Now we can model the stack behaviour at each basic block level and replace 'Pop' expressions with 'VPop' explicit references.
+If 'Pop' is attempted when a stack model is empty, then an argument slot is created. If a stack model is not empty at a basic block end,
+the remaining stack is stored as a list of 'return values'.
+
+\pfcode{
+% "Track stacks on bb level, annotating basic block arguments and return values"
+function cc_ssa_track_stack(code) {
+  popper(stk, args, insn) = {
+     vstk = mkref(stk);
+     vargs = mkref(args);
+     pop() = {
+        if (^vstk) {
+          nxt = car(^vstk);
+          vstk := cdr(^vstk);
+          return nxt
+        } else {
+          nxt = gensym();
+          vargs := ^vargs :: [nxt];
+          return nxt}};
+     ninsn = visit:cc_flat_bb(code:insn) {
+        deep expr {
+          Pop -> 'VPop'(pop())
+        | else -> node
+        };
+        deep code {
+          Set -> {
+            vstk := id : ^vstk;
+            return node
+          }
+        | else -> node}};
+     return [^vstk; ^vargs; ninsn]};
+  track(cd, t) = {
+    do loop(stk = [], args = [], lst = cd :: [t], out = []) {
+      match lst with
+        hd : tl -> {
+           <[nstk;nargs;ninstr]> = popper(stk, args, hd);
+           loop(nstk, nargs, tl, ninstr : out)
+        }
+      | [] -> return [reverse(args); stk; reverse(cdr(out)); car(out)]}};
+  visit:cc_flat_bb(block:code) {
+    once bbcode {
+      bb -> {<[nargs; nstk; ncd; nt]> = track(cd, t);
+             mk:node(args = nargs, rets = nstk, cd = ncd, t = nt)}
+    | else -> node}}}
+}
+
+\subsubsection{Some auxillary functions}
+
+\pfcode{
+% "Return a list of bb exits"
+function cc_ssa_bb_nexts(bb) collector(add, get) {
+  iter:cc_flat_bb(bbcode: bb) {
+     once bbcode {
+        bb -> {iter:cc_flat_bb(code:t) {
+                 once label : add(node);}}
+     | else -> []}};
+  return unifiq(get())}
+}
+
+\pfcode{
+% "Return args and rets of a bb"
+function cc_ssa_bb_args(bb) {
+   visit:cc_flat_bb(bbcode: bb) {
+      once bbcode {
+        bb -> [args;rets]
+      | else -> [[];[]]}}}
+}
+
+\pfcode{
+% "Return a hash of bbs"
+function cc_ssa_bb_hash(code)
+{
+  ht = mkhash();
+  iter:cc_flat_bb(block:code) {
+     once bbcode {
+       bb -> ohashput(ht, name, node)
+     | else -> []}};
+  return ht;}
+}
+
+\pfcode{
+% "Return a list of catch blocks"
+function cc_ssa_catch_blocks(code)
+collector(add, get) {
+  iter:cc_flat_bb(block:code) {
+     once bbcode {
+       bb -> iter r in rs do add(car(r))
+     | else -> []}};
+  return unifiq(get())}
+}
+
+\subsubsection{Putting everything together}
+
+A path in CFG is uniquely identified by a basic block and its entry stack state. For each path
+in a function body we're building a pair-up table, matching 'argument' uses against 'return value' slots.
+
+\pfcode{
+% "Match arguments with return values, using a CFG. Catch block is a special case here."
+function cc_ssa_match_slots(code) {
+  bbs = cc_ssa_bb_hash(code);
+  visited = mkhash();
+  matches = mkhash();
+  add_match(a, b) = ohashput(matches, a, b:ohashget(matches, a));
+  stack_match(stk, in, out) = {
+    do loop(s = stk, i = in) {
+       match i with
+         hd:tl -> if(s) {
+            add_match(hd, car(s));
+            loop(cdr(s), tl)}
+       | [] -> out :: s}};
+  process(entry) = 
+   do loop(e = entry, stk = []) {
+    idnt = %S<<(e, stk);
+    if (hashget(visited, idnt)) []
+    else if(not(e=='*End*')) {
+      hashput(visited, idnt, e);
+      bb = ohashget(bbs, e);
+      if (not(bb)) {
+         ccerror('NO-EXIT'(e));
+      };
+      nexts = cc_ssa_bb_nexts(bb);
+     <[args;rets]> = cc_ssa_bb_args(bb);
+      nstk = stack_match(stk, args, rets);
+      iter n in nexts do loop(n, nstk)}};
+  if (code) {
+    process('*Entry*');
+    iter e in cc_ssa_catch_blocks(code) do process(e);};
+  return matches;}
+}
+
+
+Now, having a match table, we can simply rewrite the code, replacing all the return value slots with
+local variable writes. Use slots uniquely identify such variables, due to the code generation constraints. I.e., a single stack slot may be pushed in multiple different
+basic blocks, but can only be popped once.
+
+\pfcode{
+% "Rewrite arguments and returns with local variables"
+function cc_ssa_eradicate_all_stack(code)
+{ matches = cc_ssa_match_slots(code);
+  revmatches = {
+    ht = mkhash();
+    hashiter(fun(k,vs) {
+        iter v in vs do {
+           if(ohashget(ht, v) && not(ohashget(ht,v) == k)) {
+              ccerror('DOUBLE'(v,k,ohashget(ht,v)));
+           };
+           ohashput(ht, v, k)}
+      }, matches);
+    return ht;};
+  catches = {ht = mkhash(); iter e in cc_ssa_catch_blocks(code) do ohashput(ht, e, e); ht};
+  visit:cc_flat_bb(block: code) {
+    deep expr {
+       VPop -> {
+          chk = ohashget(matches, nm);
+          if (chk) {
+            'Var'(nm)
+          } else node}
+    | else -> node};
+    deep code {
+      Set -> {
+         chk = ohashget(revmatches, id);
+         if (chk)  {
+           ['Local'(chk);
+            mk:node(c=car(c));
+            'Setlocal'(chk, 'VPop'(id))] // N.B.: new locals may be duplicated here
+         } else [mk:node(c=car(c))]}
+    | else -> [node]};
+    deep bbcode {
+      bb -> mk:node(cd = map append c in cd do c,
+                    t = car(t), rets = [],
+                    args = if(ohashget(catches, name)) args else [])
+    | else -> node}}}
+}
+
+After the previous pass, the order of VPop entries in the ops is reverted. We need a separate pass to fix this order.
+
+\pfcode{
+function cc_ssa_fix_vpop_order(code)
+{ fixorder(insn) = {
+    ord = mkref([]);
+    visit:cc_flat_bb(code: insn) {
+       deep expr {
+          VPop -> ord := node : ^ord
+        | else -> []}};
+    visit:cc_flat_bb(code: insn) {
+       deep expr {
+          VPop -> {ret = car(^ord); ord := cdr(^ord); ret}
+       |  else -> node}}};
+  visit:cc_flat_bb(block: code) {
+    once code: forall fixorder(node)}}
+}
+
+\subsection{A refined AST}
+
+Now, once stack is gone for good, we can introduce a finer IR, suitable for our SSA representation.
+
+\pfcode{
+ast cc_ssa: cc_flat_bb () {
+  bbcode = bb(label:name, *localarg:catcharg, *code:cd, term:t, .*tryregion:rs)
+         | nop()
+         ;
+  code is (reg:dst, stmt:v);
+  stmt =
+         Phi(.*phinode:ns)
+       | Alloca(type:t)
+       | DebugPoint(.*debugdata:d)
+       | Setglobal(extident:nm, expr:value)
+       | Setnewglobal(extident:nm, expr:value)
+
+       | Store(expr:ptr, expr:value)
+       | Load(expr:ptr)
+       
+       | Patchclosure(expr:id, extident:liftid, .*patcharg:args)
+       | Call(calltype:t, expr:fn, .*expr:args)
+       | Asm(atarget:tgt, *varident:use, .any:body)
+       
+       | InitGlobalVar(expr:a1, expr:a2, expr:a3)
+       | InitGlobalFun(expr:a1, expr:a2, expr:a3)
+       | InitGlobalMac(expr:a1, expr:a2)
+
+       | Car(expr:arg)
+       | Cdr(expr:arg)
+       | Cons(expr:a, expr:b)
+
+       | BinOp(arith:op, expr:left, expr:right)
+       | IntBox(expr:arg)
+       | IntUnbox(expr:arg)
+
+       | Rewrite(expr:v) // temporary node, must be eliminated after initial pass
+
+       | Type(type:t, stmt:s) // type-annotate a statement
+       ;
+  phinode is (label:src, expr:v);
+  patcharg is (number:n, expr:v);
+  varident is (ident:n, expr:v);
+
+  term =  Goto(label:lbl)
+        | Switch(expr:val, .*label:labels)
+        | GotoNull(expr:a, label:lbl, label:next)
+        | GotoPairP(expr:a, label:lbl, label:next)
+        | GotoEqv(expr:a, expr:b, label:lbl, label:next)
+        | Return(expr:value)
+        | Gotoif(label:lbl, expr:cnd, label:next)
+        | Gotoifnot(label:lbl, expr:cnd, label:next)
+        ;
+
+  expr = Var(ident:name) // it's a pointer now, not a value
+       | Arg(ident:name) // and this is still a value
+       | Glob(ident:name)
+       | GlobRec(ident:name)
+       | Gencall(number:n)
+       | Clenv(ident:name)
+       | Meta(ipexpr:v)
+       | IntPtr(ipexpr:name)
+       | Str(string:s)
+       | Num(number:n)
+       | NBNum(number:n)
+       | Chr(char:c)
+       | Bool(bool:b)
+       | Symbol(symbol:v)
+       | Quote(any:val)
+       | Nil()
+       | Reg(reg:id)
+       | ClosureDummy() // it should have been an expression all the way
+       ;
+
+  type = generic() // any reference type
+       | closure(extident:id) // a closure reference
+       | genfun(number:args) // a function of n arguments
+       | number()
+       | string()
+       | symbol()
+       | char()
+       | target(any:tp) // target platform type, e.g., a .net type
+       | list() // cons cell
+       | cons(type:hd, type:tl) // statically known list structure
+       | bnumber() // boxed number
+       | bool() // boolean
+       | nullref() // only observed as used as null reference
+       ;
+}
+}
+
+\pfcode{
+% "First refine pass: lift all the Var refs into dedicated Push(Var(...)) nodes"
+function cc_ssa_pre_refine(code) {
+  liftvars(i) = collector(add, get) {
+     ret = visit:cc_flat_bb(code: i) {
+        deep expr {
+            Var -> {n = gensym();
+                    add('Set'(n, 'Push'('Var'(name))));
+                    return 'VPop'(n)}
+          | else -> node}};
+     return [get();ret]};
+  visit:cc_flat_bb(block:code) {
+     deep bbcode {
+        bb -> {
+           ncd0 = map append c in cd do 
+                { <[a;b]> = liftvars(c); a :: [b] };
+           <[nxt;nt]> = liftvars(t);
+           ncd = ncd0 :: nxt;
+           mk:node(cd = ncd, t = nt)
+        }
+     | else -> node
+     }}}
+}
+
+\pfcode{
+% "Second refinement step, removing redundancy"
+function cc_ssa_refine(code) {
+  fix(c) = match c with [v] -> v | else -> ccerror('IMPOSSIBLE'(c));
+  visit:cc_flat_bb(block: code) {
+    deep bbcode {
+       bb -> {
+         newcode_0 = map append c in cd do {
+           match c with 
+             'ins'(@rst) -> rst
+           | [] -> []
+           | else -> [c]
+         };
+         newcode = map c in newcode_0 do {
+            match c with 
+              [dst;v] -> c
+            | [v] -> [gensym();v] // todo: dummy namespace
+         };
+         'bb'(name, args, newcode, fix(t),@rs)} 
+     | else -> node};
+    deep code {
+       // We're assuming that Var refs had been lifted already
+       Push -> (match value with
+                   'Var'(id) -> ['Load'('Reg'(id))]
+                 | else -> ['Rewrite'(value)])
+    |  Set -> [id; fix(c)]
+    |  ClosureDummy -> ['Rewrite'('ClosureDummy'())]
+    |  Pop -> []
+    |  Nop -> []
+    |  Local -> [name;'Alloca'('generic'())]
+    |  FixLocal -> [] // TODO! Preserve this somehow
+    |  Setlocal -> ['Store'('Reg'(id), value)]
+    |  Pushapp -> ['Call'('norm', fn, @args)]
+    |  Setlocapp -> symbols(dst) 'ins'([dst;'Call'('norm', fn, @args)], ['Store'('Reg'(nm), 'Reg'(dst))])
+    |  Retapp -> ['Call'('tail', fn, @args)]
+    |  Dropapp -> ['Call'('drop', fn, @args)]
+    |  Patchclosure -> symbols(cl) {
+         nmargs = map a in args do [gensym();a];
+         'ins'([cl;'Load'('Reg'(id))],@map ([d;[n;a]]) in nmargs do [d;'Load'('Reg'(a))], ['Patchclosure'('Reg'(cl),liftid,@map ([d;[n;a]]) in nmargs do [n;'Reg'(d)])])}
+    |  else -> [node]
+    };
+    deep expr {
+     | VPop -> 'Reg'(nm)
+     | else -> node}
+  }}
+}
+
+\pfcode{
+% "Final refinement touch, removine Rewrite nodes"
+function cc_ssa_refine_finish(code)
+{ 
+  rewrites=mkhash();
+  rewrite(n) = {
+     chk = ohashget(rewrites, n);
+     if(chk) chk else 'Reg'(n)};
+  visit:cc_ssa(block: code) {
+     deep code : v(dst);
+     deep stmt {
+        Rewrite -> fun(dst) ohashput(rewrites, dst, v)
+     |  else -> fun(dst) []}};
+  visit:cc_ssa(block:code) {
+     deep stmt {
+        Rewrite -> []
+     |  else -> node};
+     deep code: { if (v) [node] else [] };
+     deep bbcode {
+        bb -> mk:node(cd = map append c in cd do c)
+     |  else -> node};
+     deep expr { Reg -> rewrite(id) | else -> node}}}
+}
+
+\subsection{Abstract SSA IR}
+
+At this stage our IR is suitable for an abstract SSA exctraction. The required properties are: named basic blocks, named instructions (because
+we have to merge the abstract IR back again, so we have to be able to identify every entity in the source code), explicit allocas, loads and
+stores.
+
+\pfcode{
+% "Extract an abstract SSA IR, list of allocas and temporary constant names"
+function cc_ssa_abstract(code) {
+  allocas = mkhash(); consts = mkhash();
+  addalloca(dst) = ohashput(allocas, dst, dst); // not using a collector due to possible duplicates
+  maybedummy(v) = visit:cc_ssa(expr: v) {
+    deep expr {
+       Reg -> id
+    |  else -> symbols(n1) {
+          ohashput(consts, n1, v); return n1}}};
+  getvar(v) = visit:cc_ssa(expr: v) {
+    deep expr {
+       Reg -> id
+    |  else -> ccerror('IMPOSSIBLE'(v))}};
+  makeuse(s) = collector(add, get) {
+    iter:cc_ssa(stmt: s) {
+      deep expr {
+        Reg -> add(id)
+     |  else -> []}};
+    return unifiq(get())};
+  maketusesexits(s) = 
+   collector(uadd, uget) collector(eadd, eget) {
+    iter:cc_ssa(term: s) {
+      deep label: if(node!='*End*') eadd(node);
+      deep expr {
+        Reg -> uadd(id)
+     |  else -> []}};
+    return unifiq(uget()):unifiq(eget())};
+  ret = visit:cc_ssa(block: code) {
+    deep block: map append c in cd do c;
+    deep bbcode {
+      bb -> ['b'(if(name=='*Entry*') 'entry' else if(name=='entry') '*Entry*' else name,
+                 cd::[[%Sm<<(name,"_TERM"); 'use'(@car(t))]], cdr(t)::map(car, rs))]
+    | else -> []};
+    deep code: [dst; v(dst)];
+    deep stmt {
+      Alloca -> fun(dst) {addalloca(dst); 'use'()}
+    | Load -> fun(dst) {'load'(getvar(ptr))}
+    | Store -> fun(dst) {'store'(getvar(ptr), maybedummy(value))}
+    | else -> fun(dst) 'use'(@makeuse(node))};
+    once term : forall maketusesexits(node);};
+  return [hashmap(fun(k,v) k, allocas);
+          consts;
+          ret]}
+}
+
+\pfcode{
+% "Run abstract SSA passes and apply the result to the source code"
+function cc_ssa_apply(abs, code)
+{
+  <[allocas;consts;ssa]> = abs;
+   // This is where all the magic happens:
+  <[vmap;nssa;cfg]> = ssa_transform(ssa, allocas);
+   // A rewrite hash is a side-effect of an abstract SSA transform
+   // It duplicates the "rewrite" nodes, which we simply ignore here.
+   remap0(n) = {
+       do loop(x = ohashget(vmap, n), p = n) {
+          if(x) return loop(ohashget(vmap, x), x)
+          else return p }};
+   remap(n) = {
+     n0 = remap0(n);
+     chk = ohashget(consts, n0);
+     if(chk) chk else 'Reg'(n0)
+   };
+   // No pointer can escape in MBase, so all the allocas are redundant
+   allocash = {ht = mkhash(); iter a in allocas do ohashput(ht, a, a); ht};
+   bbname(n) = if(n=='*Entry*') 'entry' else if (n=='entry') '*Entry*' else n;
+   genh = mkhash(); keeph = mkhash();
+   keepit(v) = ohashput(keeph, v, v);
+   // Collect the essence:
+   visit:genssa(code:nssa) {
+    deep bblock { b -> iter ops do ops(name) };
+    deep oppair : fun(bb) { keepit(name); op(bb, name) };
+    deep iop {
+         phi -> fun(bb, tgt) {
+           nphi = [tgt;'Phi'(@zip(map(bbname, prevs), map(remap, vals)))];
+           ohashput(genh, bbname(bb),
+              ohashget(genh, bbname(bb))::[nphi]) }
+      |  else -> fun(bb, tgt) {[]} }};
+   // Now we can rewrite the cc_ssa code using collected rewriting rules
+   // and inserting pre-cooked Phi nodes.
+   // Some registers are going to be replaced by the constants here.
+   visit:cc_ssa(block: code) {
+     deep bbcode {
+       bb -> mk:node(cd = ohashget(genh, name) :: map append c in cd do c)
+     | else -> node};
+     deep code: {
+       if (ohashget(keeph, dst) && not(ohashget(allocash,dst)) && v)
+         [node] else []};
+     deep stmt {
+       Alloca -> []
+     | Load -> []
+     | Store -> []
+     | else -> node};
+     deep expr {
+       Reg -> remap(id)
+     | else -> node};}}
+}
+
+\pfcode{
+% "Perform an ssa transform"
+function cc_ssa_mem2reg(code) {
+  if (code) {
+    abs = cc_ssa_abstract(code);
+    return cc_ssa_apply(abs, code);
+  } else code}
+}
+
+\pfcode{
+% "Combining all the flat to ssa passes together, argument is 'lifted'"
+function cc_flat_to_ssa(code)
+  visit:cc_flatast(lifted: code) {
+     once block:
+      cc_ssa_mem2reg(
+       cc_ssa_refine_finish(
+        cc_ssa_refine(
+         cc_ssa_pre_refine(
+          cc_ssa_fix_vpop_order(
+           cc_ssa_eradicate_all_stack(
+            cc_ssa_track_stack(
+             cc_ssa_touch_stack(
+              cc_flat_ssa_bblocks(
+               cc_flat_fuse(
+                cc_flat_asm_desugar(node)))))))))))}
+}
+
+\section{And back again}
+
+After spending some time in a nice and clean SSA world we must eventually get back into our mundane and boring flat IR, at least for the default .Net backend.
+It means eliminating the named registers and getting back into a stack representation, inserting local variables where needed. Some optimisation results from the SSA passes may
+be taken into account here - e.g., some variables may have a non--generic type.
+
+In order to ensure the maximum stack utilisation we need to build a tree IR first, now unifying statemens and expressions. Terminals are still discriminated. We're still keeping phis.
+Please note that we went considerable lenghts in order to make sure simple values are not bound to registers. Fusing statemens with expressions here does not mean this kind of behaviour
+is going to be tolerated now.
+
+Calls are discriminated as pure, having side effect or having unknown behaviour --- this is handled by the global compiler context. Other than this new call property, this tree
+AST is fully compatible with the previous SSA AST. Asm nodes are indiscriminately considered impure and cannot be moved --- this can change in the future if such information is either provided
+by the frontend or inferred somehow. The general trend should be to minimise Asm usage.
+
+\pfcode{
+ast cc_ssa_tree : cc_ssa () {
+   code is (reg: dst, expr:v);
+   stmt is dummy:v; // make sure it's dead
+   varident is (ident:n, expr:v);
+   expr =
+         Phi(.*phinode:ns)
+       | Alloca(type:t)
+       | DebugPoint(.*debugdata:d)
+       | Setglobal(extident:nm, expr:value)
+       | Setnewglobal(extident:nm, expr:value)
+
+       | Store(expr:ptr, expr:value)
+       | Load(expr:ptr)
+       
+       | Patchclosure(expr:id, extident:liftid, .*patcharg:args)
+       | Call(pure:p, calltype:t, expr:fn, .*expr:args)
+       | Asm(atarget:tgt, *varident:use, .any:body)
+       
+       | InitGlobalVar(expr:a1, expr:a2, expr:a3)
+       | InitGlobalFun(expr:a1, expr:a2, expr:a3)
+       | InitGlobalMac(expr:a1, expr:a2)
+
+       | Car(expr:arg)
+       | Cdr(expr:arg)
+       | Cons(expr:a, expr:b)
+
+       | BinOp(arith:op, expr:left, expr:right)
+       | IntBox(expr:arg)
+       | IntUnbox(expr:arg)
+
+       | Type(type:t, expr:s)
+
+       | Arg(ident:name)
+       | Glob(ident:name)
+       | GlobRec(ident:name)
+       | Gencall(number:n)
+       | Clenv(ident:name)
+       | Meta(ipexpr:v)
+       | IntPtr(ipexpr:name)
+       | Str(string:s)
+       | Num(number:n)
+       | NBNum(number:n)
+       | Chr(char:c)
+       | Bool(bool:b)
+       | Symbol(symbol:v)
+       | Quote(any:val)
+       | Nil()
+       | Reg(reg:id)
+       | ClosureDummy()
+
+       | Push(expr:v) // pseudo-instruction for the special case phi expansion
+       | Pop(.*reg:id)  // pseudo-instruction for the special case inner phis
+       | Catcharg() // special case catch argument pseudo-instruction
+       ;
+}}
+
+\pfcode{
+function cc_ssa_mark_calls_dummy(code)
+  visit:cc_ssa(block: code) {
+     deep stmt {
+       Call -> 'Call'('dirty', t, fn, @args)
+     | else -> node}}
+}
+
+Folding into a tree can be done in several steps. First we will fold the pure things, where we do not care about the order. Then we'll try to fold
+the impure calls preserving their order (always assuming left to right arguments evaluation). Phis are still unmovable.
+
+After folding is done, everything that remains named and used must be demoted to local variables. Each Phi node with all its register entries is given a single variable,
+while impure calls, asm nodes and other non--movable things not associated with phis are given one variable each. Catch block arguments are also decorated with
+variables. We do not care much about producing very efficient stack representation, knowing that the .Net JIT will go through the same SSA thing again, the only
+thing that matters here is getting a reasonably compact code (and for the alternative backends, e.g., LLVM, we do not need this stack representation at all).
+
+\pfcode{
+function cc_ssa_usecount(code)
+{
+  regs = mkhash(); usecount = mkhash();
+  inc(id) = {
+    cnt = ohashget(usecount, id);
+    cnt1 = 1 + (if(cnt) cnt else 0);
+    ohashput(usecount, id, cnt1);
+  };
+  iter:cc_ssa_tree(block: code) {
+    deep code: {ohashput(regs, dst, v)};
+    deep expr {
+       Reg -> {inc(id);node}
+    |  else -> node}};
+  return [regs;usecount]}
+}
+
+\pfcode{
+function cc_ssa_perform_moves(movable, regs, code) {
+  move(e0) = {
+     do loop(e = e0) {
+       chg = mkref([]);
+       nxt = visit:cc_ssa_tree(expr:e) {
+               deep expr {
+                 Reg -> {
+                   if (ohashget(movable, id)) {
+                     chg := true;
+                     return ohashget(regs, id)
+                   } else node}
+                | else -> node}};
+       if (^chg) loop(nxt) else nxt}};
+  return visit:cc_ssa_tree(block: code) {
+     deep bbcode {
+        bb -> mk:node(cd = map append c in cd do c)
+     |  else -> node};
+     deep code: if (ohashget(movable, dst)) [] else [node];
+     once expr: forall move(node);}}
+}
+
+\pfcode{
+% "Fold the movable values into a tree"
+function cc_ssa_fold_pure(code)
+{
+ <[regs;usecount]> = cc_ssa_usecount(code);
+  // At this stage we only move single-use registers with pure values.
+  // Phi nodes, impure calls and registers used more than once are left intact.
+  // Identify the movable registers
+  movable = mkhash();
+  classify(e) = if(e) {
+     visit:cc_ssa_tree(expr: e) {
+        deep expr {
+           Type -> s
+         | Phi -> 'phi'
+         | Asm -> 'asm'
+         | Call -> p
+         | Load -> 'load'
+         | Car -> 'load'
+         | Cdr -> 'load'
+         | else -> 'pure'}}};
+  hashiter(fun(id, n) {
+     if (n == 1) {
+       if (classify(ohashget(regs,id)) == 'pure') {
+         ohashput(movable, id, id)}}}, usecount);
+  return cc_ssa_perform_moves(movable, regs, code)
+}}
+
+The next pass may move Phi instructions inside a tree. When it happens, it is an indication
+that corresponding stack pushes must be performed in the incoming basic blocks. That's the reason
+why a 'Push' pseudo-instruction is introduced into the tree language. It is not analysable, and may
+appear only before the final flat codegen pass.
+
+\pfcode{
+% "Fold unmovable values within a single basic block if an order can be preserved"
+function cc_ssa_fold_ordered(code)
+{
+  <[regs;usecount]> = cc_ssa_usecount(code);
+  movable = mkhash(); phis = mkhash();
+  visit:cc_ssa_tree(block:code) {
+     deep code: v(dst);
+     once expr {
+       Phi -> fun(name) ohashput(phis, name, name)
+     | else -> fun(name) []}};
+  isphi(name) = ohashget(phis, name);
+  foldbblock(bb) = {
+    q = mkref([]);
+    u = mkref([]);
+    flush() = { q := [] };
+    singleuse(id) = {
+       chk = ohashget(usecount,id);
+       return chk && chk == 1;
+    };
+    push(id) = {
+      // Another alternative with multi-use values is
+      // to dup and save them, but the current flat IR
+      // does not allow to do so.
+      if (singleuse(id) && not(isphi(id))) {
+        q := id : ^q;
+      } else flush();
+    };
+    pop(id) = {
+      u := id : ^u;
+    };
+    trytoconsume(id) = {
+      if (^q && car(^q) == id) {
+         ohashput(movable, id, id);
+         ^q := cdr(^q);}};
+    check() = {
+      // pop values from u, and look for them in q
+      // if a value is not on top of q, skip it,
+      // otherwise, consume.
+      do loop(nu = ^u) {
+         match nu with
+            hd : tl -> {
+               c = trytoconsume(hd);
+               loop(tl)
+            }
+      };
+      u := []; // flush it on every check()
+    };
+    visit:cc_ssa_tree(bbcode: bb) {
+       deep bbcode {
+         bb -> {
+             check(); // perform a check for terminal arguments
+             node}
+       | else -> node
+       };
+       deep code: {check(); push(dst); node};
+       once phinode: node; // block going into phi nodes
+       deep expr {
+          Reg -> {pop(id);node}
+        | else -> node}};
+   };
+   iter:cc_ssa_tree(block: code) {
+      once bbcode: forall foldbblock(node)};
+   return cc_ssa_perform_moves(movable, regs, code)}
+}
+
+
+\subsection{Demoting registers to memory}
+
+At this point our tree IR is suitable for a relatively sane reg2mem demotion. The rules are following:
+
+\begin{itemize}
+\item In a separate pass, named 'Phi' nodes are translated into variables, moving the stores into incoming bbs. An additional
+      folding may be useful here, so the process may be iterative.
+\item For the inner 'Phi' instances, 'Push' instructions added to the incoming bbs, in a usual left to right order. Folding may also
+      help here.
+\item For all the remaining named instructions with non-zero uses, variables are introduced.
+\end{itemize}
+
+\pfcode{
+function cc_ssa_tree_phis(code)
+{
+  stores = mkhash(); vars = mkhash();
+  add_var(nm) = ohashput(vars, nm, %Sm<<(nm,"_v"));
+  add_store(lbl, dst, e) = {
+    ohashput(stores, lbl, ohashget(stores, lbl) :: [[gensym(); 'Store'('Reg'(%Sm<<(dst, "_v")), e)]])
+  };
+  demote_phi(dst, ns) = {
+    add_var(dst); // TODO: take type optimisations into account
+    iter [lbl; e] in ns do {
+      add_store(lbl, dst, e)
+    }};
+  // Prepare phis
+  visit:cc_ssa_tree(block: code) {
+    deep code: v(dst);
+    once expr {
+      Phi -> fun(dst) demote_phi(dst, ns)
+    | else -> fun(dst) node}};
+  // Execute demotion
+  return visit:cc_ssa_tree(block: code) {
+    deep bbcode {
+      bb -> { mk:node(cd = 
+                     (if (name == '*Entry*') 
+                        hashmap(fun(k,v) [v;'Alloca'('generic'())], vars) else []
+                      )  :: cd :: ohashget(stores, name)) }
+    };
+    deep code: {
+      chk = ohashget(vars, dst);
+      if (chk) {
+        [dst; 'Load'('Reg'(%Sm<<(dst, "_v")))]
+      } else node}}}
+}
+
+\pfcode{
+function cc_ssa_tree_inner_phis(code)
+{
+  // At this stage only the inner Phi nodes left
+  pushes = mkhash();
+  add_push(lbl, e) = symbols(id) {
+      ohashput(pushes, lbl, ohashget(pushes, lbl):: [[id; 'Push'(e)]]);
+      return id};
+  elem = visit:cc_ssa_tree(block: code) {
+    deep expr {
+      Phi -> {
+         srcs = map [lbl; e] in ns do add_push(lbl, e);
+         'Pop'(@srcs)}
+    | else -> node}};
+  return visit:cc_ssa_tree(block: elem) {
+    once bbcode {
+      bb -> mk:node(cd = cd :: ohashget(pushes, name))
+    | else -> node}}}
+}
+
+\pfcode{
+% "Insert explicit catch argument handling"
+function cc_ssa_insert_catchargs(code)
+  visit:cc_ssa_tree(block: code) {
+    deep bbcode {
+      bb -> mk:node(cd = (if(catcharg) [[car(catcharg);'Catcharg'()]] else []) :: cd)
+    | else -> node}}
+}
+
+\pfcode{
+% "Demote all the named nodes with uses"
+function cc_ssa_demote_remaining(code)
+{
+ <[regs;usecount]> = cc_ssa_usecount(code);
+  demoted = mkhash();
+  notalloca(id) = {
+    chk = ohashget(regs, id);
+    if (chk) {
+      match chk with
+         'Alloca'(@x) -> []
+      |  else -> true
+    } else []
+  };
+  allocas = map append a in hashmap(fun(id, n) if (notalloca(id)) {
+    ohashput(demoted, id, id);
+    [[id;'Alloca'('generic'())]]} else [], usecount) do a;
+  demotep(id) = ohashget(demoted, id);
+  visit:cc_ssa_tree(block: code) {
+    deep bbcode {
+      bb ->
+        if (name == '*Entry*') mk:node(cd = allocas::cd) else node
+    | else -> node
+    };
+    deep code:
+       if (demotep(dst)) {
+         [gensym(); 'Store'('Reg'(dst), v)]
+       } else node;
+    deep expr {
+       Reg -> {
+          if (demotep(id)) 'Load'('Reg'(id)) else node}
+    |  else -> node}}}
+}
+
+\pfcode{
+% "Sanitise Asm nodes: they can only have Reg or constant arguments"
+function cc_ssa_asm_sanitise(code) {
+  dolift(add, use) = {
+         map [d;t] in use do {
+            liftp = case (car(t)) {
+              'Reg' | 'Arg' | 'Glob' | 'GlobRec' | 'Clenv' | 'Meta' | 'IntPtr' | 'Str'
+             | 'Num' | 'NBNum' | 'Chr' | 'Bool' | 'Symbol' | 'Quote' | 'Nil' -> []
+             | else -> true};
+            if(liftp) symbols(nm) {
+               add([nm; t]);
+               return [d;'Reg'(nm)]
+            } else {
+               return [d;t]}};
+  };
+  lift(e) = collector(add, get) {
+    exp = visit:cc_ssa_tree(expr: e) {
+     deep expr {
+       Asm -> {use1 = dolift(add, use);
+               return mk:node(use = use1)}
+     | else -> node}};
+    return [get(); exp]
+  };
+  tlift(t) = collector(add, get) {
+    exp = visit:cc_ssa_tree(term: t) {
+     deep expr {
+       Asm -> {use1 = dolift(add, use);
+               return mk:node(use = use1)}
+     | else -> node}};
+    return [get(); exp]
+  };
+  return visit:cc_ssa_tree(block: code) {
+    once expr : forall lift(node);
+    once term : forall tlift(node);
+    deep code : { [@(car(v));[dst;cadr(v)]] };
+    deep bbcode {
+      bb -> mk:node(cd = (map append c in cd do c)::car(t), t = cadr(t))
+    | else -> node}}}
+}
+
+\pfcode{
+% "Flatten back into cc_flat_bb, keeping basic blocks for time being"
+function cc_ssa_bb_flatten(code)
+{
+  getvar(v) = {
+    match v with
+      'Var'(id) -> id
+    | ['Push'('Var'(id))] -> id // Patchclosure special case
+    | else -> ccerror('GETVAR'(v))};
+  getfn(v) = {
+    match v with
+      'Gencall'(n) -> v
+    | ['Push'(x)] -> x
+    | else -> ccerror('GETFN'(v))};
+  visit:cc_ssa_tree(block:code) {
+     deep bbcode {
+       bb -> 'bb'(name, catcharg, [], (map append c in cd do c)::car(t), cdr(t),@rs)
+     | else -> []
+     };
+     deep term {
+        Switch -> val : mk:node(val = 'Pop'())
+      | GotoNull -> a : mk:node(a = 'Pop'())
+      | GotoPairP -> a : mk:node(a = 'Pop'())
+      | Gotoif -> cnd : mk:node(cnd = 'Pop'())
+      | Gotoifnot -> cnd : mk:node(cnd = 'Pop'())
+      | GotoEqv -> [@a;@b] : mk:node(a = 'Pop'(), b = 'Pop'())
+      | Return -> value : 'Return'('Pop'())
+      | else -> []:node
+     };
+     deep code : v;
+     deep expr {
+        Phi     -> ccerror('IMPOSSIBLE'(node))
+     |  Arg     -> ['Push'(node)]
+     |  Glob    -> ['Push'(node)]
+     |  GlobRec -> ['Push'(node)]
+     |  Gencall -> node
+     |  Clenv   -> ['Push'(node)]
+     |  Meta    -> ['Push'(node)]
+     |  IntPtr  -> ['Push'(node)]
+     |  Str     -> ['Push'(node)]
+     |  Num     -> ['Push'(node)]
+     |  NBNum   -> ['Push'(node)]
+     |  Chr     -> ['Push'(node)]
+     |  Bool    -> ['Push'(node)]
+     |  Symbol  -> ['Push'(node)]
+     |  Quote   -> ['Push'(node)]
+     |  Nil     -> ['Push'(node)]
+     |  ClosureDummy
+                -> ['Push'(node)]
+
+     |  Catcharg -> 'Pop'()
+                
+     |  Reg     -> 'Var'(id)
+     |  Pop     -> [] //'Pop'()
+     |  Push    -> v
+     |  Type    -> s
+
+     |  IntBox     -> [@arg;'IntBox'('Pop'())]
+     |  IntUnbox   -> [@arg;'IntUnbox'('Pop'())]
+     |  Car        -> [@arg;'Car'('Pop'())]
+     |  Cdr        -> [@arg;'Cdr'('Pop'())]
+     
+     |  BinOp      -> [@left;@right;'BinOp'(op,'Pop'(),'Pop'())]
+     |  Cons       -> [@a;@b;'Cons'('Pop'(),'Pop'())]
+
+     |  Store      -> [@(match value with 'Pop'() -> [] | else -> value);'Setlocal'(getvar(ptr),'Pop'())]
+     |  Load       -> ['Push'('Var'(getvar(ptr)))]
+
+     |  Alloca     -> ['Local'(caar(stack))] // assuming it is alwais register-assigned
+
+     |  DebugPoint    -> [node]
+     |  Setglobal     -> [@value; 'Setglobal'(nm, 'Pop'())]
+     |  Setnewglobal  -> [@value; 'Setnewglobal'(nm, 'Pop'())]
+     |  Patchclosure  -> ['Patchclosure'(getvar(id), liftid,@map [n;v] in args do [n;getvar(v)])]
+     
+     |  InitGlobalVar -> [@a1;@a2;@a3;'InitGlobalVar'('Pop'(),'Pop'(),'Pop'())]
+     |  InitGlobalFun -> [@a1;@a2;@a3;'InitGlobalFun'('Pop'(),'Pop'(),'Pop'())]
+     |  InitGlobalMac -> [@a1;@a2;'InitGlobalMac'('Pop'(),'Pop'())]
+
+     // Call and Asm are the most complicated nodes
+     |  Call    ->       [@map append a in args do a;
+                          [case (t) {
+                              'norm' -> 'Pushapp'
+                           |  'tail' -> 'Retapp'
+                           |  'drop' -> 'Dropapp'
+                           |  else -> ccerror('IMPOSSIBLE'(node))};
+                           getfn(fn);
+                           @map a in args do 'Pop'()]]
+     |  Asm     ->       [node]
+     };
+   deep varident : { match v with ['Push'(x)] -> [n;x] | else -> ccerror('VARIDENT'(n,v))}
+  }
+}}
+
+\pfcode{
+% "Reordering basic blocks, code is cc_flat_bb:block"
+function cc_ssa_chain_bbs_inner(code)
+{
+  // 1. Build a list of bbs that must be paired
+  up = mkhash(); down = mkhash(); regions = mkhash();
+  glue(id) = fun(src) {
+    ohashput(down, src, id);
+    ohashput(up, id, src: ohashget(up, id)); // multiple entries will get proxy bbs
+  };
+  visit:cc_flat_bb(block:code) {
+    deep code { // terminals only
+      | GotoNull -> glue(next)
+      | GotoPairP -> glue(next)
+      | GotoEqv -> glue(next)
+      | Gotoif -> glue(next)
+      | Gotoifnot -> glue(next)
+      | else -> fun(id) []
+    };
+    deep bbcode {
+      bb -> {if(rs) {ohashput(regions, name, rs)}; t(name)} | else -> []}};
+  // 2. Emit proxy bbs for all the multiple entries
+  proxies = mkhash();
+  hashiter(fun (id, srcs) {
+      match srcs with
+        [a] -> []
+      | hd:tl -> {
+        // keep hd, and issue proxies for all edges in tl
+        iter src in tl do symbols(nnm) {
+           prox = 'bb'(nnm, [], [], [], 'Goto'(id),@ohashget(regions, id));
+           ohashput(proxies, nnm, prox);
+           ohashput(down, src, nnm); // replace an edge
+        }}}, up);
+  // 3. Reorder the blocks
+  bbs = mkhash();
+  lst0 = map append b in visit:cc_flat_bb(block: code) {
+     once bbcode {
+        bb -> {
+          ohashput(bbs, name, node);
+          return [name]} | else -> []}} do b;
+  lst = lst0 :: 
+    hashmap(fun(nm, nd) { ohashput(bbs, nm, nd); nm }, proxies);
+  done = mkhash();
+  do loop(next = '*Entry*', rest = lst) {
+    if (ohashget(done, next)) {
+      if (rest) loop(car(rest),cdr(rest)) else []
+    } else {
+      bb = ohashget(bbs, next);
+      ohashput(done, next, next);
+      must = ohashget(down, next);
+      if (must) bb : loop(must, rest)
+        else if (rest) bb : loop(car(rest), cdr(rest))
+          else [bb]}}}
+
+function cc_ssa_chain_bbs(code)
+  if(code) cc_ssa_chain_bbs_inner(code)
+}
+
+
+\pfcode{
+% "Remove basic blocks from an already ordered list, inserting exception handling where necessary"
+function cc_ssa_remove_bbs(code)
+symbols(newentry, newend) {
+  bbflatten(b) = {
+    visit:cc_flat_bb(bbcode: b) {
+     deep label : if(node=='*Entry*') newentry
+                  else if(node=='*End*') newend
+                       else node;
+     deep bbcode {
+        bb -> ['Label'(name);
+               @cd;
+               t] | else -> []};
+     deep code {
+       GotoNull  -> 'GotoNull'(a, lbl)
+     | GotoPairP -> 'GotoPairP'(a, lbl)
+     | GotoEqv   -> 'GotoEqv'(a, b, lbl)
+     | Gotoif    -> 'Gotoif'(lbl, cnd)
+     | Gotoifnot -> 'Gotoifnot'(lbl, cnd)
+     | else -> node}}};
+  bblocks = mkhash();
+  catchblocks = mkhash();
+  iter:cc_flat_bb(block:code) {
+     once bbcode {
+       bb -> {
+         ohashput(bblocks, name, rs);
+         if (args) ohashput(catchblocks, name, bbflatten(node))}
+     | else -> []}};
+  collector(add, get) {
+   cfind(l, c) = do loop(l = l) if(l) {if(caar(l)==c) cdar(l) else loop(cdr(l))};
+   set_sub(s1, s2) = filter s in s1 as not(memq(s, s2));
+   finish_try_catch(env, d) = {
+     bb = ohashget(catchblocks, d);
+     tp = cfind(env, d);
+     add('CatchBegin'(tp));
+     iter a in bb do add(a);
+     add('TryEnd'());
+   };
+   do loop(c = code, tryenv = []) {
+    // For each basic block, compare the try environment with a previous one.
+    // Possible outcomes:
+    //   - A new catch destination is added:
+    //     Insert TryBegin before this basic block, one for each new destination
+    //   - One or more destinations disappeared:
+    //     For each of them, insert TryCatch, then the catch block copy,
+    //     then TryEnd. cc_ssa_chain_bbs must try to keep blocks within one try environment
+    //     together, but it is not necessary.
+    //   - Some exits disappered, then some new exits added:
+    //     First handle the catches for disappered exits, then add TryBegins
+    //   - No changes: do nothing
+    match c with
+       hd : tl ->
+        if (ohashget(catchblocks, cadr(hd))) loop(tl, tryenv)
+        else {
+          bb = bbflatten(hd);
+          add(car(bb)); // Label, always.
+          name = cadr(hd);
+          next = ohashget(bblocks, name);
+          tcur = map(car,tryenv);
+          tnew = map(car,next);
+          // Catch destinations disappeared since the previous block
+          doneexits = set_sub(tcur, tnew);
+          // Catch destinations added
+          newexits = set_sub(tnew, tcur);
+          // Handle the done exits
+          iter d in doneexits do finish_try_catch(tryenv, d);
+          // Handle the new entries
+          iter n in newexits do add('TryBegin'());
+          // Handle this basic block
+          iter a in cdr(bb) do add(a);
+          loop(tl, next);
+       }
+     | [] -> {  // close all
+          iter (d:t) in tryenv do finish_try_catch(tryenv, d)}};
+  add('Label'(newend));
+  return get()}}
+}
+
+\section{Translation pipeline}
+
+\pfcode{
+
+function cc_ssa_backend_passes(code) {
+  visit:cc_ssa(lifted: code) {
+     once block: if(node)
+      cc_ssa_remove_bbs(
+      cc_ssa_chain_bbs(
+      cc_ssa_bb_flatten(
+      cc_ssa_demote_remaining(
+      cc_ssa_insert_catchargs(
+      cc_ssa_asm_sanitise(
+       cc_ssa_fold_ordered(
+        cc_ssa_fold_pure(
+         cc_ssa_tree_inner_phis(
+          cc_ssa_tree_phis(
+           cc_ssa_fold_ordered(
+            cc_ssa_fold_pure(
+             cc_ssa_mark_calls_dummy(
+              node)))))))))))))}}
+
+function cc_ssa_backend_plugin(code)
+{
+  writeline(#`(PRE-SSA: ,code));
+  tmp = #(cc_ssa_backend_passes (cc_flat_to_ssa code));
+  writeline(#`(POST-SSA: ,tmp));
+  tmp1 = %cc:lifted-reschedule(tmp);
+  writeline(#`(SCHED: ,tmp1));
+  return tmp;
+}
+
+#(force-class-flush)
+}
+
+%%%%%%%%%%%%%%%%%%

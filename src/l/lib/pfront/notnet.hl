@@ -1,0 +1,531 @@
+//////////////////////////////////////////////////////////////////////////////
+//
+//   OpenMBase
+//
+// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
+// This file is distributed under the terms of the Q Public License version 1.0.
+//
+//////////////////////////////////////////////////////////////////////////////
+
+/*
+ *
+ *  Not.Net extended syntax frontend:
+ *   - AST
+ *   - Parser
+ *   - PFront syntax
+ *   - Code generation
+ *
+ */
+
+
+// An AST for a Not.Net parser:
+ast pfnotnetast {
+    member =
+       field(type:tp, ident:name, *mod:mods) 
+     | method(type:tp, ident:name, *argdef:args , stmt:body);
+    top = notnet(*argdef:args, stmt:body)
+        | class(ident:nm, *any:mods,*ident:inh,*member:body)
+        | mixclass(ident:nm, *any:mods,*ident:inh,*mixmember:body)
+	;
+    member = field(type:tp, ident:nm, *accs:mods)
+           | method(type:tp, ident:nm, *accs:mods, *argdef:args, stmt:body)
+	   | constructor(*accs:mods, ident:chknm, *argdef:args, stmt:body)
+	   | entry(ident:nm)
+	   ;
+    mixmember = dnet(member:m)
+           | mbmethod(type:tp, ident:nm, *accs:mods, *argdef:args, any:body)
+	   ;
+    type =   simple(ident:nm)
+           | array(type:t)
+	   | generic(ident:nm,*type:args)
+           ;
+    argdef is ( type:tp, ident:name);
+    stmt = goto(ident:lbl)
+         | loc(loc:L)
+         | begin(*stmt:body)
+         | flatbegin(*stmt:body)
+         | tailreturn(expr:v)
+         | return(expr:v)
+         | vreturn()
+         | leave(expr:v)
+         | if3(expr:cnd, stmt:iftr, stmt:iffl)
+         | if2(expr:cnd, stmt:iftr)
+         | try(stmt:body, argdef:catch, stmt:cblock)
+         | throw(expr:ex)
+         | foreach(ident:var, expr:v, stmt:body)
+         | while(expr:v, stmt:body)
+         | vardef(ident:id, type:tp)
+         | varinit(ident:id, type:tp, expr:v)
+         | uvarinit(ident:id, expr:v)
+         | lift(member:m)
+         | set(expr:left,expr:right)
+         | label(ident:lbl)
+         | expr(expr:e)
+
+	 | verbatim(any:v)
+
+	 | unquote(any:v)
+
+         ;
+    exprortype = expr(expr:e) | type(type:tp);
+
+    expr = logand(expr:a,expr:b)
+         | logor(expr:a,expr:b)
+         | greq(expr:a,expr:b)
+         | lteq(expr:a,expr:b)
+         | gr(expr:a,expr:b)
+         | lt(expr:a,expr:b)
+         | eq(expr:a,expr:b)
+         | noteq(expr:a,expr:b)
+         | lshift(expr:a,expr:b)
+         | rshift(expr:a,expr:b)
+         | plus(expr:a,expr:b)
+         | minus(expr:a,expr:b)
+         | mul(expr:a,expr:b)
+         | div(expr:a,expr:b)
+         | mod(expr:a,expr:b)
+         | xor(expr:a,expr:b)
+         | binand(expr:a,expr:b)
+         | binor(expr:a,expr:b)
+         | istype(expr:a,type:tp)
+         | typecast(expr:a,type:tp)
+         | unot(expr:a)
+         | uminus(expr:a)
+         | isnull(expr:a)
+         | typeof(expr:a)
+         | typetoken(type:tp)
+         | new(type:tp,*expr:args)
+	 | newarr(type:tp, expr:sz)
+	 | newdelegate(type:tp, exprortype:inst, ident:nm)
+         | mtdcall(expr:e, ident:mtd, *expr:args)
+         | smtdcall(ident:nm, *expr:args)
+         | fldaccess(expr:e, ident:fld) 
+         | arrayacc(expr:ar, expr:idx)
+         | embedbegin(*stmt:sts)
+         | null()
+         | true()
+         | false()
+         | var(ident:id)
+         | float(any:v)
+         | double(any:v)
+         | int(any:v)
+         | string(any:v)
+
+	 | verbatim(any:v)
+
+	 | unquote(any:v)
+
+         ;
+}
+
+// Not.Net parser, with a syntax somewhat similar to C#
+parser pfnotnet ( pfront )
+{
+  !!Spaces;       
+  [lexical:] := [lexical] => {ctoken = lexic};
+  [keyword:] := [keyword] ![IdentRest] => {ctoken = keyword};
+
+  &nnexpr_bin1;
+  &nnexpr_bin2;
+  &nnexpr_bin3;
+  &nnexpr_bin4;
+  &nnexpr_unary;
+  &nnexpr_prim;
+  &nnexpr_start;
+  &nnstmt_start;
+
+  @pfmbsemi := ";"?;
+
+  pfnotnettop := 
+    {[pfclsmodifiers]:mods class [pfclassname]:nm [pfclassargs]:args
+      "{" eslist<[pfclassmember]>:members "}" =>
+      class(nm, mods, args, members)}
+  / {[pfclsmodifiers]:mods mixed class [pfclassname]:nm [pfclassargs]:args
+      "{" eslist<[pfmixclassmember]>:members "}" =>
+      mixclass(nm, mods, args, members)}
+     ;
+
+  pfnotnet :=
+     notnet "(" ecslist<[pfargdef],",">:args ")" [pfnetbody]:b
+       => notnet(args,b)
+   ; // More to be defined
+
+  pfargdef := [pftype]:type [pfident]:name => $list(type,name);  
+
+  @tkfloat := "-"? [Digit]+ "." [Digit]+ "f";
+  @tkdouble := "-"? [Digit]+ "." [Digit]+ ("d")?;
+  @tkint := "-"? [Digit]+;
+
+  pffloat := [tkfloat]:v => {ctoken = const} $val(v);  
+  pfdouble := [tkdouble]:v => {ctoken = const} $val(v);  
+  pfint := [tkint]:v => {ctoken = const} $val(v);
+  
+  pfstring := [string] => {ctoken = const};
+
+  @@dot := ".";
+
+  @@clsident := [Letter] [IdentRest]*;
+  @tkpfident := [clsident];
+  pfident :=
+        {"\" [tkpfident]:i "\" => {qstate = unquote} unquote($sval(i))} 
+    /   { [tkpfident]:i => {ctoken = ident} $sval(i)};
+
+  @tkpfclassname := {([clsident] [dot])+ [clsident]} / [clsident];
+
+  pfclassname :=
+         {"\" [tkpfident]:i "\" => {qstate = unquote} unquote($sval(i))} 
+     /   { [tkpfclassname]:e => {ctoken = ident} $sval(e)};
+
+  pfclsmodifiers := eslist<[pfclsmodifier]>:lst => lst;
+
+  pfclsmodifier := {public => public()} / {static => static()} /
+                {private => private()} / {protected => protected()} /
+		{sealed => sealed()}
+                ; // more?
+  
+  pfmodifiers := eslist<[pfmodifier]>:lst => lst;
+
+  pfmodifier := {public => public()} / {static => static()} /
+                {private => private()} / {protected => protected()} /
+		{virtual => virtual()} / {override => override()} / {final => final()}
+                ; // more?
+ 
+  pfclassargs := {":" slist<[pfclassname]>:inher => inher }
+              /  {!":" => $nil()} ;
+
+  pftype := 
+      {[pftype]:n "[" "]" => array(n) }
+   /  {[pfclassname]:n "<" cslist<[pftype],",">:args ">" => generic(...) }
+   /  {[pfclassname]:n => {ctoken = keyword} simple(...)} ; // Add generics here!
+
+  pfmixclassmember :=
+     { mbase [pfmodifiers]:mods [pftype]:tp [pfident]:name 
+        "(" ecslist<[pfargdef],",">:args ")" [expr]:b ";"?
+         => mbmethod(tp,name,mods,args,b) }
+   / { [pfclassmember]:m => dnet(m) }
+   ;
+
+  pfclassmember :=
+     {entry ":" [pfident]:name ";" => entry(...)}
+   / {[pfmodifiers]:mods [pftype]:tp [pfident]:name 
+       "(" ecslist<[pfargdef],",">:args ")" [pfnetbody]:b ";"?
+      => method(tp,name,mods,args,b)}
+   / {[pfmodifiers]:mods [pfident]:name
+       "(" ecslist<[pfargdef],",">:args ")" [pfnetbody]:b ";"?
+      => constructor(mods, name, args, b)}
+   / {[pfmodifiers]:mods [pftype]:tp [pfident]:name ";"
+       => field(tp,name,mods) }
+   ;
+
+  pfnetbody :=  "{" slist<[pfstatement]>:body "}" => begin(...);
+
+  pfstatement := [pfnetbody]
+               / [nnstmt_start]
+               / { goto [pfident]:lbl ";" => goto(...) }
+               / { tail return  [pfexpr]:ex ";" => tailreturn(...) }
+               / { return  [pfexpr]:ex ";" => return(...) }
+               / { leave  [pfexpr]:ex ";" => leave(...) }
+               / { return ";" => vreturn() }
+ 	       / { if "(" [pfexpr]:cnd ")" (then)? [pfstatement]:iftr
+                   else [pfstatement]:iffl => if3(...) }
+ 	       / { if "(" [pfexpr]:cnd ")" (then)? [pfstatement]:iftr
+                    => if2(...) }
+	       / { try [pfstatement]:tr catch "(" [pftype]:tp [pfident]:nm ")"
+	           [pfstatement]:cblock 
+		   => try(tr,$list(tp,nm),cblock) }
+	       / { throw [pfexpr]:ex ";" => throw(...) }
+               / { foreach "(" [pfident]:var in [pfexpr]:e ")" [pfstatement]:b
+                   =>
+                   foreach(...) }
+               / { while "(" [pfexpr]:e ")" [pfstatement]:b
+                   =>
+                   while(...) }
+	       / { lift ":" [pfclassmember]:mem => lift(...) }
+	       / { [pftype]:tp [pfident]:id ";"
+	           => vardef(id, tp) }
+	       / { [pftype]:tp [pfident]:id "=" [pfexpr]:ex ";"
+                   => varinit(id,tp, ex) }
+	       / { var [pfident]:l "=" [pfexpr]:v ";" => uvarinit(...) } 
+	       / { [pfexpr]:l "=" [pfexpr]:v ";" => set(...) } 
+	       / { [pfexpr]:l ":=" [pfexpr]:v ";" => set(...) } 
+               / { [pfident]:lbl ":"  => label(...) }
+               / { "\" [tkpfident]:i "\" ";" => {qstate = unquote} unquote($sval(i)) }
+	       / { [pfexpr]:e ";" => expr(e) }
+               / { ";" => begin($nil()) }
+               ; // more to come
+
+  binary pfexpr :=
+           (100) [pfexpr] "&&" [pfexpr] => logand(L,R)
+         | (100) [pfexpr] "||" [pfexpr] => logor(L,R)
+
+         | (200) [pfexpr] ">=" [pfexpr] => greq(L,R) 
+         | (200) [pfexpr] "<=" [pfexpr] => lteq(L,R)
+         | (200) [pfexpr] ">"  [pfexpr] => gr(L,R)
+         | (200) [pfexpr] "<"  [pfexpr] => lt(L,R)
+         | (200) [pfexpr] "==" [pfexpr] => eq(L,R)
+         | (200) [pfexpr] "!=" [pfexpr] => noteq(L,R)
+
+         | (300) [pfexpr] "+"  [pfexpr] => plus(L,R)
+         | (300) [pfexpr] "-"  [pfexpr] => minus(L,R)
+	 | (300) [pfexpr] "<<" [pfexpr] => lshift(L,R)
+	 | (300) [pfexpr] ">>" [pfexpr] => rshift(L,R)
+
+         | (400) [pfexpr] "*"  [pfexpr] => mul(L,R)
+         | (400) [pfexpr] "/"  [pfexpr] => div(L,R)
+         | (400) [pfexpr] mod  [pfexpr] => mod(L,R)
+         | (400) [pfexpr] "^"  [pfexpr] => xor(L,R)
+         | (400) [pfexpr] "&"  [pfexpr] => binand(L,R)
+         | (400) [pfexpr] "|"  [pfexpr] => binor(L,R)
+         | [pfexprasis]
+         ;
+
+  pfexprasis := 
+	   { [pfexpr5]:L is   [pftype]:R => istype ... }
+	 / { [pfexpr5]:L as   [pftype]:R => typecast ... }
+         / [pfexpr5]
+         ;
+         
+  pfexpr5 := { "!" [pfexpr5]:a => unot(a) }
+          /  { "-" [pfexpr5]:a => uminus(a) }
+	  /  { "null?" [pfexpr5]:a => isnull(a) }
+	  /  { typeof [pfexpr5]:a => typeof(a) }
+	  /  { type [pftype]:t => typetoken(t) }
+	  /  { "(" [pftype]:tp ")" [pfexpr5]:a => typecast(a,tp) }
+	  /  { delegate [pftype]:tp "(" [pftype]:e ":" [pfident]:nm ")" =>
+	        newdelegate(tp, type(e), nm) }
+	  /  { delegate [pftype]:tp "(" [pfexpr]:e ":" [pfident]:nm ")" =>
+	        newdelegate(tp, expr(e), nm) }
+	  /  { new [pftype]:tp "(" ecslist<[pfexpr],",">:args ")" => 
+                new(tp,args) }
+	  /  { new [pftype]:tp "[" [pfexpr]:sz "]" => 
+                newarr(tp,sz) }
+          /  [nnexpr_unary]
+	  /  [pfprim]
+	  ;
+
+  pfprim :=
+             { [pfprim]:ex "." [pfident]:mtd "(" ecslist<[pfexpr],",">:args ")" =>
+               mtdcall(ex,mtd,args) }
+          / { [pfprim]:ex "." [pfident]:fld 
+               => fldaccess(ex, fld) }
+	  / { [pfprim]:ex "[" [pfexpr]:idx "]"
+               => arrayacc(ex, idx) }
+          / { [pfident]:id "(" ecslist<[pfexpr],",">:args ")" =>
+               smtdcall(id,args) }                    
+          / [nnexpr_prim]
+	  / [pfatom]
+	  ;
+
+  pfatom := 
+            { "(" [pfexpr]:e ")" => e}
+         /  { "{" slist<[pfstatement]>:body "}" => embedbegin(body) }
+         /  { "\" [tkpfident]:i "\" => {qstate = unquote} unquote($sval(i)) }
+         /  { null => null() }
+         /  { true => true() }
+         /  { false => false() }
+         /  [nnexpr_start]
+         /  { [pfident]:id => var(id) }
+         /  { [pffloat]:num => float(num) }
+         /  { [pfdouble]:num => double(num) }
+         /  { [pfint]:num => int(num) }
+	 /  { [pfstring]:str => string(str) }
+	 ;
+}
+
+// Replace initial sets with uvarinits where appropriate
+function pfnotnet_sets (nn)
+{
+  ht = mkhash();
+  visit:pfnotnetast(stmt: nn) {
+    deep stmt {
+      set -> (match left with
+                var(id) -> if (hashget(ht,id)) then node 
+                             else { hashput(ht,id,id); 
+                                    'uvarinit'(id,right); }
+              | else      -> node)
+    | varinit -> {hashput(ht,id,id); node}
+    | uvarinit -> {hashput(ht,id,id); node}
+    | else -> node
+    }}
+}
+
+
+// Transformation from our intermediate AST into the simplified Not.Net form.
+// See the core MBase documentation for the Not.Net reference.
+function pfnotnet_top (nn)
+{
+   n0 = visit:pfnotnetast(top: nn) {
+          once stmt : forall pfnotnet_sets (node)};
+   visit:pfnotnetast(top: n0)
+   {
+      deep top {
+          notnet -> 'not.neth'(args,body)
+       |  class -> ['not.class';nm]::(if (inh) then ['extends':inh] else nil)::
+                        body
+       |  mixclass -> ['mixed-class';nm]::(if (inh) then ['extends':inh] else nil)::
+                        body
+      };
+      deep member {
+          field -> ['field';tp;nm]::mods
+       |  method -> ['method';mods;tp;nm;args;body]
+       |  constructor -> ['constructor';mods;args;body] //TODO: check name
+       |  entry -> ['custom';['main';%L[;to-string;](nm)]]
+      };
+      deep mixmember {
+          dnet -> m
+       |  mbmethod -> ['lmethod';mods;tp;[nm;nm];args;%hlevel-compile-expr(body)]
+      };
+      deep stmt {
+          begin -> 'begin':body
+       |  flatbegin -> 'begin':body
+       |  loc -> {
+            <[Src;F;T]> = L;
+	    <[fl;fc]> = %peg:decode-pos(F);
+	    <[tl;tc]> = %peg:decode-pos(T);
+	    return 'debugpoint'(Src,fl+1,fc+1,tl+1,tc+1)
+          }
+       |  goto  -> 'goto'(lbl)
+       |  return -> 'return'(v)
+       |  tailreturn -> 'tail-return'(v)
+       |  leave -> 'leave'(v)
+       |  vreturn -> ['return']
+       |  if3 -> 'if'(cnd,iftr,iffl)
+       |  if2 -> 'if'(cnd,iftr)
+       |  try -> 'try'(body,'catch'(catch,cblock))
+       |  throw -> node
+       |  foreach -> 'foreach'([var;v],body)
+       |  while -> 'while'(v,body)
+       |  label -> 'quote'(lbl)
+       |  vardef -> ['nop'] //TODO!
+       |  varinit -> [tp;id;'=';v]
+       |  uvarinit -> [id;'=';v]
+       |  lift -> {
+            match m with
+	       'field':_ -> 'lift-field'(m)
+	     | 'method':_ -> 'lift-method'(m)
+          }
+       |  set -> [left;'<-';right]
+       |  verbatim -> v
+       |  expr -> e
+      };
+      deep expr {
+          greq -> '>='(a,b)
+       |  lteq -> '<='(a,b)
+       |  gr -> '>'(a,b)
+       |  lt -> '<'(a,b)
+       |  eq -> '=='(a,b)
+       |  noteq -> '!='(a,b)
+       |  plus -> '+'(a,b)
+       |  minus -> '-'(a,b)
+       |  mul -> '*'(a,b)
+       |  mod -> 'mod'(a,b)
+       |  div -> '/'(a,b)
+       |  logand -> 'and'(a,b)
+       |  logor -> 'or'(a,b)
+       |  xor -> 'xor'(a,b)
+       |  lshift -> 'lshift'(a,b)
+       |  rshift -> 'rshift'(a,b)
+       |  binand -> 'binand'(a,b)
+       |  binor -> 'binor'(a,b)
+       |  istype -> 'istype'(a,tp)
+       |  typeof -> 'typeof'(a)
+       |  typecast -> [[tp];a]
+       |  unot -> 'not'(a)
+       |  uminus -> '-'(a)
+       |  isnull -> 'isnull'(a)
+       |  new -> 'new'(tp)::args
+       |  newarr -> 'mkarr'(tp,sz)
+       |  newdelegate -> ['&&&';tp;cadr(inst);nm]
+       |  mtdcall -> [e;'@';mtd]::args
+       |  smtdcall -> nm:args
+       |  fldaccess -> [e;'#';fld]
+       |  arrayacc -> 'aref'(ar,idx)
+       |  embedbegin -> 'begin':sts
+       |  var -> id
+       |  float -> %Sm<<("f",v)
+       |  double -> %Sm<<("d",v)
+       |  int -> %S->N(v)
+       |  string -> v
+       |  null -> 'null'
+       |  true -> 'true'
+       |  false -> 'false'
+
+       |  verbatim -> v
+
+       |  unquote -> 'unquote'('pfnotnet_expr'(v))
+      };
+      deep type {
+         simple -> nm
+       | array -> 'array'(t)
+       | generic -> 'generic'(nm,@args)
+      }
+      // ...
+   }
+}
+
+function pfnotnet_core (nn)
+{
+ <[x;y;z]> = pfnotnet_top('notnet'([],nn));
+  return z;
+}
+
+function pfnotnet_expr (nn)
+{
+  pfnotnet_core('expr'(nn))
+}
+
+
+// Binding the parser defined above to the PFront core syntax:
+
+syntax in top, start (pfnotnet): '[pfnotnettop]:nn' 
+{
+   'expr'('lisp'('ctime'('pfnotnet_top'('quote'(nn)))))
+}
+
+syntax in expr, start (pfnotnet): '[pfnotnet]:nn' 
+{
+   'lisp'(pfnotnet_top(nn))
+}
+
+syntax in expr, start (pfnotnet): '".net" "(" ecslist<[pfident],",">:args ")" ":" [pfexpr]:b' 
+{
+   'lisp'('not.neth'((map a in args do 'object'(a)),
+             'begin'('leave'(pfnotnet_expr(b)))))
+}
+
+syntax in expr, start (pfnotnet): '".net" ":" [pfexpr]:b' 
+{
+   'lisp'('not.neth'(nil,
+             'begin'('leave'(pfnotnet_expr(b)))))
+}
+
+
+syntax in expr, start (pfnotnet): '".net-statement" "`" [pfstatement]:b "`"'
+ { 'qquote'(b) }
+
+syntax in expr, start (pfnotnet): '".net-expr" "`" [pfexpr]:b "`"'
+ { 'qquote'(b) }
+
+syntax in expr, start (pfnotnet): '".net-member" "`" [pfclassmember]:b "`"'
+ { 'qquote'(b) }
+
+syntax in expr, start (pfnotnet): '".net-class" "`" [pfnotnettop]:b "`"'
+ { 'qquote'(b) }
+
+syntax in top, start: '".net-macro" [qident]:name "(" ecslist<[fqident],",">:args ")" [expr]:e' +
+  {
+   fqident := { "@" [qident]:i => a(i) }
+           /  { [qident]:i => i(i) }
+           ;
+  }
+{
+  e1 = %L[;hlevel-compile-expr;](e);
+  argslist = do iloop ( a = args ) 
+             {
+               match a with
+                 a(i) : rest -> i
+               | i(i) : rest -> i : iloop(rest)
+               | [] -> []
+             };
+  'expr'('lisp'('lltnet-macro'(name,argslist,e1)))
+}

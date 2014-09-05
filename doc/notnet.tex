@@ -1,0 +1,159 @@
+\subsection{Not.Net language details}
+
+Not.Net is a low level .NET language. It can be either used standalone or
+embedded into MBase code.
+
+\subsubsection{Types}
+
+ Some short type names are defined for convenience: void, int, ptr, 
+short, long, char, byte,
+float, double, string, object, bool. A special type name 'this' must be used
+as a reference to the current class (and it works even with an 
+expression--embedded code).
+
+ Other types must be named explicitly, as in C\#. Since 
+normal MBase {\tt(dotnet ...)} function is used for a type lookup, its current
+lookup path is taken into account, i.e. one can use 
+{\tt(using (<namespaces>) ...)} construction.
+
+\subsubsection{Statements}
+
+ Not.Net is a statement--based language, so there is a distinction between 
+statements and expressions.
+
+ The following statements are defined:
+
+{\tt (begin ...)} executes statements sequentially.
+
+{\tt (quote <symbol>)} defines a label.
+
+{\tt (for ((<symbol:name> <expr:initial> <expr:step>) <expr:condition>) ...)}
+ is a simple looping statement: a variable {\tt <name>} is set as {\tt <initial>},
+and until {\tt <condition>} is false, the body statements are evaluated and
+{\tt <name>} is updated to {\tt <step>} value.
+
+{\tt (while <expr:condition> ...)}
+  loops until {\tt <condition>} is false, condition is checked prior to 
+the body execution.
+
+{\tt (dowhile <expr:condition> ...)}
+  loops until {\tt <condition>} is false, condition is checked after the body
+execution.
+
+{\tt (foreach (<symbol:name> <expr:initial>) ...)}
+  iterates over any {\tt System.Collection.IEnumerable} collection.
+
+{\tt (goto <symbol:label>)}
+  jumps to a given label.
+
+{\tt (goto-if <expr:condition> <symbol:label>)}
+ jumps to a given label if a condition value is true.
+
+{\tt (goto-if-not <expr:condition> <symbol:label>)}
+ jumps to a given label if a condition value is false.
+
+{\tt (return <expr:value>)} returns a value from the current method.
+
+{\tt (return)} returns from a void method.
+
+{\tt (if <expr:condition> <statement:iftrue> [<statement:iffalse>])}
+  executes {\tt iftrue} statement if condition value is true, and {\tt iffalse} otherwise. 
+
+{\tt (try <statement:code> (catch (<type:exception> <symbol:name>) 
+      <statement:excode>))} tries to execute {\tt <code>}, and if an {\tt <exception>} is raised, binds it to {\tt <name>} and executes {\tt <excode>}.
+
+{\tt (throw <expr:value>)} throws and exception.
+
+{\tt (<symbol:name> = <expr:value>)} defines a variable with a given 
+  initial value. Variable type is same as {\tt <value>} type.
+
+{\tt (<type> <symbol:name> = <expr:value>)} defines an explicitly typed 
+  variable with a given initial value.
+
+{\tt (<lvalue> <- <expr:value>)} destructively assigns a value to a given lvalue (e.g., a local variable, a field, an array element).
+
+{\tt (lift-field <field>)} adds a field to the current class, this works
+  for embedded not.net code as well as for complete class definitions.
+
+{\tt (lift-method <method>)} adds a not.net method to the current class,
+  method is defined as in {\tt not.class} language.
+
+\subsubsection{Expressions}
+
+ The following expressions are allowed:
+
+{\tt ((<type>) <expr>)} casts an expression value to a given type
+
+{\tt (type <type>)} loads a type token
+
+{\tt (marshal <type> <expr>)} marshals an expression to a given type
+
+{\tt (arr . <*expr>)} builds an array of given elements, array type if defined
+  by the most generic type of all the expressions.
+
+{\tt (arrt <type> . <*expr>)} builds an array of given elements, array type is
+  specified explicitly.
+
+{\tt (mkarr <type> <expr:length>)} build an array of a given type and
+   dynamically evaluated length ({\tt <length>} must be an integer expression).
+
+{\tt (ref <symbol>)} 
+
+{\tt (aref <expr:array> <expr:index>)} references to an element of an array, 
+ can be either an expression or an lvalue.
+
+{\tt (begin <statement> ... <expr>)} executes a sequence of statements with a final expression.
+
+{\tt (new <type> . <*expr>)} creates a new object or a value of a given type, using an appropriate constructor call.
+
+{\tt (<type> \# <symbol:field>)} references to a static field.
+
+{\tt (<expr> \# <symbol:field>)} references to a field.
+
+{\tt (<expr> @ <symbol:method> . <*expr:args>)} calls a method.
+
+{\tt (typeof <expr>)} gives a type of a value in runtime.
+
+{\tt (istype <expr> <type>)} checks a type of a value
+
+{\tt (\&\& <type> @ <symbol:method> . <*type:argtypes>)}
+
+{\tt (\&\&\& <type> <type> <symbol>)}
+
+{\tt (\&\&\& <type> <expr> <symbol>)}
+
+{\tt null}
+
+{\tt true}
+
+{\tt false}
+
+{\tt self}
+
+{\tt <literal>}
+
+{\tt (<binop> <expr> <expr>)}
+
+{\tt (<unop> <expr>)}
+
+
+\subsubsection{Class definition}
+
+ Class is defined as follows:
+
+{\tt (not.class <name> [(extends <type>)] [(implements <type>)...] ...)}
+
+Class definition body may contain fields, methods and constructors definitions.
+
+Field definition format is: {\tt (field <type> <name>  <attribute> ...)}, where attributes can be {\tt (public)}, {\tt (static)}, {\tt (private)}, 
+      {\tt (protected)}.
+
+Method definition is: 
+{\tt (method (<attribute> ...) <type> <name> ((<argtype> <argname>) ...) ...)}
+
+Constructor definition is:
+{\tt (constructor (<attribute> ...) ((<argtype> <argname>) ...) ...)}
+
+
+
+ 

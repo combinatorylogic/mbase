@@ -1,0 +1,10 @@
+#!/bin/sh
+
+set +e
+editbin /stack:9000000 $1
+
+CorFlags.exe /Force /32BIT+ $1
+sn -Ra $1 pubpriv
+
+set -e
+

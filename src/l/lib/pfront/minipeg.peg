@@ -1,0 +1,178 @@
+//////////////////////////////////////////////////////////////////////////////
+//
+//   OpenMBase
+//
+// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
+// This file is distributed under the terms of the Q Public License version 1.0.
+//
+//////////////////////////////////////////////////////////////////////////////
+
+/*
+
+ This is a syntax for embedded PEG parsers to be used in PFront and other 
+ derived languages. It is different from the language accepted by MBasePackrat,
+ since the latter is defined using the old MBase parsers generator, and it is
+ more lightweight, more leaned towards short embedded parsers.
+
+*/
+
+.peg:
+
+parser minipeg extends pfcommon (
+   ignoring Spaces;
+
+   rule lexical := lexical => {ctoken = keyword};
+
+   token singlone := ( . ) ;
+   token tsinglechar := '"' . '"';
+
+   token tkhexnumber := '0x' ([a-f]/[A-F]/[0-9])+;
+  
+   term hexnumber := tkhexnumber:n => {ctoken=const} $hexval(n);
+
+
+   token mTO := '=>' => {ctoken = doubleto};
+
+   token mLEFT := ':=' => {ctoken = leftset};
+
+   term singlechar := tsinglechar:c => $stripval(c);
+   term charrange := '[' singlone:a '-' singlone:b ']' => 
+          range($charcode($val(a)),$charcode($val(b)));
+
+   term mpsymbol0 := tIdent:i => {ctoken = ident} $sval(i);
+   term mpstring := tString0:t => {ctoken = ident} $stripval(t);
+   term mpsymbol := mpsymbol0 / {mpstring:s => $symbol(s)};
+
+   term minipeg := 
+         {tQUOTE miniexpr:e mTO miniastx:a tQUOTE '+'
+          '{' cslist<mininode,';'>:nodes ';'? '}' => peg(e,a,nodes)}
+      /  {tQUOTE miniexpr:e mTO miniastx:a tQUOTE => peg(e,a,$nil())}
+      ;
+
+   term mpeg := 
+         {tQUOTE miniexpr:e tQUOTE '+'
+          '{' cslist<mininode,';'>:nodes ';'? '}'
+          => mpeg(e,nodes)}
+      /  {tQUOTE miniexpr:e tQUOTE => mpeg(e,$nil())}
+      ;
+         
+
+   term miniexpr "PEG expression" :=
+       { minielt:e '/' cslist<minielt,'/'>:els => palt(e,@els) }
+    /  { minielt:e slist<minielt>:els => seq(e,@els)}
+    /  minielt
+    ;
+
+   term minielt "PEG element" := 
+       { miniatom:a '?' => {state=pattern} maybe(a) }
+    /  { miniatom:a '+' => {state=pattern} plus(a) }
+    /  { miniatom:a '*' => {state=pattern} star(a) }
+    /  { '!' miniatom:a => {state=pattern} notp(a) }
+    /  { '&' miniatom:a => {state=pattern} andp(a) }
+    /  miniatom
+    ;
+
+    term miniatom "PEG atom" :=
+       { miniatomx:at ':' tIdent:nm => {state=pattern} bind($sval(nm),at) }
+       / miniatomx
+       ;
+
+    term miniatomx :=
+       { tIdent:i '<' cslist<miniatomx,','>:args '>'
+          => {state=pattern}  macroapp($sval(i),@args) }
+    /  { '~' ident:nm  '(' ecslist<constrarg,','>:args ')' => [[action]](nm, args) }
+    /  { '#' ident:nm '<' cslist<ident,','>:args '>' => [[highorder]](args,nm) }
+    /  { '(' '?' ':' tIdent:i ')' => [[check]]($sval(i)) }
+    /  { '[' tIdent:i ']' => {state=pattern} {ctoken = keyword} terminal($sval(i)) }
+    /  { singlechar:ch => {state=pattern} {ctoken = const} trivial(char($charcode(ch))) }
+    /  { charrange:rng => {state=pattern} {ctoken = const} trivial(rng) }
+    /  { '..' => trivial(fail()) }
+    /  { '.' => trivial(anychar()) }
+    /  { tIdent:i => {ctoken=const} {state=pattern} [[rule]](`keyword, $val(i)) }
+    /  { string0:s => {ctoken=const} {state=pattern} trivial(sstring(s)) }
+    /  { '[' tIdent:i ':' string0:s ']' => {state=pattern} [[rule]]($sval(i),s) }
+    /  { '{' miniexpr:e mTO miniastx:a '}' => lift(e,a) }
+    /  { '{' miniexpr:e '}' => lift(e,$list($nil(),$nil())) }
+    /  { '(' miniexpr:es ')' => es }
+    /  { number:n => trivial(char(n)) }
+    /  { hexnumber:n => trivial(char(n)) }
+    ;
+
+    term miniastx "PEG annotations and/or constructor" :=
+       {   miniast0:v => $list($nil(),v) }
+    /  {   slist<miniannotation>:a miniast0:v => $list(a,v) }
+    /  {   slist<miniannotation>:a => $list(a,$nil()) }
+    ;
+
+    term miniannotation := '{' mpsymbol:k '=' mpsymbol:v '}' => $list(k,v);
+
+    term miniast0 "PEG constructor" :=
+       { mpsymbol:id '(' '...' ')' => [[auto]](id) }
+    /  { mpsymbol:id '...' => [[auto]](id) }
+    /  { '...' => [[auto]]() }
+    /  { miniast:a => a}
+    ;
+
+    term miniast "PEG constructor" :=
+       { mpsymbol:ctr '(' ecslist<miniastc,','>:args ')' => constr(ctr,@args) }
+    /  { '$' mpsymbol:fn '(' ecslist<miniast,','>:args ')' => fcall(fn,@args) }
+    /  { '`' mpsymbol:c => const(c) }
+    /  { '`' number:n => const(n) }
+    /  { ident:v => var(v) }
+    => {state = constr}
+    ;
+
+    term miniastc "PEG constructor argument" :=
+       { miniast:a => set($gensym(),a) }
+     / { '@' miniast:a => append($gensym(),a) }
+     ;
+
+    term report :=
+        { string:s => $wrap(s) }
+      / { empty => $nil() }
+      ;
+
+    token empty := !..;
+
+    term miniparser "PEG parser" :=
+      ident:name '(' ecslist<ident,','>:borrow ')' '{'
+           cslist<mininode,';'>:nodes ';'? '}' => topparser(name,borrow,@nodes);
+
+    term miniassoc :=
+         { 'left' => `[[left]] }
+      /  { 'right' => `[[right]] }
+      /  { empty => `[[left]] }
+      ;
+
+    term minibin :=
+        { '(' number:prec miniassoc:assoc ')'
+              miniexpr:e '=>' miniastx:a =>  binary(prec, assoc, e, a) }
+     /  { miniexpr:e => simple(e) }
+     ;
+
+
+
+    term mininode "PEG parser entry" :=
+       { 'binary' ident:nm report:r mLEFT cslist<minibin,'|'>:bins =>
+            [[src-binaries]](`[[term]],nm, bins, @r) }
+    /  { ident:nm report:r mLEFT miniexpr:e mTO miniastx:a  => terminal(`[[term]],nm,e,a,@r) }
+    /  { ident:nm report:r mLEFT miniexpr:e => terminal(`[[term]],nm,e,$list($nil(),$nil()),@r) }
+    /  { '&' ident:nm => dynahook(nm) }
+    /  { '@@' ident:nm report:r mLEFT miniexpr:e mTO slist<miniannotation>:a
+           => terminal(`[[normal]],nm,e,$list(a,$nil()),@r) }
+    /  { '@@' ident:nm report:r mLEFT miniexpr:e => terminal(`[[normal]],nm,e,$list($nil(),$nil()),@r) }
+    /  { '@' ident:nm report:r mLEFT miniexpr:e  mTO slist<miniannotation>:a  
+           => terminal(`[[token]],nm,e,$list(a,$nil()),@r) }
+    /  { '@' ident:nm report:r mLEFT miniexpr:e => terminal(`[[token]],nm,e,$list($nil(),$nil()),@r) }
+    /  { '!!' ident:nm => [[with-ignore]](nm) }
+    /  { '[' ident:nm ':' ']' mLEFT miniexpr:e mTO miniastx:a
+         => [[rule]](nm, e, a) }
+    /  { '[' ident:nm ':' ']' mLEFT miniexpr:e
+         => [[rule]](nm, e, $list($nil(),$nil())) }
+    /  { ident:nm '<' cslist<ident,','>:args '>' mLEFT miniexpr:e mTO miniastx:a =>
+         [[define]](nm, args, e, a) }
+    /  { ident:nm '<' cslist<ident,','>:args '>' mLEFT miniexpr:e =>
+         [[define]](nm, args, e, $list($nil(),$nil())) }
+    ;
+
+)

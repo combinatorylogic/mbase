@@ -1,0 +1,349 @@
+//////////////////////////////////////////////////////////////////////////////
+//
+//   OpenMBase
+//
+// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
+// This file is distributed under the terms of the Q Public License version 1.0.
+//
+//////////////////////////////////////////////////////////////////////////////
+
+/* Syntax extensions that should not be present in the core language */
+
+/* Precooked hashtable generator */
+
+syntax in expr, start:
+  '"->hash" [qident]:f "(" [expr]:e ")"'
+{
+  `{ t = \e\;
+     th = mkhash();
+     iter x in t do match x with [n;v] -> hashput(th,n, \f\ (v));
+     th}`
+}
+
+syntax in expr, bin1:
+  ' [basicexpr]:l "/@" [expr]:r '
+{
+  `hashget( \l\ , \r\ )`
+}
+
+syntax in expr, bin1:
+  ' [basicexpr]:l "/!" [expr]:i "<-" [expr]:r '
+{
+  `hashput( \l\ , \i\ , \r\ )`
+}
+
+syntax in expr, start:
+ ' with hash "(" cslist<[qident],",">:nms ")" [expr]:i '
+{
+   ids = map nms do ` \nms\ = mkhash() `;
+   'begin':ids :: [i];
+}
+
+/* A very typical gensym wrapper */
+
+syntax in expr, start:
+  'symbols "(" cslist<[qident],",">:args ")" [expr]:body'
+{
+   ('begin':(map a in args do 
+               `\a\ = gensym()`)) :: [body]
+}
+
+/* Simple format macro on top of match ... construction */
+
+syntax in expr, start:
+  'format "(" cslist<[formatentry],",">:entries ")" [expr]:body'
++ {
+     formatentry := [basicexpr]:ex ":" [mpattern]:pt => $list(ex,pt);
+  }
+{
+   do loop ( e = entries ) {
+      if (e) {
+         match car(e) with
+           [ex;pt] -> {inner = loop(cdr(e)); 
+                       'match'(ex,[pt;inner])}
+      } else body
+   }
+}
+
+/* A way to quasiquote a toplevel expression */
+
+syntax in expr, start: '"top-expr" "`" [topexpr]:b "`"'
+{
+   ['qquote';b]
+}
+
+/* "Old" heavy-weight PEG syntax, the one used to define PFront itself */
+
+syntax in top, start (pegparser) : ' ".peg" ":" [decl]:t '
+{
+   'expr'('lisp'(t))
+}
+
+/* An easy-to-use parsing interface for strings */
+syntax in expr, start: ' parse [expr]:e as [qident]:i '
+{
+   vi='var'(i);
+   return `%L[;pfront:easyparse;]( \vi\,\e\ )`
+}
+
+macro %L[;pfront:easyparse;](i,e)
+{
+   return  'peg:easyparse'(%L[;Sm<<;]('peg_',i),'peg:str->stream'(e));
+}
+
+syntax in expr, start: ' parse stream [expr]:e as [qident]:i '
+{
+   vi='var'(i);
+   return `%L[;pfront:easyparse-stream;]( \vi\,\e\ )`
+}
+
+macro %L[;pfront:easyparse-stream;](i,e)
+{
+   return  'peg:easyparse'(%L[;Sm<<;]('peg_',i),e);
+}
+
+------------------------
+
+syntax in expr, start : ' "[" [expr]:e "|" cslist<[lcclause],",">:cls "]" '
+ +
+ {
+  lcclause := {[qident]:id "<-" [expr]:ex (where [expr]:cl)? => c ...};
+ }
+{
+ return
+  'lisp'('<L>'(pfront_expr(e),'|'
+     ,@({c2 = (
+          map cls do 
+           format(cls : c(id,ee,cl))
+	     {
+              [id;'<-';pfront_expr(ee)] :: 
+	        (if cl then ['&';pfront_expr(car(cl))] else [])
+	     });
+	  map append c in interleave(c2,['|']) do c}
+        )))
+}
+
+syntax of pfnotnet in nnstmt, start: 
+' for "(" cslist<[pfdecl],",">:initdecls ";" [pfexpr]:condn ";" 
+          cslist<[pfeqstatement],",">:steps ")" [pfstatement]:body '
++ {
+    // Copypasted from notnet.hl:
+    pfdecl := { [pftype]:tp [pfident]:id "=" [pfexpr]:ex
+                   => varinit(id,tp, ex) }
+            / { [pfident]:id "=" [pfexpr]:ex
+                   => uvarinit(...) };
+    pfeqstatement := {[pfexpr]:l (":="/"=") [pfexpr]:v => set(...)}
+              / { [pfexpr]:e => expr(...) };
+  }
+{
+  stepsx = 'begin'(steps);
+  symbols(replabel) {
+   'begin'
+   (initdecls::
+     [.net-statement 
+      `{ 
+         \replabel\:
+           if( \condn\ ) { \body\; \stepsx\; goto \replabel\;}
+       }`])
+    }
+}
+
+syntax in top, start (pliter): ' "%" "literate:" slist<[pliter]>:rest &[EOF] '
+{
+  collector(add,get)
+  {
+     iter rest do match rest with 
+        pltopexpr(e) -> iter e do add(e)
+      | plqhexpr(e) -> iter e do add(e);
+     return 'begin':get();
+  }
+}
+
+
+syntax in expr, bin1: '[eterm]:l "/.." "{" [matchbody]:mb "}" '
+{
+   'lisp'('pfront_rewrite_rules'(1,l,mb))
+}
+
+syntax in expr, bin2: '[basicexpr]:l "!@!" [eterm]:r'
+{
+   n = gensym();vn = 'var'(n);
+   return
+   `{\n\ = \l\;
+     if ( \vn\ ) then return \vn\ else return \r\
+    }`;
+}
+
+syntax in expr, bin1: '[eterm]:l "/." "{" [matchbody]:mb "}" '
+{
+   'lisp'('pfront_rewrite_rules'([],l,mb))
+}
+
+macro pfront_rewrite_rules(rep,l,mb)
+{
+   symbols(nm,arg) {
+     defptn = [['cons'('binding'('l'),'binding'('r')); 
+               ` cons(\nm\ (l), \nm\ (r)) `];
+               [['any'];'var'(arg)]];
+     mb1 = if (rep) then map mb do 
+              (match mb with 
+                 [ptn;str] -> [ptn;` \nm\ (\str\)`])
+           else mb;
+     mtch = 'match'('var'(arg),@(mb1 :: defptn));
+     pfront_expr(`do \nm\ ( \ arg \ = \ l \ )
+                  { \mtch\ }`);
+   }
+}
+
+/* Example:
+
+  define abc = #'(abc (@ aaa 2) (@ bbb 3) (ooo (@ ccc 4)));
+
+  abc /. { ['@';a;b] -> [a;[b]] };
+
+ */
+
+
+syntax in expr, start:
+  ' [qident]:nm "(" ecslist<[qident],",">:args ")" "=" [expr]:i '
+{
+	'def'(nm, 'lambda'(args,i));
+}
+
+
+syntax in top, start:
+  ' ".unittest" ([number]:level)? ":" 
+    "(" [expr]:e ")" "expect" ":" [expr]:res '
+{
+   lev = if(level) car(level) else 1;
+   ec = pfront_expr(e);
+   eres = pfront_expr(res);
+   'expr'('lisp'('unit-test'(lev, ec, eres)));
+}
+
+syntax in top, start:
+  ' ".unittest" ([number]:level)? "code" ":"
+    [topexpr]:tp '
+{
+   lev = if(level) car(level) else 1;
+   ec = pfront_top(tp);
+   'expr'('lisp'('unit-test-defn'(lev, ec)));
+}
+
+syntax in expr, bin2: 
+  ' [basicexpr]:l ":=" [expr]:r '
+ {  return ` %r!( \l\ , \r\ ) ` }
+
+syntax in expr, start:
+  ' "^" [basicexpr]:e '
+ { return ` deref( \e\ ) ` }
+
+syntax in top, start:
+  ' screen function [qident]:nm "(" ecslist<[qident],",">:args ")" [expr]:b '
+{
+  prnt = 'call'('var'('println'),'call'('var'('list'), 'var'('screenExc') ,@map args do 'var'(args)));
+  return  'topfunction'(nm, args, `try { \b\ } catch (t_Exception screenExc) { \prnt\; r_raise(screenExc) }`);
+}
+
+syntax in expr, start:
+  ' sequence "(" [qident]:nm ")" [expr]:b '
+{
+  bc = pfront_expr(b);
+  return 'lisp'('with-sequence'([nm], bc))
+}
+
+----------------------
+
+function %peg-makerfunction-inlineparser (pn, en)
+{
+   pc = shashget(getfuncenv(), %Sm<<("peg_",pn, "_Context"));
+   pe = hashget(pc, en);
+   return car(pe);
+}
+
+function quote_wrap(e) { return 'quote'(e) }
+
+----------------------
+
+syntax in expr, start: 
+  ' "$" "<" [qident]:pname "," [qident]:ename (":" [qident]:fname)? ">" "{" 
+     #inlineparser<pname, ename>:res "}" '
+{
+   proc = if(fname) shashget(getfuncenv(), car(fname)) else quote_wrap;
+   return proc(res);
+}
+
+function %peg-function-addnumber (a, b) { a+b }
+---------------
+
+syntax in expr, start:
+  ' roman [roman]:rnum '
++ {
+    roman := { [ratom]:a [roman]:b => $addnumber(a, b) }
+          /    [ratom]
+	  ;
+    ratom := {"M" => `1000 }
+          /  [rhundreds]
+	  /  [rtens]
+	  /  [rones]
+	  ;
+    rhundreds := {"CM" => `900 }          
+          /      {"CD" => `400 }          
+          /      {"C" => `100 }
+          /      {"D" => `500 }
+	  ;
+    rtens := {"XC" => `90}
+	  /  {"XL"  => `40}
+	  /  {"X"  => `10}
+	  /  {"L"  => `50}
+	  ;
+     rones := {"IV" => `4}
+	  /   {"IX" => `9}
+	  /   {"I" => `1}
+	  /   {"V" => `5}
+	  ; }
+ { return 'number'(rnum) }
+
+
+----------------
+
+syntax in expr, start: ' collect [qident]:ast "(" [qident]:entry ":" [expr]:v ")"
+                         with cslist<[collectdef],",">:defs [expr]:body '
+  + {
+       collectdef := [qident]:d from cslist<[qident],".">:path => from(d,path);
+    }
+{
+   collector(iadd, iget) {
+     ih = mkhash(); lh = mkhash();
+     iter [frm;id;[p1;@pr]] in defs do {
+        iadd(id);
+        chk = ohashget(ih, p1);
+        if(chk) {
+          ohashput(ih, p1, (id:pr):chk);
+        } else {
+          ohashput(ih, p1, [(id:pr)]);
+          ohashput(lh, p1, match pr with [a;b] -> 3 | else -> 2);
+        }
+     };
+     ip = hashmap(fun(id,v) [id;v], ih);
+     inner =
+       #`(,(Sm<< ast ":iter") ,entry ,(pfront_expr v)
+              ,@(foreach-map (i ip)
+                  (format i (p lst)
+                      `(,p DEEP
+                          ,(if (eq? (ohashget lh p) 2)
+                             `(begin ,@(foreach-map (l lst)
+                                          (format l (id fld) `(ohashput ,id ,fld node))))
+                             `(,@(foreach-map (l lst)
+                                     (format l (id vr fld)
+                                         `(,vr (ohashput ,id ,fld node))))
+                               (else nil)))))));
+      ids = iget();
+      'lisp'(#`(let ,(foreach-map (i ids) `(,i (mkhash)))
+                    ,inner
+                    ,(pfront_expr body)));}
+}
+
+
+--------------
+

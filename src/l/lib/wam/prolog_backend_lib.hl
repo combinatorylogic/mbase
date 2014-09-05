@@ -1,0 +1,94 @@
+\section{Prolog core library}
+
+\pfcode{
+.prolog: {
+   //Equality
+   X=X.
+   // Lists
+   append([],L,L). 
+   append([H|T],L,[H|A]) :- append(T,L,A).
+   treclength([],N,N).
+   treclength([H|T],L,N) :- isadd(NN,1,N), treclength(T,L,NN).
+   length([],0).
+   length([H|T], L) :- treclength(T,L,1).
+
+   revert([], []).
+   revert([H|L], R) :- revert(L, RL), append(RL,[H],R).
+
+   // Infamous Prolog negation
+   negate(X) :- call(X),!,fail.
+   negate(X).
+   // Sets (list-based)
+   in(E, []) :- fail.
+   in(E, [E|X]) :- !.
+   in(E, [X|Y]) :- in(E,Y).
+
+
+   setsubelt([E|T], E, T) :- !.
+   setsubelt([], E, []).
+   setsubelt([H|T], E, [H|R1]) :- setsubelt(T,E,R1).
+   setsub(A, [], A).
+   setsub(A, [H|T], R) :- setsubelt(A, H, X), setsub(X, T, R).
+   setadd(A, B, AB) :- setsub(A, B, X), append(X, B, AB).
+
+   setxor(A, B, XAB) :- setsub(A, B, AB), setsub(B, A, BA), 
+                        append(AB, BA, XAB).
+   setand(A, B, AAB) :- setadd(A, B, AB), setxor(A,B, XAB), 
+                        setsub(AB, XAB, AAB).
+
+   unifiqinner([], R, R).
+   unifiqinner([H|T], Prev,R) :- in(H,Prev),!,unifiqinner(T,Prev,R).
+   unifiqinner([H|T], Prev,R) :- unifiqinner(T,[H|Prev],R).
+
+   unifiq([], []) :- !.
+   unifiq(L, R) :- unifiqinner(L,[],R),!.
+
+   // // // Does not work yet:
+   // perms(L, [H|T]) :- setsubelt(L,H,R), perms(R,T).
+   // perms([], []).
+
+   // Assoc lists
+   find(Key, [[Key, Value]|Rest], Value) :- !.
+   find(Key, [X|Rest], Value) :- find(Key, Rest, Value).
+
+   amod(K, V, [], []) :- !.
+   amod(Key, Value, [[Key, OldValue]|Rest], [[Key, Value]|Rest]) :- !.
+   amod(Key, Value, [X|Rest], [X|R]) :- amod(Key, Value, Rest, R).
+
+   //Peano
+   natural_number(o).
+   natural_number(s(N)) :- natural_number(N).
+
+   natural_add(o, N, N).
+   natural_add(s(A), B, s(C)) :- natural_add(A,B,C).
+
+   natural_mul(o, N, o).
+   natural_mul(s(N), M, P) :-
+       natural_mul(N, M, K),
+       natural_add(K, M, P).
+
+   natural_gr(s(N),o).
+   natural_gr(s(A),s(B)) :- natural_gr(A,B).
+
+   natural_lt(o,s(N)).
+   natural_lt(s(A),s(B)) :- natural_lt(A,B).
+
+   natural_max(A,A,A).
+   natural_max(A,B,A) :- natural_gr(A,B).
+   natural_max(A,B,B) :- natural_gr(B,A).
+
+   natural_min(A,A,A).
+   natural_min(A,B,B) :- natural_gr(A,B).
+   natural_min(A,B,A) :- natural_gr(B,A).
+
+   natural_to_num(o,0).
+   natural_to_num(s(N), I) :- natural_to_num(N, I1), isadd(I, I1, 1).
+   
+   num_to_natural(0,o).
+   num_to_natural(I, s(N)) :- issub(I1, I, 1), num_to_natural(I1, N).
+
+}}
+
+%%%%////////////////
+
+

@@ -1,0 +1,149 @@
+include "./lib.hl";
+
+-----------------
+
+%force-class-flush()
+
+function test() {
+ src0 = " test(V) :- X = [a,b,c,d,e], Y = [a,b], append(Y,V,X). test1(V) :- X = [a,b,c,d,e], Y = [d,e], append(V,Y,X). test2([V|Y]) :- X = [a,b,c], append(V,Y,X). 
+
+ test3(V) :- X = [a,b], Y = [c], Z = append(X,Y,V), call(Z).
+
+";
+ app0 = parse src0 as prolog;
+writeline(app0);
+ app = map a in app0 do prolog_parse_fix_arity_clause(a);
+ writeline(app);
+writeline('--------------------0');
+ capp = prolog_compile(app);
+writeline(capp);
+writeline('--------------------1');
+ t0 = map(prolog_codegen,capp);
+ writeline(t0);
+  %read-compile-eval('begin'(@t0));  
+writeline('--------------------2');
+  test2();
+}
+
+function test2() {
+  fn = %read-int-eval( '_prolog_function_test/1' );
+  res = 'var':[];
+  env0 = 'env':[];
+  cnt0 = fun(env) { return env; };
+  tres = fn(env0, cnt0, res);
+  if(tres) writeline(prolog_deref(res));
+  test3();
+}
+
+function test3()
+{
+  fn = %read-int-eval( '_prolog_function_test1/1' );
+  res = 'var':[];
+  env0 = 'env':[];
+  cnt0 = fun(env) { return env; };
+  tres = fn(env0, cnt0, res);
+  if(tres) writeline(prolog_deref(res));
+  test4();
+}
+
+function test4()
+{
+  fn = %read-int-eval( '_prolog_function_test2/1' );
+  res = 'var':[];
+  env0 = 'env':[];
+  cnt0 = fun(env) { return env; };
+  tres = fn(env0, cnt0, res);
+  do loop(t = tres, i=0) 
+    {
+      if(t) {
+         writeline('SOLUTION'(i));
+         println(prolog_term_to_string(prolog_decode_result(mkhash(),res)));
+         loop(prolog_failure(t),i+1)}};
+  test5();
+}
+
+function test5()
+{
+  fn = %read-int-eval( '_prolog_function_test3/1' );
+  res = 'var':[];
+  env0 = 'env':[];
+  cnt0 = fun(env) { return env; };
+  tres = fn(env0, cnt0, res);
+  if(tres) writeline(prolog_decode_result(mkhash(),res));
+  test6();
+}
+
+function test6()
+{
+   src = "test6(X,V,L) :- append(X,V,[1,2,3,4]), length(V,L), gr(L,2). ? test6(X,V,L).";
+   prolog_backend_driver(parse src as prolog, %read-compile-eval , true);
+   test7();
+}
+
+function test7()
+{
+   X = prolog_alloc_cell([]);
+   tst <-? append($X,Y,[Z,b]), length($X, L).;
+   writeline(tst); 
+   writeline('X='(prolog_decode_result(cdar(tst),X)));
+   writeline('Y='(prolog_decode_result(cdar(tst),Y)));
+   writeline('L='(prolog_decode_result(cdar(tst),L)));
+   tst2 = (cddr(tst))();
+   writeline('X='(prolog_decode_result(cdar(tst),X)));
+   writeline('Y='(prolog_decode_result(cdar(tst),Y)));
+   writeline('L='(prolog_decode_result(cdar(tst),L)));
+   writeline(tst2);
+   tstx <-? append(X,Y,[a,b,c,d]), print(X).;
+   tstx = (cddr(tstx))();
+   tstx = (cddr(tstx))();
+   tstx <-? print("Hello, world!").;
+   tsty <-? find(z,[[a,1],[b,2],[z,3],[c,4],[z,5]],Value), print(Value).;
+   tsty = (cddr(tsty))();
+   test8();
+}
+
+function test8()
+{ // interpreted version
+   src = "? append(X,V,[1,2,3,4]), length(V,L), gr(L,1), print(\"Interpreted\"), print(L).";
+   prolog_backend_driver(parse src as prolog, %read-int-eval , true);
+   test9()
+}
+
+function test9()
+{
+  env = mkhash();
+  src = "schmest(T,L) :- length(T,L), print(L).";
+  prolog_backend_driver_generic(parse src as prolog, fun(v) { %_prolog_minicps(env, v)}, fun(nm) [], prolog_failure_f , false);
+  src1 = "? schmest([1,2,3,4],X).";
+writeline("---------------?99");
+  res = prolog_backend_driver_generic(parse src1 as prolog, fun(v) { writeline(v); %_prolog_minicps(env, v)}, fun(nm) {writeline('NM'(nm, ohashget(env,nm))); ohashget(env, nm)}, prolog_failure_f, true);
+writeline("---------------?991");
+}
+
+function test10()
+{
+   s1 = ['from'(10)]; s2 = ['to'(20)];
+   writeline( %prolog_merge_sets(s1, s2));
+   s1 = ['from'(10); 'elt'(5)]; s2 = ['to'(20)];
+   writeline( %prolog_merge_sets(s1, s2));
+   s1 = ['elt'(10);'range'(20,30);'elt'(40);'elt'(12)]; s2 = ['to'(25)];
+   writeline( %prolog_merge_sets(s1, s2));
+   s1x = [1;2;3;4;6]; s2x = [4;5;6;7;8];
+   s1 = map s1x do 'elt'(s1x);
+   s2 = map s2x do 'elt'(s2x);
+   writeline(%prolog_merge_sets(s1, s2));
+
+}
+
+.prolog: {
+   dynamic dyntest(X,Y).
+   testdyn(A,B) :- dyntest(X,Y).
+}
+
+function test11()
+{
+   dtest <-? testdyn(1,2).;
+}
+
+
+test()

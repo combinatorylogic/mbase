@@ -1,0 +1,46 @@
+//////////////////////////////////////////////////////////////////////////////
+//
+//   OpenMBase
+//
+// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
+// This file is distributed under the terms of the Q Public License version 1.0.
+//
+//////////////////////////////////////////////////////////////////////////////
+
+.peg:
+
+parser basics (
+   alpha := [a-z]/[A-Z] ;
+   digit := [0-9] ;
+   lcalpha := [a-z];
+   ucalpha := [A-Z];
+
+   CR := 13;
+   SQUOTE := 0x27;
+   TAB := 9;
+   NEWLINE := 10;
+   whitespace := (' '/CR/TAB/NEWLINE)+ ;
+   
+   fpnumber := '-'? digit+ ('.' digit+)? ;
+   intnumber := '-'? digit+ ;
+   word := alpha+ ;
+   define cslist<a,b> := 
+                        {a:head b cslist:tail => $cons(head,tail)}
+                      / {a:head => $wrap(head)};
+
+   define ecslist<a,b> := 
+                        {a:head b ecslist:tail => $cons(head,tail)}
+                      / {a:head => $wrap(head)}
+                      / {!a => $nil() };
+
+   define slist<a> := {a:head slist:tail => $cons(head,tail)}
+                    / {a:head => $wrap(head)};
+
+
+   define eslist<a> := {a:head eslist:tail => $cons(head,tail)}
+                     / {!a => $nil() };
+
+   basics := whitespace;
+   token empty := ! ..;
+)
+

@@ -1,0 +1,344 @@
+\documentclass{article}
+\usepackage{alltt}
+\usepackage{listings}
+\usepackage{rotating}
+\lstloadlanguages{Lisp}
+\lstset{language=Lisp,escapechar=£,commentstyle=\itshape}
+\def\NET{\hbox{\tt .NET}}
+\def\Lzero{${\cal L}_0$}
+\def\Lone{${\cal L}_1$}
+\def\LonePrim{${\cal L}_1'$}
+\def\LoneC{${\cal L}_1^{\cal C}$}
+\def\LoneCPrim{${{\cal L}_1^{\cal C}}'$}
+\def\Csharp{\hbox{C\#}}
+
+\newcommand{\mbfunction}[2]{\noindent {\bf Function:}~{\sl #1}~{#2} \par}
+
+\newcommand{\mbmacro}[2]{{\noindent \bf Macro:}~{\sl #1}~{#2} \par}
+\newcommand{\mbdefine}[1]{\noindent {\bf Definition:}~{\sl #1} \par}
+
+\newcommand{\mbsection}[1]{\subsection{#1}}
+
+\newcommand{\fixik}[1]{#1}
+
+\title{MBase Reference Manual v1.0.2.0}
+\author{Meta Alternative Ltd.}
+\date{2014}
+
+
+\begin{document}
+
+\maketitle
+
+\newpage
+
+\tableofcontents
+
+\newpage
+
+\section{Introduction}
+
+MBase is a framework for implementing compilers, code analysis tools and interpreters.
+It consists of a simple ``general purpose'' core language and a hierarchy of domain specific languages
+built on top of the core. This document describes the core language design and a part of the runtime library.
+
+
+\section{Architecture outline}
+
+MBase core contains several layers. Each layer forms a complete and
+usable language, and every next layer is built as an extension to a
+previous layer functionality. The most basic layer, runtime library
+and \Lzero{} interpreter, is implemented in \Csharp. This layer is only used
+for bootstrapping.
+
+\subsection{Runtime library}
+
+This is a minimalistic library written in \Csharp.  It contains a DLL
+loading interface, a standard bootstrap sequence definition, and a
+basic runtime functions set, including a minimal comprehensive set of
+bindings to the {\tt System.Reflection} functionality. Some functions
+of the runtime could have been omitted and implemented within a higher
+level code, but they are here for the better \Lzero{} interpretation
+efficiency. Functions defined via reflection are later redefined as
+direct calls in a compiled mode (in \LonePrim).
+
+\subsection{\Lzero{} interpreter}
+
+It is a closure--based interpreter for the simple \Lzero{} language
+and an S--expressions parser used by several bottom layers of MBase.
+\Lzero{} statements are compiled to runnable objects, stacking into
+one single object for one statement. E.g., {\tt (+ 2 2)} will be
+represented as two objects returning a constant {\tt 2} and an object
+applying the function {\tt +} to an array of evaluation results of two
+constant objects.
+
+Expression types are: Try, If, Apply, Sequence, Reference, Constant,
+Lambda, Closure.
+
+\subsection{\Lone $\to$ \Lzero{} compiler}
+
+This is an \Lzero{} program, compiling \Lone{} expressions into
+\Lzero.  It is compiled from \Lone{} itself, and used for
+bootstrapping the whole system from scratch. Compiler contains a
+simple macro expansion preprocessor, which is used later to extend the
+language. Macros are removed from the bootstrap version of the compiler.
+
+\subsection{\LonePrim{} language extensions}
+
+After \Lone{} language is bootstrapped, it is extended (using macro
+metaprogramming) to the level that provides better usability,
+including a simple interface to \NET{} reflection, all standard
+Lisp--like constructions, some basic pattern matching and lists
+construction, some basic input$/$output (via reflected \NET{}
+libraries).
+
+\subsection{\LoneC$\to$CLI compiler}
+
+Now, using the functionality of \LonePrim{} language, a ``native'' CLI
+compiler is implemented for a superset of \Lone{}: \LoneC.  It
+differs from \Lone: recursion and local variables are defined via
+special constructions, while in \Lone{} they are macros which expands into
+more basic forms.
+
+\subsection{Alternative target languages}
+
+At the level of \LoneCPrim, one can either use a direct \NET{} code
+generation infrastructure or target the \LoneCPrim{} or its subsets
+using macro metaprogramming or an interface to compiler
+implementation. It is possible to mix both ways, since \LoneCPrim{}
+have an embedded assebmly and \NET{} class generation macros.
+
+The semantics of some languages requires different target language
+semantics, often of a much higher level than the raw CLI or the
+lisp--like \LoneCPrim. MBase provides some alternative target
+semantics: it is a Forth--like stack language, Prolog (both
+interpreted and WAM--compiled), a \Csharp--like \NET--specific
+language, a lazy lambda evaluator (combinator graph reduction based)
+and a finite state machines builder. Non--\NET{} targets are also
+available, including an LLVM backend and an extensible C--like language.
+
+\section{Metaprogramming support}
+
+MBase macro system is somewhat similiar to the Common Lisp one, with
+some advanced features added.
+
+In Common Lisp--style macro expansion there's only one rule: if a head
+of a list being processed by an expander is a symbol, and this symbol
+is a name of a macro, a relevant macro function will be called and its
+result will be processed by an expander again.  Very simple but
+powerful approach, whereas one important thing is missing: any kind of
+support for a context.  Macros are processed separately and normally
+can't pass any information to each other.
+
+MBase provides features to handle some sort of a context: lexically
+scoped local macros and {\tt (inner-expand-first} {\tt ...)} and 
+{\tt (inner-expand-with} {\tt ...)} special constructions. There is also
+an in--list macro syntax.
+
+Local macros are defined as follows:
+\begin{verbatim}
+(with-macros
+  ((<macro-name> <macro-function>) ...)
+  <body>)
+\end{verbatim}
+
+ Macro function is a function of one argument --- a list to be
+ macro--expanded. Local macros are valid only in the scope of 
+{\tt <body>}, and macro functions definitions are generated in the
+ compilation time and interpreded by the macro expander (i.e., never
+ compiled and would not appear in a binary module). If a local macro
+ name shadows a global macro name or an outer scope local macro name,
+ the latest (innermost) definition will be used.
+
+ This feature can be used to deal with a context. To pass something
+ stored in a local macro to an inner macro, that local macro must be
+ expanded first. This is why we have introduced a special form 
+{\tt inner-expand-first}. For example, an expansion of the following
+ construction:
+
+\begin{verbatim}
+(inner-expand-first mymacro (list 1 2 3))
+\end{verbatim}
+
+ will go into an expansion of {\tt mymacro} with {\tt list} already
+ expanded, i.e., a list {\tt (mymacro (cons 1 (cons 2 (cons 3 nil))))}
+ will be actually expanded.
+
+ This little trick allows to feed a macro with a content of a locally
+ scoped macro. One of a practical examples of of this feature
+ application is in the {\tt ast:visit} language defined in an extra
+ libraries section below: local macros are defined for every node and
+ every variant processing code, and macros like {\tt ast:mknode} use
+ that information to substitute a correct format.
+
+ {\tt with-macros} itself is a higher level feature not naturally
+ known to a core macro expander. It is a macro built on top of a
+ fundamental macro expansion control form: 
+{\tt (inner-expand-with <hashtable> <code>)}. 
+Hashtable is added to the list of a current
+ context macros name tables and an expansion for an inner code is
+ using this new environment, which is later discarded for an outer
+ scope.
+
+ There is no direct access to this environment from macro expanders,
+ so the only way to fetch a data from it is {\tt inner-expand-first}.
+
+\section{Library}
+
+MBase library is staged as well as MBase itself. The same
+functionality is provided by different layers, with different levels
+of abstraction.
+
+\subsection{Core library (accessible from \Lzero)}
+
+Core functions are defined in \Csharp{} library code. Some of them are
+later overridden by \LoneC{} native definitions. The following list is
+not comprehensive, since we do not want to encourage MBase users to
+rely on this lowest level.
+
+\mbfunction{car}{(l)}
+
+Returns a list's head.
+
+\mbfunction{cdr}{(l)}
+
+Returns a list's tail.
+
+\mbfunction{cons}{($l_1${} $l_2$)}
+
+Makes a new cons cell of head $l_1${} and tail $l_2$.
+
+\mbfunction{null?}{(x)}
+
+Checks if x is nil.
+
+\mbfunction{list?}{(x)}
+
+Checks if x is a list.
+
+\mbfunction{string?}{(x)}
+
+Checks if x is a string.
+
+\mbfunction{symbol?}{(x)}
+
+Checks if x is a symbol.
+
+\mbfunction{char?}{(x)}
+
+Checks if x is a char.
+
+\mbfunction{number?}{(x)}
+
+{Checks if x is a number.}
+
+\mbfunction{boolean?}{(x)}
+
+{Checks if x is a boolean.}
+
+\mbfunction{eqv?}{(a b)}
+
+{Checks if a physically equals to b.}
+
+\mbfunction{eq?}{(a b)}
+
+{Checks if a logically equals to b.}
+
+\mbfunction{$>$}{(a b)}
+
+{Checks if number a is greater than number b.}
+
+\mbfunction{mkhash}{()}
+
+{Makes an empty hashtable.}
+
+\mbfunction{hashget}{(ht key)}
+
+{Gets a hashtable value associated with a key.}
+
+\mbfunction{hashput}{(ht key value)}
+
+{Puts a value into a hashtable with a given key.}
+
+\mbfunction{symbol-$>$string}{(value)}
+
+{Converts a symbol into string}
+
+\mbfunction{any-$>$string}{(value)}
+
+{Converts any \NET{} object into string using {\tt ToString} method}
+
+\mbfunction{string-$>$symbol}{(str)}
+
+{Makes a symbol out of a given string. Symbol syntax is not enforced.}
+
+\mbfunction{string-escape}{(str)}
+
+{Enriches a string with proper escape characters}
+
+\mbfunction{getfuncenv}{()}
+
+{Returns a dictionary with all the current functions namespace definitions}
+
+\mbfunction{getmacroenv}{()}
+
+{Returns a hashtable with all the current macros namespace definitions}
+
+\subsection{Boot library (\Lone{} language)}
+
+This library is not covered by an automatic documenting system, so
+here follows a brief description of the most important definitions.
+
+\mbfunction{:Y1}{(f)}
+
+
+ Y combinator for 1--ary functions.
+
+ Usage example:
+
+\begin{lstlisting}
+(:Y1 (fun (factorial)
+       (fun (n)
+          (if (> n 1) (* n (factorial (- n 1))) 1))))
+\end{lstlisting}
+
+\mbfunction{:Y2}{(f)}
+
+Y--combinator for 2--ary functions.
+
+\mbfunction{:Y0}{(f)}
+
+Y--combinator for 0--ary functions.
+
+\mbmacro{:Yn}{(n)}
+
+Generator for an $n$--ary Y--combinator.
+
+\mbmacro{list}{args}
+
+Makes a list of values
+
+
+\mbfunction{append}{(a b)}
+
+{Appends a list {\tt b} to the end of the list {\tt a}}
+
+\mbfunction{to-string}{(value)}
+
+{Converts a list or atom to string}
+
+\mbfunction{read-int-eval}{(lst)}
+
+{Compiles a list into \Lzero, evaluates it, returns a result}
+
+\mbfunction{read-compile-eval-dump}{(lst)}
+
+{Compile a list into \Lzero, evaluate it, return a string with a compiled code. Supposed to be used
+for an initial bootstrapping purposes only.}
+
+%%%%%%%%
+{\raggedright
+\input{clib}
+}
+
+\end{document}

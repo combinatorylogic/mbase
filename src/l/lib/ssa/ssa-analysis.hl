@@ -1,0 +1,130 @@
+% literate:
+
+\section{An SSA-stage analysis}
+
+\pfcode{
+function ssa_find_loops_inner(DT, m, n, edges)
+{
+  <[dg;dtree;dpairs]> = DT;
+   mdom = ohashget(dtree, n);
+   pathcache = mkhash();
+   xs = map append x in mdom do {
+      // check if there is a path from x to m avoiding n
+      visit = mkhash(); stop = mkref([]);
+      do loop(i = x, path = []) {
+         if(^stop || ohashget(visit, i)) [] else {
+            nxts = ohashget(edges, i);
+	    ohashput(visit, i, i);
+	    if ( i === m || ohashget(pathcache, i) )
+	      { iter p in path do ohashput(pathcache, p, p);
+	        stop := true; }
+            else {
+	      iter n1 in nxts do {
+	         if (n1 === n) [] else {
+		    loop(n1, i:path);
+		 }
+	      }
+	    }
+	 }
+      };
+      if (ohashget(pathcache, x)) [x] else []
+   };
+   return [[m;n];unifiq(m:n:xs)]
+}
+}
+
+\pfcode{
+function ssa_loops_nesting(nloops)
+{
+   subsetp(s1, s2) = {
+      length(filter(fun(x) memq(x, s2), s1)) == length(s1)
+   };
+   map append [nm;X;xs] in nloops do { 
+      map append [nm1;X1;xs1] in nloops do {
+        if (nm===nm1) [] else
+        if (subsetp(xs, xs1)) return ['subloop'(nm, nm1)]
+        else []
+      }
+   }
+}
+}
+
+\pfcode{
+function ssa_loops_classify_edges(DT, edges, loops)
+{
+   CNT = mkref(1); 
+   genname() = { ret = ^CNT; CNT := ret + 1; return %Sm<<("L",ret) };
+   collector(add, get) {
+     // Name the loops
+     loops1 = map l in loops do genname():l;
+     iter(add, ssa_loops_nesting(loops1));
+     // Fill in hashes
+     lh = mkhash(); bbh = mkhash();
+     rloops = map [nm;[bf;bt];xs] in loops1 do {
+       ohashput(lh, nm, [[bf;bt]; xs]);
+       add('backedge'(nm, bf, bt));
+       iter x in xs do {
+         ohashput(bbh, x, nm : ohashget(bbh, x));
+	 add('inaloop'(x, nm));
+       };
+       return 'loop'(nm, xs);
+     };
+     // Classify the edges
+     iter [ef;et] in edges do {
+        fl = ohashget(bbh, ef);
+	tl = ohashget(bbh, et);
+	// Loops, for which ef -> et is an exit edge:
+	exitedge = [ x | x <- fl where not(memq(x, tl)) ];
+	// Loops, for which ef -> et is an entry edge:
+	entryedge = [x | x <- tl where not(memq(x, fl)) ];
+	// Loops, for which ef -> et is inner transitions:
+	inneredge = [y | x <- fl, y <- tl where x === y ];
+	// Issue annotations
+	iter L in exitedge do add('exitedge'(L, ef, et));
+	iter L in entryedge do add('entryedge'(L, ef, et));
+	iter L in inneredge do add('inneredge'(L, ef, et));
+     };
+     return [rloops; get()]
+   };
+}
+}
+
+\pfcode{
+function ssa_find_loops(code, DT)
+{
+  <[dg;dtree;dpairs]> = DT;
+   // Build a list of edges
+   hedges = mkhash();
+   edges = collector(eadd, eget) {
+     iter:genssa(code: code) {
+        deep bblock {
+	   b ->  { iter n in nexts do eadd([name;n]);
+                   ohashput(hedges, name, nexts); }
+	}
+     };
+     return eget();
+   };
+   // DEBUG
+   /* ee = hashmap(fun (k,v) { k }, dpairs);
+   writeline(%S<<("DOMPAIRS: ", ee));
+   writeline(%S<<("EDGES: ", edges)); */
+   // Identify the back-edges
+   backedges = map append [f;t] in edges do {
+     if(ohashget(dpairs, %S<<(t, " || ", f)))
+          return [[f;t]]
+     else return []
+   };
+   // For each back-edge, build a loop.
+   // A loop of a back edge (m->n) is the set of all nodes x such that n
+   //  dominates x and there is a path from x to m not containing n.
+   loops = map [m;n] in backedges do ssa_find_loops_inner(DT, m, n, hedges);
+   // And now we can name the loops and classify all the edges wrt. those loops
+   cloops = ssa_loops_classify_edges(DT, edges, loops);
+   return cloops
+}
+}
+
+
+%%%%%%%%%%%%%%%
+
+

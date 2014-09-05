@@ -1,0 +1,452 @@
+%literate:
+
+\section{A generic Prolog compiler}
+
+The current Prolog implementation in MBase is not very efficient, it is a non-destructive, 
+pure functional interpreter. This compiler is supposed to provide a more efficient and 
+flexible implementation with easy--to--write drop--in backends.
+
+Compiler idea is simple: Prolog source is translated into an intermediate language which 
+explicitly introduces new variables, explicitly marks choice points and explicitly unifies 
+values. There are two call varieties: \verb|call_with| which calls a Prolog function and passes a
+remaining continuation to it and a simpler \verb|tailcall| which does not pass any continuation. 
+Only variables and constants are allowed as call arguments, any structured call arguments must be 
+lifted as new variable definitions.
+
+The trickiest part is the \verb|choice| construction which allocates a choice point and makes a list of 
+continuations (choice variants). 
+
+
+Any backend should implement a translation from this intermediate language into something which 
+can be compiled or interpreted.
+A default backend translates this code into raw MBase featuring explicit continuations, whith a 
+handful of simple runtime function library.
+
+It's a backend's responsibility to provide implementations of \verb|cut/0| and \verb|call/1|.
+
+\subsection{Prolog source AST}
+
+Source language is simpler than the original MBase Prolog, therefore we'd need a new definition:
+
+\pfcode{
+ast prolog {
+  term = term(ident:id, .*term:ts)
+       | var(ident:id)
+       // Extensions
+       | number(number:v)
+       | string(string:v)
+       // Externally defined variable
+       // Must be elimnated by a pre-compilation pass
+       | evar(ident:id)
+       ;
+  clause = clause(term:hd, .*term:tl)
+       |  query(.*term:tl) // headless clause
+       |  dynamic(term:t) // external dynamic entry, database query, etc.
+       ;
+  clauses is (.*clause:cs);
+}}
+
+
+\subsection{Compiler helper functions}
+
+Environment is pretty simple in this compiler. It contains only the locally 
+scoped definitons, in form of a list of pairs: {\tt name:type}, where 
+{\tt type} can either be {\tt 'var'} or {\tt 'arg'}. We do not keep a track 
+of any global declarations, hoping that the backend or some post--processing 
+passes will take care of it (e.g., it should be possible to do some inlining and
+compile--time specialisation).
+
+\pfcode{
+% "Look up a variable in the environment"
+function prolog_check_env(env,id)
+  do loop(l = env) 
+     match l with 
+       (xid:v):tl -> if(xid===id) v else loop(tl) 
+     | else -> []}
+
+We have to extract the free variables in order to initialise them explicitly 
+before any unification attempts. In addition to the explicit free variables 
+there will be a list of new implicit variables introduced for the high order "call" arguments.
+
+\pfcode{
+% "Get a list of free variables in a term within a 
+   given environment"
+function prolog_freevars(env, t)
+ collector(add,get) {
+   iter:prolog(term:t) {
+     deep term {
+       var -> {
+         chk = prolog_check_env(env, id);
+         if (not(chk)) add(id)
+      } | else -> []}};
+   return unifiq(get()) }}
+
+A key idea of this compiler is that all the calls are made with 
+trivial arguments only (constants and variables). It means that a structure
+argument have to be lifted and explicitly unified with a newly allocated variable. A separate
+optimisation pass (in a backend) can mark such trivial unifications explicitly.
+
+
+\pfcode{
+% "Compile a call argument; Returns [nenv; intros; arg]"
+function prolog_compile_arg(env, t)
+  collector(add, get) {
+    v = visit:prolog(term:t) {
+       deep term {
+          term -> 'new'(id,@ts)
+        | number -> 'const'(v)
+        | string -> 'const'(v)
+        | var -> {
+             chk = prolog_check_env(env, id);
+             match chk with 
+                'arg' -> 'arg'(id)
+              | 'var' -> 'var'(id)
+              | [] -> { add(id); 'var'(id) }
+          }}};
+    ins = get();
+    nenv = (map i in ins do i:'var')::env;
+    return [nenv; ins; v]}}
+
+
+\pfcode{
+% "Compile a single call with possibly high order arguments"
+function prolog_lift_call(env, r)
+  collector(add, get) {
+     nins = prolog_freevars(env, r);///\footnote{New variables must be allocated before the call}\\
+     v = visit:prolog(term:r) {
+        once term {
+           term -> {
+             newargs = map a in ts do {
+               visit:prolog(term:a) {
+                  once term {
+                     var -> node
+                   | number -> 'const'(v)
+                   | string -> 'const'(v)
+                   | term -> {
+                        nm = gensym();
+                       <[x_;x_;cnode]> = prolog_compile_arg(env, node);
+                        add([nm;cnode]);
+                        return 'var'(nm)
+                     }}}};
+             return mk:node(ts=newargs)
+           }
+         | var -> ccerror('PROLOG_WRONG_CLAUSE'(r))
+        }};
+     r = get();
+     ins = nins :: map [nm;x] in r do nm;///\footnote{List of free variables and new variables}\\
+     nenv = (map i in ins do i:'var')::env;
+    <[x;id;@args]> = v;
+     return [nenv; ins; r; id; args]}}
+
+\pfcode{
+% "Build a chain of nested unifications"
+function prolog_unify_chain(ins, inner)
+  do loop(i=ins)
+    match i with
+       [nm;vl]:tl -> 'unify'('var'(nm), vl, loop(tl))
+     | else -> inner}
+
+
+The list of rules in a function "body" is compiled as a sequence of nested 
+function calls. The last term is a tail call (i.e., there is no continuation).
+If any explicit or implicit free variables occured inside a term, they're 
+lifted into an explicit {\tt 'intros'} node and unified before committing
+a call.
+
+\pfcode{
+% "Compile a prolog function body"
+function prolog_compile_body(env0, rules)
+  do loop(env = env0, rs = rules)
+    match rs with
+      [r] -> {
+       <[nenv; ins; uns; id; args]> = prolog_lift_call(env, r);
+        inner = 'tailcall'(id,@args);
+        if (ins) 'intros'(ins, prolog_unify_chain(uns, inner)) else inner
+      }
+    | r:tl -> {
+       <[nenv; ins; uns; id; args]> = prolog_lift_call(env, r);
+        inner = 'call_with'([id;@args], loop(nenv, tl));
+        if (ins) 'intros'(ins, prolog_unify_chain(uns, inner)) else inner
+      }
+    | else -> 'proceed'()}
+
+A clause head introduces function "arguments". High order arguments are simply
+unified with the argument variable slots, which are expected to be allocated
+outside of a call (see the flat call rules above).
+
+\pfcode{
+% "Compile clause head"
+function prolog_compile_head(aterms, args, tl)
+  do aloop(a = aterms, n = args, env=map a in args do a:'arg') {
+     match [a;n] with
+       [hd:tl; nhd:ntl] -> {
+         <[nenv;ins;v]> = prolog_compile_arg(env, hd);
+          body = 'unify'('arg'(nhd), v, aloop(tl, ntl, nenv));
+          if (ins) 'intros'(ins, body) else body
+       }
+     | else -> prolog_compile_body(env, tl)}}
+
+Some simple helper functions:
+
+\pfcode{
+function prolog_term_arity(t) {<[x;id;@rest]> = t; length(rest) }
+function prolog_term_args(t) {<[x;id;@rest]> = t; rest }
+function prolog_term_head(t) {<[x;id;@rest]> = t; id }}
+
+\subsection{Compiler top level}
+
+Queries are pretty much a backend business, so here we'll provide only 
+the most basic support. Namely, transforming a query into a special function
+called 'query', with all the free variables lifted into arguments, 
+preserving their names. 
+
+Backend must detect this name and behave appropriately.
+A possible behaviour is following: detect 'query' function in a parsed stream,
+slice everything above it and perform the compilation (may be giving a new 
+unique name to the query function), extract a list of argument names, allocate
+the variable slots, store them with their corresponding names into a variables
+environment and then call the query function. Dismiss results with 
+a backend's failure function to get more alternative answers. 
+Use the variables environment for pretty--printing the results.
+
+\pfcode{
+% "Sanitise queries into special predicates, 
+   expect only ONE query"
+function prolog_sanitise_queries(cs, qname, qargsref)
+  visit:prolog(clauses:cs) {
+    once clause {
+       query -> {
+          fv = unifiq(foldl(fun(fv, t) {
+                  prolog_freevars([],t)::fv
+                }, [], tl));
+          qargsref := fv;
+          'clause'('term'(qname,@map f in fv do 'var'(f)),@tl)
+       }
+    | else -> node}}}
+
+Once clauses are prepared for compilation, their arguments are given consequent
+simple names and heads and bodies are compiled. Multiple clauses for the same
+predicate are going into a single {\tt 'choose'} node.
+
+\pfcode{
+% "Compile a single clause (should go into 'choose' sequence)"
+function prolog_compile_clause(c)
+  visit:prolog(clause:c) {
+     once clause { clause -> {
+        nargs = prolog_term_arity(hd);
+        args = map i in [0..nargs] do %Sm<<('__A',i);///\footnote{Arguments are named as {\tt \_\_}$A_i$, just for convenience.}\\
+        aterms = prolog_term_args(hd);
+        id = prolog_term_head(hd);
+        return (id:args) : prolog_compile_head(aterms, args, tl)
+     }}}}
+
+Multiple clauses are compiled into a single prolog function with a 'choose'
+group inside. Interpretation of such node is up to backend - e.g., it can be
+compiled into a list of stored continuations.
+
+\pfcode{
+% "Compile group of the same predicates"
+function prolog_compile_clauses(cs)
+{  cls = map c in cs do prolog_compile_clause(c);
+   body = (match cls with
+              [a:one] -> one
+            | hd:more -> 'choose'(@map (a:cx) in cls do cx));
+  <id:args> = caar(cls);
+   return 'define_prolog_function'(id,args,body)}}
+
+
+Dynamic entries are expected to be served by the backend:
+
+\pfcode{
+% "Compile a list of dynamic entries"
+function prolog_compile_dynamics(ts)
+   map t in ts do {
+      visit:prolog(term:t) {
+        deep term {
+           term -> 'define_prolog_dynamic_function'(id, ts)
+         | var -> id
+         | else -> ccerror('ARG'(node))
+        }}}}
+
+Predicates in the source stream can be given with an arbitrary order, so we
+have to group the same predicates together and then compile.
+
+\pfcode{
+% "Group the predicates together for compilation"
+function prolog_compile(cs)
+collector(add_dyn, get_dyn) {
+  groups = mkhash();
+  add(id, v) = {
+     prev = ohashget(groups,id);
+     ohashput(groups, id, v : prev)
+  };
+
+  iter:prolog(clauses:cs) { once clause {
+       clause -> add(prolog_term_head(hd), node)
+     | dynamic -> add_dyn(t)
+  }};
+  dyns = prolog_compile_dynamics(get_dyn());
+  return dyns ::
+    hashmap(
+      fun(id, gr) { prolog_compile_clauses(reverse(gr)) },
+      groups)
+}}
+
+\subsection{Compiled backend AST}
+
+Now, the formal specification for the language generated by the above compiler
+is following:
+
+\pfcode{
+ast pbackend {
+   top = define_prolog_function(ident:id, *ident:args, expr:body)
+       | define_prolog_dynamic_function(ident:id, *ident:args)
+       ;
+   tops is (.*top:ts);
+   expr = intros(*ident:vars, expr:body)
+        | unify(ctor:a, ctor:b, expr:tr)
+        | choose(.*expr:es)
+        | call_with(calltgt:t, expr:cnt)
+        | tailcall(.calltgt:t)
+        | proceed()
+        ;
+   calltgt is (ident:fn, .*callarg:a);
+   callarg = var(ident:id) | arg(ident:id) | const(any:v);
+   ctor = new(ident:id, .*ctor:args)
+        | const(any:v)
+        | var(ident:id)
+        | arg(ident:id)
+        ;
+}}
+
+\section{Parser frontend}
+
+\pfcode{
+parser prologlex (pfront) {
+   @@CapLetter := [A-Z];
+   @@LLetter := [a-z];
+   @tkvarident := [CapLetter] [IdentRest]*;
+   @tkconstident := [LLetter] [IdentRest]*;
+   varident := [tkvarident]:v => {ctoken=ident} $sval(v);
+   constident := [tkconstident]:v => {ctoken=keyword} $sval(v);
+}
+}
+
+\pfcode{
+parser prolog (prologlex) {
+  !!Spaces;
+  [lexical:] := [lexical] => {ctoken = lexic};
+  [keyword:] := [keyword] ![IdentRest] => {ctoken=keyword};
+  
+  prolog := slist<[plgclause]>:cs [Spaces]* => cs;
+
+
+  &plgclause_start; &plgclause_end; &plgfact_start; &plgfact_end;
+
+  plgclause "Prolog clause"
+            :=
+               // syntax extensions:
+               { dynamic [plgterm]:t "." => dynamic(t) }
+            /  [plgclause_start]
+               // proper Prolog:
+            /  { [plgterm]:t ":-" cslist<[plgterm],",">:bs "." =>
+                     clause(t,@bs) }
+            /  { [plgterm]:t "." => clause(t) }
+            /  { "?" cslist<[plgterm],",">:ts "." => query(@ts) }
+            /  [plgclause_end]
+            ;
+  plgterm "Prolog binary term"
+          := { [plgfact]:l "=" [plgterm]:r => 
+                     term(`equals,l,r) }
+          /  [plgfact]
+          ;
+
+///\pfcodeblockend{}Non-binary terms:\\ \pfcodeblockbegin{}
+  plgfact "Prolog term"
+          :=
+             [plgfact_start]
+          /  { [constident]:id "(" cslist<[plgterm],",">:args ")" => 
+                     term(id,@args) }
+          /  { [constident]:id => term(id) }
+          /  { [varident]:id => var(id) }
+          /  { "$" [varident]:id => evar(id) }
+          /  { "[" [plgterm]:hd "|" [plgterm]:tl "]" => 
+                     term(`cons,hd,tl) }
+          /  { "[" [plglist]:ls "]" => ls }
+          /  { "[" "]" => term(`nil) }
+          /  { "!" => term(`cut) }
+          /  { [number]:n => number(n) }
+          /  { [string]:s => string(s) }
+          /  [plgfact_end]
+          ;
+///\pfcodeblockend{}Inner list representation:\\ \pfcodeblockbegin{}
+  plglist "Prolog list node"
+          := { [plgterm]:hd "," [plglist]:tl => 
+                    term(`cons, hd, tl) }
+          /  { [plgterm]:hd => term(`cons, hd, term(`nil)) }
+          ;
+}
+}
+
+Terms produced by this parser will lack arity information, so we'll need this simple pass to fix it:
+\pfcode{
+function prolog_parse_fix_arity(t)
+  visit:prolog(term:t) { deep term {
+        term -> mk:node(id=%Sm<<(id,"/", length(ts))) 
+      | else -> node }}
+function prolog_parse_fix_arity_clause(c)
+  visit:prolog(clause:c) { 
+     once term : forall prolog_parse_fix_arity(node) }
+}
+
+\subsection{Pretty--printer}
+
+\pfcode{
+parser prolog_strip (prologlex) {
+  prolog_strip := [constident]:id [rest]? [Spaces]* => id;
+  @@rest := "/" [0-9]+;
+}
+
+% "Remove '/N' suffix from prolog term id"
+function prolog_strip_id(id)
+   parse %S<<(id) as prolog_strip
+}
+
+\pfcode{
+% "Pretty-print a prolog term into a string"
+function prolog_term_to_string(t)
+  visit:prolog(term:t) {
+     deep term { 
+         term -> (
+           match id with
+             'cons/2' -> %S<<("[",car(ts),"|",cadr(ts),"]")
+           | 'nil/0' -> "[]"
+           | 'cut/0' -> "!"
+           | else -> 
+                if (ts) 
+                   %S<<(prolog_strip_id(id),"(",
+                         strinterleave(ts,", "),
+                       ")")
+                else prolog_strip_id(id))
+       | number -> %S<<(v)
+       | string -> v
+       | var -> %S<<(id)}}}
+
+\pfcode{
+% "Pretty-print a prolog clause or a query into a string"
+function prolog_clause_to_string(cl)
+  visit:prolog(clause:cl) {
+      deep clause { clause -> 
+                      if(tl) %S<<(hd, " :- ",
+                         strinterleave(tl, ", "), ".")
+                      else %S<<(hd, ".")
+                  | query -> %S<<("?: ",
+                      strinterleave(tl, ", "), ".")};
+      once term : forall prolog_term_to_string(node);
+  }}
+
+
+%%%%////////////////////////
+
+
+

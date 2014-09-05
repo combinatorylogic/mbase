@@ -1,0 +1,38 @@
+//////////////////////////////////////////////////////////////////////////////
+//
+//   OpenMBase
+//
+// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
+// This file is distributed under the terms of the Q Public License version 1.0.
+//
+//////////////////////////////////////////////////////////////////////////////
+
+.peg:
+
+parser pegbasics extends basics (
+   ignoring Spaces;
+
+   pegbasics := .;
+
+   keyword0 := 'rule'/'token'/'term'/'ignoring'/'define'/
+               'parser'/'extends'/'dynhook'/'check';
+   keyword := keyword0 !IdentRest;
+
+   rule lexical := lexical => {ctoken = lexic};
+
+   IdentRest := alpha/digit/'_';
+   token ident0 := !keyword (alpha IdentRest*) => {ctoken=ident};
+   token ident1x := alpha (alpha/'_'/'-'/digit)* => {ctoken=ident};
+   term ident := { ident0:i => $sval(i)}
+              /  { '[[' ident1x:x ']]' => $sval(x)};
+
+   comment := (('/*' (!'*/' .) * '*/') / ('//' (!(NEWLINE) .)* NEWLINE)) => {state=comment};
+   token innerchar := . ;
+   token tString := SQUOTE ( !SQUOTE . ) * SQUOTE;
+   token tComment := '"' ( !'"' . ) * '"' => {state=comment};
+
+   term string := tString:t => {ctoken = const} $stripval(t);
+   term tcomment := tComment:t => $stripval(t);
+   Spaces := (whitespace / comment) +;
+)
+

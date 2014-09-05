@@ -1,0 +1,49 @@
+
+\documentclass{article}
+\usepackage{alltt}
+\usepackage{rotating}
+\usepackage[usenames]{color}
+
+
+\newcommand{\colobox}[1]{
+\begin{tikzpicture}
+[execute at end picture=%
+{
+\begin{pgfonlayer}{background}
+\path[fill=black!10,thick,draw=black!40,rounded corners=0.8mm]
+(current bounding box.south west) rectangle
+(current bounding box.north east);
+\end{pgfonlayer}
+}]
+\node (box) {
+\begin{minipage}{\textwidth}
+#1
+\end{minipage}
+};
+\end{tikzpicture}\\}
+
+\newcommand{\commentbox}[1]{\colobox{\sl #1}}
+
+\newcommand{\lspspc}{{\color{white}{\tt{\_}}}}
+\newcommand{\lsplp}{(}
+\newcommand{\lsprp}{)}
+
+\newcommand{\docstring}[1]{\sl #1}
+\newcommand{\docentry}[1]{\sl #1}
+
+\newenvironment{pfcodeblock}[1]{}{}
+\newcommand{\pfcodeblockbegin}{}
+\newcommand{\pfcodeblockend}{}
+
+
+\definecolor{light-gray}{gray}{0.5}  
+
+\title{PFront manual}
+\author{Meta Alternative Ltd.}
+\date{Jan 2010}
+
+\begin{document}
+
+\input pfrontdoc
+
+\end{document}

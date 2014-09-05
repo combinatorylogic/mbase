@@ -1,0 +1,45 @@
+% literate:
+
+\section{A higher level generic SSA representation}
+
+This representation is suitable for doing generic SSA--based transformations,
+like constant folding, DCE, partial application, etc.
+
+All the target-specific operations are represented as intrinsic calls. 
+User must provide the intrinsic hooks and annotate explicitly the const calls.
+
+\pfcode{
+ast genssa2 {
+  top = f(globident:nm, type:ret, *argpair:args, code:body);
+  code is (.*bblock:bs);
+  bblock =
+    b(labident:name, *oppair:ops, term:t);
+  oppair is (varident:name, iop:op);
+  iop = phi(.*phiarg:args)
+      | call(*attr:a, expr:dst, .*expr:args)
+      ;
+  term = br(labident:dst)
+       | brc(expr:c, labident:tr, labident:fl)
+       | switch(expr:v, labident:d, .*labident:ns)
+       ;
+  expr = var(varident:id)
+       | glob(globident:id)
+       | arg(argident:id)
+       | const(type:t, any:v)
+       ;
+  varident is id:v;
+  labident is id:v;
+}}
+
+Please note that alloca, load and store are missing. They are supposed to be intrinsics too, if needed at all (e.g., an MBase backend won't need
+any of those after an SSA--transform).
+
+Generic constant folding:
+
+- Build a value dependency graph, annotated with the value properties
+- Propagate properties, using the following rules
+  - A constant function applied to all constant arguments yields a constant value
+  - A phi loop with only constant inputs and a constant bound yields a constant value (needs loop analysis data)
+  - Side effect instructions are marked so
+  - Loops not containing side effects are marked so
+- 

@@ -1,0 +1,302 @@
+% literate:
+
+\section{Generic SSA transform implementation}
+
+This SSA--transform is working upon a very limited mini--language which is specifically designed to represent
+only those aspects of the code which are of an interest for SSA analysis. The language contains nothing but
+named basic blocks, unconditional jumps, {\tt use} nodes, {\tt load} and {\tt store} nodes and, of course, $\varphi$--nodes.
+
+\phcode{
+function quickunifiq(v)
+collector(add, get) {
+   ht = mkhash();
+   iter v do 
+      if(ohashget(ht,v)) [] else {
+         ohashput(ht,v,v); add(v)
+      };
+   return get()}
+}
+
+
+\phcode{
+function fastunifiq(v)
+  return unifiq(v)
+}
+
+\pfcode{
+function ssa_transform_findallstores(code, sth, aas)
+collector(add,get) { 
+   visit:genssa(code: code) {
+      deep bblock { b -> iter [_;o] in ops do o(name) };
+      deep iop {
+        store -> fun(nm) {ohashput(sth, dst, nm : ohashget(sth, dst))}
+      | else -> fun(nm) []
+      }
+   };
+   iter a in aas do {
+      u = ohashget(sth, a);
+      ohashput(sth, a, quickunifiq(u))
+   }
+}
+}
+
+\pfcode{
+function ssa_extract_cfg(c)
+{
+   cfg = mkhash();
+   visit:genssa(code: c) {
+     once bblock {
+       b -> ohashput(cfg, name, nexts)
+     }
+   };
+   return cfg
+}
+}
+
+\pfcode{
+function ssa_domtree_pairup(dtree)
+{
+   pairs = mkhash();
+   hashiter(fun(k,vs) {
+     iter v in vs do ohashput(pairs, %S<<(k, " || ", v), true)
+     }, dtree);
+   return pairs
+}
+}
+
+\pfcode{
+function ssa_transform_domfront(cfg, dtree, srcs, cache) 
+collector(add, get) {
+  <[domtree;pairdomtree]> = dtree;
+   iter s in srcs do {
+     chk = ohashget(cache, s);
+     if(chk) {iter c in chk do add(c)}
+     else collector(add1, get1) {   
+       doms = ohashget(domtree, s);
+       iter d in doms do {
+         ns = ohashget(cfg, d);
+         iter n in ns do {
+           if(not(ohashget(pairdomtree,%S<<(s," || ", n)))) {add(n); add1(n)}
+            else if(n===s) {add(n);add1(n);};
+         }
+       };
+       ohashput(cache, s, fastunifiq(get1()));
+     }
+   };
+   return fastunifiq(get())
+}
+}
+
+\pfcode{
+function ssa_transform_3(mapink, cfg, code, a)
+{
+  // store the code
+  cht = mkhash();
+  iter:genssa(code: code) {
+     once bblock { b -> ohashput(cht, name, node) }
+  };
+
+  // Shortcut
+  In(x,h) = ohashget(h, x);
+
+  // Sequence of hash tables
+  Inc(s) = mkhash():s;
+  Update(s,k,v) = {
+    <h:rest> = s;
+     ohashput(h, k, v);
+  };
+  Find(s, k) = do loop(l = s) {
+    match l with
+       hd : tl -> {
+          chk = ohashget(hd, k);
+	  if(chk) return chk else loop(tl)
+       }
+    |  else -> []
+  };
+
+  // for each point, walk over cfg, rename stuff and extend phis
+  path = mkhash();
+  iter ptn in ['entry'] do {
+     remap(n) = {
+       do loop(x = ohashget(mapink, n), p = n) {
+          if(x) return loop(ohashget(mapink, x), x)
+          else return p
+       }};
+     do iloop(c = ptn, ldef = [], prev = []) {
+          caon = not(ohashget(path, c));
+          cd = ohashget(cht, c); cdef = Inc(ldef);
+          ohashput(path,c,c); mod = mkref([]);nextsh = mkref([]);
+          nc = visit:genssa(bblock: cd) {
+	    deep bblock { b -> {nextsh:=nexts;node} };
+            deep oppair : [name;op(name)];
+            once iop {
+               store -> fun(n) if(In(dst,a)) {
+		  mod := true;
+                  Update(cdef,dst,src);
+                  return 'remap'(src)
+               } else node
+             | load -> fun(n) if(In(v, a)) {
+                pcdef = Find(cdef, v);
+                if(pcdef) {
+		  mod := true;
+                  pv = remap(pcdef);
+                  ohashput(mapink, n, pv);
+                  return 'remap'(pv)
+               } else node} else node
+             | remap -> fun(n) { return node; }
+             | use -> fun(n) {
+                  mk:node(ids = map i in ids do { chk1 = remap(i);
+                     if(chk1===i) i else {mod:=true; chk1}
+                  })
+               }
+             | phi -> fun(n) if(and(prev,In(orig,a))) {
+		  mod := true;
+                  ocdef0 = Find(cdef,orig);
+		  ocdef = if (ocdef0) ocdef0 else '*Undefined*';
+                  Update(cdef, orig, n);
+                  mk:node(prevs = prev: prevs, vals = ocdef: vals)
+               } else node
+            }
+          };
+          nexts = ^nextsh;
+          if(^mod) ohashput(cht, c, nc);
+          if(caon) iter n in nexts do iloop(n, cdef, c);
+     }
+  };
+  return visit:genssa(code: code) {
+     once bblock { b -> {ohashget(cht, name)} }
+  }
+}
+}
+
+\pfcode{
+function ssa_transform_2(valmap, cfg, code, phis, stores, a)
+{
+  // Insert phi placeholders
+  code1 = visit:genssa(code: code) {
+    deep bblock {
+      b -> if(memq(name,phis)) {
+             mk:node(ops = ([gensym(); 'phi'(a, [], [])]:ops))
+          } else node
+    }
+  };
+  return code1
+}
+}
+
+\pfcode{
+function ssa_set_substract(a,b)
+   map append a do if(memq(a,b)) [] else [a]
+}
+
+\pfcode{
+function ssa_transform_1(valmap, cfg, dtree, code, a, domcache, sth)
+{
+  stores = ohashget(sth, a);
+  phis = do loop(insphis = ssa_transform_domfront(cfg, dtree, stores, domcache), total = []) {
+     trymore = ssa_set_substract(ssa_transform_domfront(cfg, dtree, insphis, domcache), total);
+     if(trymore) {
+       loop(trymore, fastunifiq(insphis :: total))
+     }
+     else fastunifiq(insphis::total)
+  };
+  return ssa_transform_2(valmap, cfg, code, phis, stores, a);
+}
+}
+
+\pfcode{
+function graph_revert(g)
+{  bg = mkhash();
+   hashiter(fun(k,v) {
+      iter v do ohashput(bg, v, k:ohashget(bg,v))
+    },g);
+   bg1 = mkhash();
+   hashiter(fun(k,v) {
+      ohashput(bg1, k, fastunifiq(v));
+   }, bg);
+   return bg1;
+}
+}
+
+\pfcode{
+function ssa_optimise(code)
+{
+   gr = mkhash(); taints = mkhash();
+   phis = mkhash();
+   getuses(n) = collector(add,get) {
+      iter:genssa(iop:n) {
+         once varident : add(node);
+      };
+      return get()
+   };
+   addref(a,b) = {
+     ohashput(gr, a, fastunifiq(b:ohashget(gr, a)));
+   };
+   addphi(a) = {ohashput(phis, a, a)};
+   // Build value dependency graph and a list of all values
+   nodes = collector(a,g) {visit:genssa(code: code) {
+      deep oppair : {a(name);op(name)};
+      deep iop {
+         phi -> fun(up) { uses = getuses(node);
+	           addphi(up);
+	           iter u in uses do addref(up, u); }
+       | else -> fun(up) { uses = getuses(node);
+                   iter u in uses do addref(up, u); }
+      }
+     }; return g()};
+   // find all the nodes in this graph which are phis and are only referenced by phis
+   // or not referenced at all
+   iter n in nodes do {
+     vis = mkhash();
+     if(not(ohashget(phis,n))) {
+       do taint(i = n) {
+         if(ohashget(vis,i)) []
+	 else {
+	    ohashput(taints, i, i);
+	    ohashput(vis, i, i);
+	    us = ohashget(gr, i);
+	    iter u in us do taint(u)
+	 }
+       }
+     }
+   };
+   // remove all the phi nodes that are not tainted
+   return visit:genssa(code: code) {
+      deep oppair : if(ohashget(taints, name)) [node] else [];
+      deep bblock {
+         b -> mk:node(ops = map append ops do ops)
+      }
+   }
+}
+}
+
+
+\pfcode{
+function ssa_export_dominators(code)
+{
+   dg = ssa_extract_cfg(code);
+   dtree = graph_revert(graph_dominators(dg, 'entry'));
+   dpairs = ssa_domtree_pairup(dtree);
+   return [dg;dtree;dpairs]
+}
+}
+
+\pfcode{
+function ssa_transform(code, allocas)
+  { dg = ssa_extract_cfg(code);
+    dtree = graph_revert(graph_dominators(dg, 'entry'));
+    dpairs = ssa_domtree_pairup(dtree);
+    valmap = mkhash(); domcache = mkhash(); stores = mkhash();
+    ssa_transform_findallstores(code, stores, allocas);
+    transform = fun(c,a) { ssa_transform_1(valmap, dg, [dtree;dpairs], c, a, domcache, stores) };
+    code1 = foldl(transform, code, allocas);
+    // Propagate each and every store and phi, eliminating loads
+    ah = mkhash(); iter a in allocas do ohashput(ah, a, a);
+    code2 = ssa_transform_3(valmap, dg, code1, ah);
+    return [valmap; ssa_optimise(code2); [dg;dtree;dpairs]] }
+}
+
+
+
+%%%    
+%%%

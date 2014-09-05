@@ -1,0 +1,9 @@
+#!/bin/sh
+
+REPL_PATH="`dirname \"$0\"`"
+REPL_PATH="`( cd \"$REPL_PATH\" && pwd )`"
+
+. $REPL_PATH/conf
+
+$MONO $0.exe $*
+

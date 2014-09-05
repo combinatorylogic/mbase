@@ -1,0 +1,103 @@
+% literate:
+
+\section{Standalone Prolog REPL}
+
+\pfcode{
+#(sysdll MBaseLogic)
+}
+
+\pfcode{
+parser prologrepl (prolog) {
+   !!Spaces;
+   prologrepl := [prologrepl0]:v [Spaces]* => v;
+   prologrepl0 :=
+         { next => NEXT() }
+     /   { exit => EXIT() }
+     /   { load [string]:s => LOAD(s) }
+     /   { debug [number]:n => DEBUG(n) }
+     /   { [prolog]:p => PROLOG(p) }
+     ;
+}
+}
+
+\pfcode{
+function prolog_display_result(r)
+{ match r with
+    rnum : rmap : next -> {
+      if (rmap) {
+        println(%S<<("Solution N", rnum, ":"));
+        map [n;nv] in rmap do {
+          println(%S<<(n, " = ", prolog_term_to_string(nv)))}
+      } else println("Yes.");
+      return next}
+  | else -> {println("No."); []}}}
+
+\pfcode{
+function prolog_repl_once(str, prev)
+{
+  v = parse str as prologrepl;
+  match v with
+    'FAIL:':(v:strm):errs -> println(%S<<("Syntax error at ", %__peg:displaypos(strm), ", expecting: ", %S<<(errs)))
+  | PROLOG(vv) -> { result = prolog_backend_driver(vv, %read-compile-eval , []);
+        return prolog_display_result(result) }
+  | NEXT() -> (if(prev) return prolog_display_result(prev()) else [])
+  | LOAD(nm) -> {
+      fpath = %generic-filepath(nm);
+      src = %peg:file->stream(fpath);
+      pars = parse stream src as prolog;
+      app0 = map a in pars do prolog_parse_fix_arity_clause(a);
+      capp = prolog_compile(app0);
+      cgen = %map(prolog_codegen, capp);
+      %read-compile-eval('begin'(@cgen));
+      return []
+    }
+  | DEBUG(n) -> {
+      if(n==0) {
+        #(read-int-eval '(define debug-prolog-compile nil));
+        #(read-int-eval '(define debug-prolog-codegen nil))
+      } else if(n==1) {
+        #(read-int-eval '(define debug-prolog-compile 1))
+      } else if(n==2) {
+        #(read-int-eval '(define debug-prolog-codegen 1))
+      };
+      return prev
+    }
+  | EXIT() -> quit()
+}
+}
+
+\pfcode{
+#(define sem (car (string->list ";")))
+#(function plg_read_eval_print_loop (redr)
+  (let loop ((buf nil) (prev nil))
+    (if (null? buf) (print "<< "))
+    (format 
+     (p:match buf
+       (($a $b . $r) (list a b))
+       (else (list 0 0)))  (a b)
+     (if (and (eq? a sem) (eq? b sem))
+         (let ((nprev (prolog_repl_once 
+                   (list->string (reverse (cddr buf))) prev)))
+           (loop nil nprev))
+         (alet chr (not.neth ((System.IO.StreamReader redr))
+                        (chr = (redr@Read))
+                        (object ret = null)
+                        (if (>= chr 0) (ret <- ((object)((char)chr))))
+                        (leave ret))
+           (if (not chr) nil
+               (loop (cons chr buf) prev)))))))
+}
+
+\pfcode{
+function main()
+{
+  #(corelib:set-lookup-path 
+     (not.neth ()
+         (leave
+          (System.IO.Directory@GetCurrentDirectory))));
+  #(plg_read_eval_print_loop
+   (not.neth ()
+       (leave ((object)(new System.IO.StreamReader 
+                            (System.Console@OpenStandardInput))))))}}
+
+%%%%%%%%%%%%%

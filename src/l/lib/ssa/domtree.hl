@@ -1,0 +1,155 @@
+
+
+// Convert a symbolic graph into a numeric adj matrix
+function graph_sym2num_map(gr)
+{
+  ht = mkhash();
+  idx = mkref(0);
+  add(v) = {
+    chk = ohashget(ht,v);
+    if(chk) chk else {
+      n = ^idx;
+      ohashput(ht, v, n);
+      idx := n+1;
+      return n
+    }  
+  };
+  add('entry'); // Must always be 0
+  hashiter(fun(k,v) {
+     add(k); iter v do add(v)
+    }, gr);
+  return [ht;^idx]
+}
+
+function graph_sym2num(gr)
+{
+  <[m;n]> = graph_sym2num_map(gr);
+   NN = n*n;
+// writeline(#`(graph N = ,n));
+   arr = .net(NN): new int[(int)NN];
+   put(x,y) = {
+     notnet(int[] arr, int x, int y, int n) {
+        arr[x+y*n] = 1;
+	leave null;
+     }
+   };
+   get(x,y) = {
+     notnet(int[] arr, int x, int y, int n) {
+        leave arr[x+y*n];
+     }
+   };
+   hashiter(fun(k,v) {
+     y = ohashget(m, k);
+     iter v do {
+        x = ohashget(m, v);
+	put(x,y)
+     }
+    }, gr);
+   return [get;put;n;m]
+}
+
+function graph_getpreds(gr, nd)
+{
+  <[get;put;n;m]> = gr;
+   collector(a,g) {
+     x = nd;
+     do loop(y = 0) {
+       if(y<n) {
+         if(get(x,y)>0) a(y);
+	 loop(y+1)}};
+     return g()}}
+
+function sets_intersect_add(gr, ls, nd1)
+{
+  <[get;put;n;m]> = gr;
+   ar = .net(n): new int[(int)n];
+   nb = length(ls);
+   iter l in ls do {
+     iter i in l do {
+        notnet(int[] ar, int i) {
+	   ar[i] = ar[i]+1;
+           leave null;
+	}
+     }};
+   collector(Ad, Gt) {
+     do loop(nn = 0) {
+      if(nn<n) {
+        i = (notnet(int[] ar, int nn) { leave ar[nn];});
+        if((i == nb) || (nn == nd1)) Ad(nn);
+        loop(nn+1);
+      }};
+     return Gt()
+   }
+} 
+
+function graph_dominators_inner(N, gr, nd)
+{
+   Dom = mkhash();
+   ohashput(Dom, nd, [nd]);
+   N1 = filter(fun(n) (nd!=n), N);
+   iter n in N1 do {
+      ohashput(Dom, n, N);
+   };
+   chg = mkref(true);
+   do loop() {
+     if(^chg) {
+       chg := [];
+       iter n in N1 do {
+          Dom0 = ohashget(Dom, n);
+	  preds = map p in ohashget(car(gr),n) do ohashget(Dom, p);
+          Dom1 = if(preds) sets_intersect_add(gr, preds, n) else [n];
+	  if(not(length(Dom1)==length(Dom0))) {
+	     ohashput(Dom, n, Dom1);
+	     chg := true
+	  }
+       };
+       loop()
+     }
+   };
+   return Dom
+}
+
+function graph_dominators_i0(htgr, nd)
+{
+  gr = graph_sym2num(htgr);
+ <[get;put;n;m]> = gr;
+  preds = mkhash();
+  N = [0..n];
+  iter i in N do {
+     ohashput(preds, i, graph_getpreds(gr, i))
+  };
+  return [preds;N;n;m]
+}
+
+function graph_dominators(htgr, nd) 
+{
+  gr = graph_dominators_i0(htgr, nd);
+ <[preds;N;n;m]> = gr;
+  idom = graph_dominators_inner(N, gr, ohashget(m, nd));
+  revmap = mkhash();
+  hashiter(fun(k,v) {ohashput(revmap, v, k)}, m);
+  Dom = mkhash();
+  hashiter(fun(k,v) {
+    nk = ohashget(revmap, k);
+    nv = map v do ohashget(revmap, v);
+    ohashput(Dom, nk, nv)
+   }, idom);
+  return Dom;
+}
+
+
+.unittest 1 code:
+ function test_dominators()
+ {
+   g0 = ['entry'('b','c');'b'('b','d0');'d0'('d');'d'('c');'c'('e');'e'('f');['f']];
+   gr = mkhash();
+   iter g0 do ohashput(gr, car(g0), cdr(g0));
+   Dom = graph_dominators(gr, 'entry');
+   return hashmap(fun(a,b) [%Sm<<(a);b], Dom);
+ }
+
+.unittest 1: (test_dominators()) expect: 
+      #((b (entry b)) (e (entry e c)) (d0 (entry b d0)) 
+        (d (entry b d0 d)) (entry (entry)) (c (entry c)) 
+        (f (entry e f c)))
+

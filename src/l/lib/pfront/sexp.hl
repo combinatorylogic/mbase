@@ -1,0 +1,120 @@
+//////////////////////////////////////////////////////////////////////////////
+//
+//   OpenMBase
+//
+// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
+// This file is distributed under the terms of the Q Public License version 1.0.
+//
+//////////////////////////////////////////////////////////////////////////////
+
+define %peg-function-lspcharval =
+   fun(ch) {
+     v0 = cddr(%string->list(cdr(ch)));
+     v = %list->string(v0);
+     match %string->symbol(v) with
+        'Newline' -> 10c
+      | 'Tab' -> 7c
+      | 'Space' -> 32c
+      | 'LBR' -> '('c
+      | 'RBR' -> ')'c
+      | 'Semicolon' -> ';'c
+      | else -> car(v0);
+   };
+
+define %peg-function-booltrue =
+   fun() { true };
+
+define %peg-function-boolfalse =
+   fun() { false };
+
+parser mbsexp ( pfront ) {
+       !!SXSpaces;
+
+// Inherited
+  @@Letter := [a-z]/[A-Z];
+  @@Digit  := [0-9];
+  @@Digits  := [Digit]+;
+  @@SXSpace  := " " / [TAB] / [CR] / [NEWLINE] / [InlineTexComment] / 
+      [SingleLineTexComment] / [SingleLineComment];
+  @@SXSpaces := [SXSpace]+;
+  @@SingleLineComment := ";" (![NEWLINE] .)* [NEWLINE] => {state=comment};
+  @@SingleLineTexCommentBegin := ";" "*" => {state = empty};
+  @@SingleLineTexCommentRest := (![NEWLINE] .)* [NEWLINE] => {screen=none};
+  @@SingleLineTexComment := 
+     [SingleLineTexCommentBegin] [SingleLineTexCommentRest];
+  @@InlineTexComment := [TexComment2Begin] [TexComment2Rest] [TexComment2End];
+  @@QUOTE := 39;
+  @tQUOTE := 39;
+  @@DQUOTE := 34;
+  @@BSDQUOTE := "\" 34;
+  @tDQUOTE := 34;
+
+  @@NEWLINE := 10;
+  @@CR := 13;
+  @@TAB := 9;
+  @tNumber := "-"? [Digit]+;
+  number := [tNumber]:v => {ctoken = const} $nval(v);
+  @tString := [DQUOTE] ("\\"/[BSDQUOTE]/( ![DQUOTE] . )) * [DQUOTE];
+  string := [tString]:t => {ctoken = const} $stringdescreen($stripval(t));
+// ///////////////////////////////////////////////////////////
+      
+       @lspchar := "#\" . ([Letter] *);
+
+       @@sxsymbegin := ([Letter] / "_" / "-" / "+" / "*" / "@" / "=" / "?" /
+                        "/" / "$" / "<" / ">" / "%" / ":" / "!" / "|" /
+                        "&" / "[" / "]" / "#" / "~");
+       @@sxsymrest := ([sxsymbegin]/ [Digit] / "@" / "." / ",");
+
+       @sxsymbol1 := ([sxsymbegin] [sxsymrest]*) (?:mbaseglobal);
+       @sxsymbol2 := ([sxsymbegin] [sxsymrest]*) (?:mbasemacro);
+       @sxsymbol3 := ([sxsymbegin] [sxsymrest]*);
+       @sxndots   := ".." [sxsymrest]*;
+       @onedot    := "." (!".") => {ctoken=lexic};
+
+       sxsymbol :=
+                   { [sxsymbol2]:s => {ctoken=lexic} $sval(s)}
+                /  { [sxsymbol1]:s => {ctoken=keyword} $sval(s)}
+                /  { [sxsymbol3]:s => {ctoken=ident} $sval(s)}
+		/  { [sxndots]:s => {ctoken=lexic} $sval(s) }
+                ;
+
+       [lexical:] := [lexical] => {ctoken = lexic};
+
+       sxnde := {"(" ")" => $nil()}
+             /  {"(" [sxndx]:x ")" => x}
+
+             /  {",@" [sxnde]:a => "unquote-splicing"(a) }
+             /  {"," [sxnde]:a => "unquote"(a) }
+             /  {"`" [sxnde]:a => "quasiquote"(a) }
+	     /  {"=pf:" [atopexpr]:e => "pfront_top_ast"(e)}
+             /  {[tQUOTE] [sxnde]:a => "quote"(a) }
+
+             /  {[lspchar]:c => $lspcharval(c) }
+             /  {"#t" => $booltrue() }
+             /  {"#f" => $boolfalse() }
+             /  {[number]:n => n }
+             /  {[sxsymbol]:s => s }
+             /  {[string]:s => s}
+             ;
+       sxndx := {[sxnde]:a [onedot] [sxnde]:b => $cons(a,b)}
+             /  {[sxnde]:a [sxndx]:b => $cons(a,b)}
+             /  {[sxnde]:x => $wrap(x)}
+             ;
+       mbsexp := [sxnde]:e [SXSpaces]* => e;
+}
+
+
+syntax in expr, start ( mbsexp ): ' "#" [sxnde]:e '
+{
+   ['lisp';e]
+}
+
+syntax in expr, start ( mbsexp ): ' "!#" [sxnde]:e '
+{
+   e
+}
+
+macro pfront_top_ast (e)
+{
+   %hlevel-compile(e);
+}
