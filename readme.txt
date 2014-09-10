@@ -62,6 +62,8 @@ implementation tool for higher level languages. There is a rich
 extensible syntax frontend for MBase, called PFront, although it is also
 not recommended as a "general purpose" programming language.
 
+ See an example compiler built on top of MBase and LLVM here:
+  https://github.com/combinatorylogic/clike
 
  CONTENTS (binaries)
 
