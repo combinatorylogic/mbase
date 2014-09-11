@@ -65,6 +65,20 @@ not recommended as a "general purpose" programming language.
  See an example compiler built on top of MBase and LLVM here:
   https://github.com/combinatorylogic/clike
 
+ BUILDING
+
+ MBase requires Mono >= 3.0 and must be installed into GAC.
+ To build on Linux with Mono:
+
+   cd bin
+   make
+   ./install.sh (may require root rights to access GAC)
+
+   Optional:
+   ./test.sh   
+
+   Add $MBASE/bin to your $PATH;
+
  CONTENTS (binaries)
 
   Core:
