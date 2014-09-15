@@ -68,6 +68,9 @@ not recommended as a "general purpose" programming language.
  BUILDING
 
  MBase requires Mono >= 3.0 and must be installed into GAC.
+ Graphviz and latex (preferably texlive) are required for building
+ documentation.
+ 
  To build on Linux with Mono:
 
    cd bin
@@ -78,6 +81,15 @@ not recommended as a "general purpose" programming language.
    ./test.sh   
 
    Add $MBASE/bin to your $PATH;
+
+ To build on Windows (with Cygwin or mingw32 bash and GNU Make):
+   cd bin
+   make MONO= CSC=csc backslash=\\\\
+   ./install.sh (as Administrator)
+   echo "" > conf
+
+   Optional
+   ./test.sh
 
  CONTENTS (binaries)
 
