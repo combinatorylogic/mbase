@@ -94,6 +94,7 @@ ast pfnotnetast {
          | isnull(expr:a)
          | typeof(expr:a)
          | typetoken(type:tp)
+         | ref(expr:a)
          | new(type:tp,*expr:args)
 	 | newarr(type:tp, expr:sz)
 	 | newdelegate(type:tp, exprortype:inst, ident:nm)
@@ -290,6 +291,7 @@ parser pfnotnet ( pfront )
 	  /  { "null?" [pfexpr5]:a => isnull(a) }
 	  /  { typeof [pfexpr5]:a => typeof(a) }
 	  /  { type [pftype]:t => typetoken(t) }
+          /  { ref [pfexpr5]:a => ref(a) }
 	  /  { "(" [pftype]:tp ")" [pfexpr5]:a => typecast(a,tp) }
 	  /  { delegate [pftype]:tp "(" [pftype]:e ":" [pfident]:nm ")" =>
 	        newdelegate(tp, type(e), nm) }
@@ -396,7 +398,7 @@ function pfnotnet_top (nn)
        |  foreach -> 'foreach'([var;v],body)
        |  while -> 'while'(v,body)
        |  label -> 'quote'(lbl)
-       |  vardef -> ['nop'] //TODO!
+       |  vardef -> 'declare'(tp, id)
        |  varinit -> [tp;id;'=';v]
        |  uvarinit -> [id;'=';v]
        |  lift -> {
@@ -429,6 +431,7 @@ function pfnotnet_top (nn)
        |  binor -> 'binor'(a,b)
        |  istype -> 'istype'(a,tp)
        |  typeof -> 'typeof'(a)
+       |  ref -> 'ref'(a)
        |  typecast -> [[tp];a]
        |  unot -> 'not'(a)
        |  uminus -> '-'(a)

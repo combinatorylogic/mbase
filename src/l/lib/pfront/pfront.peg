@@ -212,7 +212,8 @@ parser pfront extends minipeg (
    / { '::visit' '\' ident:i '\' => {qstate = unquote} unquote(i) }
    ;
 
-  term visitpattern "<visit pattern>" := ident:p tTO exprwrap:e => $list(p,e);
+  term visitpattern "<visit pattern>" := vpident:p tTO exprwrap:e => $list(p,e);
+  term vpident := ident / qsymbol;
 
   term visielse "<visit else>" := 
       { '|'? |'else'| tTO? exprwrap:e => velse(e) }

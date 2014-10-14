@@ -26,6 +26,7 @@
   (mtdbody
    (|
     (tvar <type:tp> <ident:name> <expression:value> . <*mtdbody:in>)
+    (tvardef <type:tp> <ident:name> . <*mtdbody:in>)
     (var <ident:name> <expression:value> . <*mtdbody:in>)
     (vvar <mtdinfo:mtd> <*expression:args> <ident:name> . <*mtdbody:in>)
 

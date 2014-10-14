@@ -42,4 +42,16 @@ Generic constant folding:
   - A phi loop with only constant inputs and a constant bound yields a constant value (needs loop analysis data)
   - Side effect instructions are marked so
   - Loops not containing side effects are marked so
-- 
+
+
+
+
+
+
+
+
+
+
+
+
+%%%%%%%%%

@@ -83,6 +83,8 @@
 	 (cons 'begin
  	  (let innerloop ((bdy b))
 	   (p:match bdy
+	     (( (tvardef $tp $nm . $rest1) . $rest2)
+	      `((tvardef ,tp ,nm (begin ,@(append rest1 (innerloop rest2))))))
 	     (( (tvar $tp $nm $vl . $rest1) . $rest2)
 	      `((tvar ,tp ,nm ,vl (begin ,@(append rest1 (innerloop rest2))))))
 	     (( (var $nm $vl . $rest1) . $rest2)
@@ -363,6 +365,8 @@
 (function last-subst (bs)
     (let loop ((v bs))
       (p:match v
+	((tvardef $_ $_ . $bbs)
+	 (loop (car (lasttail bbs))))
 	((tvar $_ $_ $_ . $bbs)
 	 (loop (car (lasttail bbs))))
 	((begin . $bbs)
@@ -422,6 +426,13 @@
 		      ,@(map-over in (cut loop <> ntps)))
 	       (ast:mknode (name newname) (value nval) 
 			   (in (map-over in (cut loop <> ntps)))))))
+        (tvardef
+	 (let* ((newname (gensymp "var_"))
+		(ntps (cons (list name newname 'var tp) tps))
+		(tx (ll-nettypeT tp))
+		)
+           (ast:mknode (name newname)
+                       (in (map-over in (cut loop <> ntps))))))
 	(tryblock
 	 (let* ((newname (gensymp "excp_"))
 		(bby (loop body tps))

@@ -230,6 +230,9 @@
 	  ,@(cdr value)
 	  (Stloc (var ,name))
 	  ,@(foreach-mappend (i in) i)))
+       (tvardef
+	`((local ,name ,(ll-nettypeT tp))
+          ,@(foreach-mappend (i in) i)))
        (vvar
 	`((local ,name ,(ll-nettypeT (caar mtd)))
 	  (Ldloca (var ,name))

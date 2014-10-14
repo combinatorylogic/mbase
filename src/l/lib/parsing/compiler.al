@@ -678,6 +678,12 @@
 
 (include "./backend-ast.al");; 
 
+(define packrat-prep-plugins (mkref nil))
+
+(function packrat-apply-plugins (entry prep)
+  (foldl (fun (l r) 
+           (r entry l)) prep (deref packrat-prep-plugins)))
+
 (function packrat-ast-f0 (exp? entry borrow0 code)
   (let* ((borrow (packrat-expand-borrow borrow0))
          (localmacros 
@@ -688,10 +694,11 @@
                                             (else nil))))
                      (mget)))
          (borrowmacros (packrat-borrow-macros borrow))
-         (prep  
+         (prep0  
               (packrat-preprocess-top 
                 (packrat-expand-macros
                  (append borrowmacros code))))
+         (prep (packrat-apply-plugins entry prep0))
          (dynhooks (filter (fmt (a . r) (eqv? a 'dynahook)) code))
          (result 
           (translate-all entry borrow prep localmacros

@@ -289,7 +289,10 @@
              (begin
                ,@(if report
                      `((__peg:env:rightmostfailure Env source (quote ,name)
-                                                   ,report)))
+                                                   ,report))
+                     `((__peg:env:rightmostfailure Env source (quote ,name)
+                                                   ,(S<< name)))
+                     )
                result))
           __result
           ))))))

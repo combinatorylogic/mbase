@@ -323,6 +323,7 @@
        `(throw ,(compile-expr e)))
       ((asm . $body)
        `(embedd-asm ,@body))
+      ((declare $$M:tp $$M:v) `(tvardef ,(compile-type tp) ,v))
       (($$M:v [=] $e) `(var ,v ,(compile-expr e)))
       (($$M:tp $$M:v [=] $e) `(tvar ,(compile-type tp) ,v ,(compile-expr e)))
       (($$XXX:lvalue [<-] $e) `(set ,(compile-expr lvalue) ,(compile-expr e)))
