@@ -43,6 +43,7 @@
        (case a
          ((AS)  `(match-as ,@b))
          ((XXX)  `(match-anybutnext ,@b))
+         ((FFF)  `(match-guard ,@b))
          ((FF)  `(match-post-function ,@b))
          ((F)  `(match-function ,@b))
 	 ((RP) `(match-many ,@b))
@@ -81,6 +82,8 @@
 		       ,(pm:ptn-process (cadr ptn))
 		       ,(pm:ptn-process (cddr ptn))
 		       ))
+         ((match-guard) rest
+          `(match-guard ,(pm:ptn-process (cadr ptn)) ,(caddr ptn)))
 	 ((match-post-function) rest
 	  `(match-post-function ,(if (null? rest) nil (car rest))
 				,(cadr ptn) ,(pm:ptn-process (cddr ptn)))) 
@@ -157,6 +160,8 @@
 		  )))))
       ((match-function) (bnd fn)
          `(pm:ptn-try (,fn ,pas) ,(if bnd `(let ((,bnd ,pas)) ,body) body)))
+      ((match-guard) (ptn fn)
+        (pm:ptn-unroll ptn pas `(pm:ptn-try (,fn ,pas) ,body))) 
       ((match-post-function) (bnd fn ptn2)
         (with-syms (sss)
           `(let (,@(if (null? bnd) nil `((,bnd ,pas))) (,sss (,fn ,pas))) ,(pm:ptn-unroll ptn2 sss body))))
@@ -209,6 +214,7 @@
     " | ($$R[:<ident>] . <symbol>*) - matches any of the given symbols"
     " | ($$XXX[:<ident>] . <pattern>) - any number of list elements before"
     "          pattern is matched"
+    " | ($$FFF <pattern> <fun(x)>) - applies a pattern and additionally applies a guard function" 
     " | ($$FF[:<ident>] <fun(x)> . <pattern>) - checks if <fun> is not nil, and" 
     "              applies pattern to a function value."
     "              This feature is a tribute to Don Syme's banana brackets."

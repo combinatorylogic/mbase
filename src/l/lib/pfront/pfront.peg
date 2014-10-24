@@ -174,6 +174,7 @@ parser pfront extends minipeg (
 
   term mpattern "Match pattern" :=
      { impattern:a ':' mpattern:p=>cons(a,p)}
+   / { impattern:a |'as'| ident:id |'when'| expr:e => guard(id, bindas(id, a), e) }
    / { impattern:a |'as'| ident:id => bindas(id,a) }
    / impattern
    =>
@@ -189,6 +190,7 @@ parser pfront extends minipeg (
    / { qsymbol:i '(' ecslist<lmpattern,','>:args ')' => alist(i,@args) }
    / { qsymbol:s => quote(s) }
    / { ident:i '(' ecslist<lmpattern,','>:args ')' => alist(i,@args) }
+   / { ident:i |'when'| expr:e => guard(i,binding(i),e) }
    / { ident:i => binding(i) }
    / { '_' => any() }
    / { number:n => number(n) }

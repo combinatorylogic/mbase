@@ -68,6 +68,7 @@
   (mpattern
    (| (cons <mpattern:a> <mpattern:b>)
       (bindas <ident:id> <mpattern:p>)
+      (guard <ident:id> <mpattern:a> <expr:b>)
       (list . <*lmpattern:ps>)
       (nil)
       (quote <symbol:s>)

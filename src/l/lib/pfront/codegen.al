@@ -185,6 +185,7 @@
     (mpattern DEEP
        ((cons (cons a b))
         (bindas `(,(Sm<< "$$AS:" id) ,p))
+        (guard `(,(Sm<< "$$FFF") ,a (fun (,id) ,b)))
         (list (normal-or-append
 	       (fun (a b) (cons a b))
 	       (fun (a b) 
