@@ -21,6 +21,7 @@
 ;;    - packrat-preprocess-autonames:  expand the "..." constructors
 ;;    - packrat-preprocess-top-0:  lift the embedded terms
 ;;    - packrat-detect-recursion:  find left-recursive clusters of terms
+;;    - packrat-analyse-ast: try to infer AST, match with declaration if needed
 ;; - From 'translate-all': for each top-level entry:
 ;;   - translate-binds
 ;;   - translate-binds-2
@@ -39,6 +40,8 @@
           ((seq (foreach-mappend (e es) e))
            (palt (foreach-mappend (e es) e))
            (withignore e)
+           (ordie e)
+
            (pdalt (foreach-mappend (e es) e))
            
            (plus e)
@@ -102,6 +105,7 @@
                 ,@inner)))
            (notp node)
            (withignore (ast:mknode (e (loop e topdown topmaybe))))
+           (ordie (ast:mknode (e (loop e topdown topmaybe))))
            (star  `(star ,(loop e topdown 0)))
            (plus  `(plus ,(loop e topdown 0)))
            (maybe  `(maybe ,(loop e topdown 0)))
@@ -206,6 +210,9 @@
                  (withignore
                   `(peg-ignore ,terms ,e))
 
+                 (ordie
+                  `(peg-ordie ,e ,m ,@args))
+
                  (bind-terminal
                   `(peg-bind ,(hashget mults fname)
                              ,fname (peg-call-terminal-gen ,tname ,rec)))
@@ -239,7 +246,7 @@
                 ))
   )
 
-(function translate-term (name ttype dcode expr report rngs)
+(function translate-term (name ttype dcode expr report rngs dtype)
   (let* ((tstruct (peg-terminal-structure expr))
          (mults (with-hash (m)
                   (foreach (a tstruct)
@@ -249,7 +256,6 @@
          (res (translate-expr expr mults nil)))
     `(peg-term-function
                         ,(alet chkx (hashget rngs name)
-                            ;;; (writeline `(RANGE: ,name ,chkx))
                             (if chkx
                                 (if (eqv? chkx 'undef)
                                     nil
@@ -258,13 +264,14 @@
                         ,name ,ttype 
                         ,(cons tstruct (fix-auto-dcode name expr dcode)) 
                         ,(packrat-optimise-intermediate res) ,report
+                        ,dtype
                         )
     ))
 
 ;; See http://publications.csail.mit.edu/lcs/pubs/pdf/MIT-LCS-TR-147.pdf
 ;;   or http://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/
 ;;      https://github.com/munificent/bantam
-(function translate-binaries (name ttype lr vs rngs)
+(function translate-binaries (name ttype lr vs rngs dtype)
   (alet chkx (hashget rngs name)
         `(peg-term-function-pratt
           ,(if chkx
@@ -282,25 +289,39 @@
                                                         (op nil)
                                                         (R nil))
                                                       (fix-auto-dcode name
-                                                                      op constr)))))))))
+                                                                      op constr))))))
+          ,dtype
+          )))
+
+(function packrat-find-target-ast (code)
+ (collector (add get)
+  (packrat:iter ntexprs code
+    (ntexpr _
+      ((targetast (add name))
+       (else nil))))
+  (let* ((r (get)))
+    (if r (car r) nil))))
 
 (function translate-all (entry borrow code localmacros dhooks exp?)
-  (alet rngs (packrat-reckon-ranges (packrat-borrow-ranges borrow) code)
+  (let* ((rngs (packrat-reckon-ranges (packrat-borrow-ranges borrow) code))
+         (targetast (packrat-find-target-ast code))
+         )
   `(peg-parser ,exp? ,entry ,borrow
                ,(foreach-mappend (c code)
                   (p:match c
-                    ((terminal $ttype $name $v $dc . $rep)
+                    ((terminal $dtype $ttype $name $v $dc . $rep)
                      `((,name ,(translate-term 
                                 name ttype dc 
                                 (translate-binds-2 (translate-binds v))
                                 (if rep (car rep) nil)
-                                rngs
+                                rngs dtype
                                 ))))
-                    ((binaries $ttype $name $lr $vs . $rep) ;; todo: respect rep
-                     `((,name ,(translate-binaries name ttype lr vs rngs))))
+                    ((binaries $dtype $ttype $name $lr $vs . $rep) ;; todo: respect rep
+                     `((,name ,(translate-binaries name ttype lr vs rngs dtype))))
                     (else nil)))
                ,localmacros
                ,dhooks
+               ,targetast
                )))
 
 ;;; (debugmacro 'peg-parser)
@@ -315,6 +336,8 @@
          (foreach (e es)
            (loop e left?)))
         (withignore
+           (loop e left?))
+        (ordie
            (loop e left?))
         (pdalt
          (foreach (e es)
@@ -360,6 +383,7 @@
          `(palt ,@(foreach-map (e es)
                     (loop e left?))))
         (withignore (ast:mknode (e (loop e left?))))
+        (ordie (ast:mknode (e (loop e left?))))
         (pdalt
          `(pdalt ,@(foreach-map (e es)
                     (loop e left?))))
@@ -407,6 +431,218 @@
        (binaries
         (ast:mknode (lr (packrat-mark-leftrec ttype uh norms lr))))
        (else node)))))))
+
+(function packrat-collect-terminal-ctors (termname add dtype value constr)
+  (let* ((rt (mkhash))
+         (associate
+          (fun (es)
+            (let* ((vs
+              (foreach-mappend (e es)
+                (packrat:visit expr e
+                   (expr DEEP 
+                     ((simple (wrap name))
+                      (terminal (wrap name))
+                      (bind-terminal (wrap tname))
+                      (else nil)))))))
+              (foreach (v vs)
+                (add `(associate ,termname ,v)))))))
+    ;; collect named bindings
+    (packrat:visit expr value
+       (expr DEEP
+          ((bind-terminal (ohashput rt fname tname) tname)
+           (bind (if e (ohashput rt name e)) e)
+           (terminal name)
+           (else nil))))
+    ;; Collect alternatives
+    (let* ((stripvalue
+            (packrat:visit expr value
+             (expr DEEP
+               ((withignore e)
+                (else node))))))
+      (packrat:visit expr stripvalue
+         (expr _
+            ((palt (associate es))                  
+             (else nil)))))
+    ;; Collect ctor tags
+    (if (cadr constr)
+     (packrat:iter code (cadr constr)
+       (code _      
+         ((constr (add `(tag ,termname ,cname)))
+          (var    (add `(associate ,termname ,(ohashget rt name))))
+          (dconstr (add `(nodetype ,termname ,nname)))
+          (else nil)))))
+    ;; No need to infer anything
+    (p:match dtype
+      (((target $nm)) ;; TODO!
+       (add `(nodetype ,termname ,nm))))
+    ))
+
+(def:ast asteqns ()
+  (eqns <*eqn:es>)
+  (eqn
+   (| (tag <termid:id> <tagid:tg>)
+      (associate <termid:a> <termid:b>)
+      (nodetype <termid:id> <nodeid:nd>)
+      )))
+
+;; AST inference steps:
+;; - flatten associations
+;; - bind all the tags to associations
+(function packrat-asteqns-clusters (eqns)
+  (let* ((ht (mkhash))
+         (cht (mkhash))
+         (tht (mkhash))
+         )
+    ;; fill the cluster table
+    (asteqns:iter eqns eqns
+        (eqn _ ((associate (ohashput ht a (unifiq (cons b (ohashget ht a))))
+                           (ohashput ht b (unifiq (cons a (ohashget ht b)))))
+                (tag (ohashput ht id (unifiq (cons id (ohashget ht id)))))
+                (else nil))))
+    ;; pick up random cluster entries and associate all the other
+    ;; linked nodes with them
+    (let* ((fillin
+            (fun (id)
+              (if (ohashget cht id) nil
+                  (begin
+                    (ohashput cht id id)
+                    (let loop ((vs (ohashget ht id)))
+                      (foreach (v vs)
+                        (if (not (ohashget cht v))
+                            (begin
+                              (ohashput cht v id)
+                              (loop (ohashget ht v)))))))))))
+      (asteqns:iter eqns eqns
+        (eqn _ ((associate (fillin a))
+                (tag (fillin id))
+                (else nil)))))
+    ;; associate tags with clusters
+    (asteqns:iter eqns eqns
+       (eqn _ ((tag (let* ((cid (ohashget cht id)))
+                      (ohashput tht cid (unifiq (cons tg (ohashget tht cid))))))
+               (else nil))))
+    ;; Return the resulting association
+    (cons cht tht)
+    ))
+
+(function packrat-ast-match (astc tgsh src eqns)
+  (format tgsh (cht . tht)
+  (let* (
+         (implct (mkhash))
+         (revcht (mkhash))
+         (report (fun (k v) (writeline `(MAYBE-ERROR ,k ,v)))) ;; TODO!
+         (set-intersect (fun (a b)
+                          (let* ((ah (mkhash)))
+                            (foreach (a a) (ohashput ah a a))
+                            (foreach-mappend (b b) (if (ohashget ah b) (wrap b) nil)))))
+         (hs 
+          (format astc (nexts-map
+                        prevs-map
+                        nodes-map
+                        vars-map)
+                  vars-map))
+         ;; For each tag, list all nodes the tag can belong to
+         (hpths1
+          (hashmap (fun (k vs)
+             `(,k
+               ,@(foreach-map (v vs)
+                   (ohashget hs v)))) tht))
+         ;; Find the common nodes for all tags for each of the clusters
+         (hpths2
+          (foreach-map (h hpths1)
+            (format h (k . vs)
+              (cons k (if vs (foldl set-intersect (car vs) (cdr vs)))))))
+         (ht (mkhash))
+         )
+    ;; Reverse cht
+    (hashiter (fun (k v)
+                (ohashput revcht v (cons k (ohashget revcht v)))) cht)
+    ;; Mark implicit nodes
+    (asteqns:iter eqns eqns
+      (eqn _ ((nodetype (let* ((cl (ohashget cht id))
+                               (rev (if cl (ohashget revcht cl))))
+                          (foreach (r rev)
+                            (ohashput implct r nd))))
+              (else nil))))
+    ;; Report errors
+    (foreach (h hpths2)
+      (format h (k . vs)
+        (p:match vs
+          (($a $b . $_)
+           (alet chk (ohashget implct k)
+                 (if chk (ohashput ht k chk)
+                     (report k `(MANY-NODES ,(ohashget tht k) ::: ,@vs)))))
+          (($a) (ohashput ht k a))
+          (()
+           (alet chk (ohashget implct k)
+                 (if chk (ohashput ht k chk))
+                 (report k `(NO-NODES ,(ohashget tht k) :::
+                                ,(foreach-map (v (ohashget tht k))
+                                   `(,v : ,@(ohashget hs v))))))))))
+    ;; Apply
+    (let* ((rht (mkhash)))
+      (packrat:iter ntexprs src
+        (ntexpr _
+          ((terminal
+            (let* ((chk (ohashget cht name)))
+              (if chk (let* ((v (ohashget ht chk)))
+                        (if v (begin
+                                (ohashput rht name v)))))))
+           (else nil))))
+      rht))))
+
+(function packrat-analyse-nobinaries (src)
+  (collector (add get)
+  (alet make_or
+    (fun (l v0)
+      (alet vs (foreach-map (vctr v0)
+                 (format vctr (v ctr)
+                   (with-syms (vn)
+                      (alet nt 
+                        `(terminal () term ,vn
+                              (seq (bind L ,l)
+                                   (bind op ,v)
+                                   (bind R ,l))
+                              ,ctr)
+                        (add nt)
+                        (return `(terminal ,vn))))))
+            `(palt ,@vs ,l)))
+  (alet ret
+     (packrat:visit ntexprs src
+      (ntexpr DEEP
+        ((binaries
+          (alet orexpr (make_or lr vs)
+                `(terminal ,dtype term ,name ,orexpr (()()))))
+         (else node)))
+      (binvar DEEP (list op constr)))
+     (return `(,@(get) ,@ret))))))
+          
+(function packrat-analyse-ast (src)
+  (collector (add get)
+  (alet nbsrc (packrat-analyse-nobinaries src)
+   (packrat:iter ntexprs nbsrc
+    (ntexpr _
+       ((terminal (packrat-collect-terminal-ctors name add dtype value constr))
+        (else nil))))
+   (let* ((eqns (get))
+          (tgs (packrat-asteqns-clusters eqns))
+          (astdef (packrat-find-target-ast src))
+          (astv (if astdef (ast2:default-ifun astdef))))
+     (if astv
+         (let* ((astc (ast-make-cache astv))
+                (astm (packrat-ast-match astc tgs nbsrc eqns)))
+           (packrat:visit ntexprs src
+             (ntexpr _
+               ((terminal
+                 (if dtype node
+                     (let* ((chk (ohashget astm name)))
+                       (if chk (ast:mknode (dtype `((target ,chk)))) node))))
+                (binaries
+                 (if dtype node
+                     (let* ((chk (ohashget astm name)))
+                       (if chk (ast:mknode (dtype `((target ,chk)))) node))))
+                (else node)))))
+         src)))))
                   
 ;;;;;;;---------------------------------------
 
@@ -418,7 +654,7 @@
         (foreach (a (zip anms args))
           (renm! (car a) (cadr a)))
         (cons newnm
-              `(terminal term
+              `(terminal () term
                          ,newnm
                          ,(loop
                           (packrat:visit expr body
@@ -485,6 +721,7 @@
                 (else (list node))))
               (binaries (list (packrat-addignore-terminal igno node)))
               (define (list node))
+              (targetast (list node))
               (else nil)))))))))
 
 (function packrat-rule-subst (nm rn body)
@@ -524,7 +761,7 @@
                     (rb (packrat-rule-subst 'lexical (if rn (car rn) nil) node))
                     )
                (hashput cache s tnm)
-               (tadd `(terminal token ,tnm ,rb ,(if rn (cadr rn) '(() ()))
+               (tadd `(terminal () token ,tnm ,rb ,(if rn (cadr rn) '(() ()))
                                 ,@(packrat-tokenreport node)))
                `(terminal ,tnm)))))
       (rule
@@ -536,7 +773,7 @@
              `(terminal ,atmpt)
              (let ((tnm (gensym)))
                (hashput cache s tnm)
-               (tadd `(terminal token ,tnm ,rb ,(if rn (cadr rn) '(() ()))
+               (tadd `(terminal () token ,tnm ,rb ,(if rn (cadr rn) '(() ()))
                                 ,@(packrat-tokenreport node)))
                `(terminal ,tnm)))))
       (else node)))))
@@ -588,12 +825,13 @@
 
             (else node))))))
 
-(function __packrat-p0-top-expr (liftadd tname e)
+(function __packrat-p0-top-expr (liftadd tname e dtype0)
   (packrat:visit expr e
     (expr DEEP
           ((lift 
             (alet t (Sm<< (if tname (S<< tname "_") "") (gensym))
-                  (liftadd `(terminal term ,t ,e ,c ,@r))
+                  (liftadd `(terminal ,(if dtype dtype dtype0)
+                                      term ,t ,e ,c ,@r))
                   `(terminal ,t)))
            (else node)))
     ))
@@ -604,17 +842,17 @@
        (packrat:visit ntexprs code
          (ntexpr _
            ((terminal
-             (ast:mknode (value (__packrat-p0-top-expr liftadd name value))))
+             (ast:mknode (value (__packrat-p0-top-expr liftadd name value dtype))))
             (binaries
-             (ast:mknode (lr (__packrat-p0-top-expr liftadd name lr))
+             (ast:mknode (lr (__packrat-p0-top-expr liftadd name lr dtype))
                          (vs (foreach-map (v vs)
                                (format v (prec assoc op constr . rep)
-                                       `(,prec ,assoc ,(__packrat-p0-top-expr liftadd name op)
+                                       `(,prec ,assoc ,(__packrat-p0-top-expr liftadd name op dtype)
                                                ,constr ,@rep))))))
             (define
-             (ast:mknode (e (__packrat-p0-top-expr liftadd name e))))
+             (ast:mknode (e (__packrat-p0-top-expr liftadd name e nil))))
             (rule 
-             (ast:mknode (e (__packrat-p0-top-expr liftadd name e))))
+             (ast:mknode (e (__packrat-p0-top-expr liftadd name e nil))))
             (else node))))
        (append (liftget) res))))
 
@@ -644,17 +882,18 @@
      (ntexpr DEEP
              ((src-binaries
                (let* ((ff (packrat-binaries-extract vs r)))
-                 `(binaries ,ttype ,name ,(car ff) ,(cdr ff))))
+                 `(binaries ,dtype ,ttype ,name ,(car ff) ,(cdr ff))))
               (else node)))))
 
 (function packrat-preprocess-top (code)
+ (packrat-analyse-ast
   (packrat-detect-recursion
    (packrat-preprocess-top-0
     (packrat-preprocess-autonames
      (packrat-preprocess-top-ignore
       (packrat-preprocess-top-tokens
        (packrat-preprocess-binaries
-        code)))))))
+        code))))))))
 
 (function packrat-borrow-macros (lst)
   (foreach-mappend (l lst)

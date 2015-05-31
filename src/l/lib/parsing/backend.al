@@ -28,7 +28,8 @@
   (if (peg-success? t2) nil (peg-fail)))
 
 (include "./backend-atoms.al")
-
+(force-class-flush)
+(include "./backend-recform.al")
 
 (macro peg-inner-ignore terms
   `(begin
@@ -154,7 +155,7 @@
     ((PRATT_ROCKS $prec $lrstk) lrstk)
     (else _lrstk_hack)))
 
-(macro peg-term-function-pratt (ranges name ttype lr vs)
+(macro peg-term-function-pratt (ranges name ttype lr vs dtype)
   `(inner.reclambda
       ,name (Env _lrstk_hack source)
       ,@(p:match lr
@@ -213,7 +214,7 @@
                                                   precsion)
                                              )))
                                      (if (peg-success? R)
-                                         (iloop (peg-dcode ,name ,dcode (list L op R)))
+                                         (iloop (peg-dcode ,name ,dcode (list L op R) ,dtype))
                                          (begin
                                            (__peg:set-position_ source saved)
                                            (peg-fail))))
@@ -231,7 +232,7 @@
               (return L))
             ))))
 
-(macro peg-term-function (ranges name ttype dcode icode report)
+(macro peg-term-function (ranges name ttype dcode icode report dtype)
   (let ((prefx
          (p:match icode
            ((peg-ignore $igcode $xcode)
@@ -285,6 +286,7 @@
                            ((token)
                             `(__peg:get-delta saved 
                                               (__peg:get-position_ source))))
+                        ,dtype
                         )
              (begin
                ,@(if report
@@ -310,7 +312,7 @@
       nil
       ))
 
-(macro peg-dcode (name adcode rcode)
+(macro peg-dcode (name adcode rcode dtype)
   (format adcode (istruct annot constr)
     (let*
         ((ac (__peg-compile-acode name annot))
@@ -320,7 +322,7 @@
                   ((nop)
                    `(peg-return (quote ,name) ,rcode))
                   (else ;; not possible for token terms!
-                   `(peg-constr-compile ,constr ,istruct)
+                   `(peg-constr-compile ,constr ,istruct ,dtype)
                    )))))
       (if ac
           `(begin
@@ -333,7 +335,7 @@
      (foreach (i istruct) (ht! (car i) #t))
      (return ht)))
 
-(macro peg-constr-compile (constr srcfmt)
+(macro peg-constr-compile-listform (constr srcfmt dtype)
  (alet varshash (peg-constr-fmtvars srcfmt)
   (packrat:visit code constr
     (code DEEP
@@ -342,12 +344,44 @@
         (fcall `(,(Sm<< "peg-function-" fname) ,@ars))
         (constr `(cons (quote ,cname) (quasiquote ,ars)))
         (action code)
-        (auto (ccerror `(PEG:AUTO-NOT-ALLOWED)))
+        (auto  (ccerror `(PEG:AUTO-NOT-ALLOWED)))
+        (dauto   (ccerror `(PEG:RECFORM)))
+        (dconstr (ccerror `(PEG:RECFORM)))
         ))
     (carg DEEP
        ((set `(unquote ,val)) ;; var name is for AST building purposes
         (append `(unquote-splicing ,val))))
     ))
+
+(macro peg-constr-compile-recform (constr srcfmt dtype)
+   ;; TODO:
+   ;; Identify the target node and variant,
+   ;; fetch the format, match this format against provided args
+   ;; Matching rules are following:
+   ;;  - if all the provided names are matching the format names,
+   ;;    assume the user meant it. TODO: generate nils instead of gensyms,
+   ;;    then add a pass to lift trivial variable names into cargs.
+   ;;  - if there is no name match, assume sequential substitution
+   ;;  - if there is an append node in the format, match accordingly
+   `(inner-expand-first
+     peg-constr-compile-recform-inner (quote ,constr)
+     (quote ,srcfmt)
+     (quote ,dtype)
+     (packrat-target-ast)
+     (packrat-target-node)
+     ))
+
+(macro peg-constr-compile (constr srcfmt dtype)
+  `(inner-expand-first
+    peg-constr-compile-select (quote (,constr ,srcfmt ,dtype))
+    (packrat-target-ast)
+    ))
+
+(macro peg-constr-compile-select (qargs ast)
+  ;; (writeline `(CONSTR: ,qargs ,ast))
+  (p:match ast
+    ((packrat-target-ast) `(peg-constr-compile-listform ,@(cadr qargs)))
+    (else `(peg-constr-compile-recform ,@(cadr qargs)))))
 
 (function peg-return (name rv)
   (p:match rv
@@ -366,23 +400,31 @@
       (($nm (peg-term-function $rng . $_))
        (if rng `((,nm ,rng)))))))
 
-(function __peg-parser_makeinitfunctions (entry defs)
+(function __peg-parser_makeinitfunctions (entry defs targetast)
   (collector (fadd fget)
   (collector (fnadd fnget)
-    (let* ((continue
+   (let* (
+          (with-ast (fun (c)
+                      (if targetast
+                          `(ast2:with-ast ,targetast ,c)
+                          c)))
+          (continue
             (fun (dfs)
              (let* ((fn (gensym))
                     (fb
                      `(top-begin
                         (function ,fn (Context)
-                        (with-macros 
-                         ((PegContext (fun (_)
+                        ,(with-ast 
+                        `(with-macros 
+                         (
+                          ,@(if targetast `((packrat-target-ast (fun (_) (quote ,targetast)))))
+                          (PegContext (fun (_)
                                         (quote 
                                          ,(Sm<< "peg_" entry "_Context")))))
                          ,@(foreach-map (d dfs)
                              (format d (n v)
                                      `(ohashput Context (quote ,(Sm<< n))
-                                               (cons ,v (quote ,(Sm<< n))))))))
+                                               (cons ,v (quote ,(Sm<< n)))))))))
                         (force-class-flush))
                      ))
                (fadd fb)
@@ -400,9 +442,9 @@
      (list (fget)
            (fnget))))))
 
-(macro peg-parser (export? entry borrow defs exports dhooks)
+(macro peg-parser (export? entry borrow defs exports dhooks targetast)
  (let* ((initnm (if (not export?) (gensym) (Sm<< "peg_" entry "_init")))
-        (initfns (__peg-parser_makeinitfunctions entry defs))
+        (initfns (__peg-parser_makeinitfunctions entry defs targetast))
         (ainits (car initfns))
         (binits (cadr initfns)))
   `(top-begin
@@ -461,18 +503,21 @@
         `((define ,(Sm<< "peg_" entry)
             (fun (Env stream)
               (with-macros 
-               ((PegContext (fun (_)
+               (
+                ,@(if targetast `((packrat-target-ast (fun (_) (quote ,targetast)))))
+                (PegContext (fun (_)
                               (quote ,(Sm<< "peg_" entry "_Context")))))
                (let* (( source (mkref stream) )
                       ( _lrstk (mkref nil) ))
-                 (try
+                 ;(try
                   (alet  res (peg-call-terminal ,entry)
                          (cons res (__peg:get-position_ source)))
-                  t_Exception
-                  (fun (e)
-                    (println (->s e))
-                    (peg-fail)
-                  ))))
+                 ; t_Exception
+                 ; (fun (e)
+                 ;   (println (->s e))
+                 ;   (peg-fail)
+                 ;   ))
+                 ))
               ))
           (define ,(Sm<< "peg-exportmacros-" entry "-src")
             (quote ,exports))
@@ -493,7 +538,7 @@
          (inm (gensym))
          (code `(packrat-ast ,inm (,tgt ,@abor)
                   ,@adden
-                  (terminal term ,nm ,@clause))))
+                  (terminal () term ,nm ,@clause))))
     `(top-begin
        ,code
        (peg-extend-dynhook ,tgt ,tnode ,inm ,nm))))

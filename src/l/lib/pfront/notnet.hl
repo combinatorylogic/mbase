@@ -259,6 +259,8 @@ parser pfnotnet ( pfront )
            (100) [pfexpr] "&&" [pfexpr] => logand(L,R)
          | (100) [pfexpr] "||" [pfexpr] => logor(L,R)
 
+         | (300) [pfexpr] "<<" [pfexpr] => lshift(L,R)
+         | (300) [pfexpr] ">>" [pfexpr] => rshift(L,R)
          | (200) [pfexpr] ">=" [pfexpr] => greq(L,R) 
          | (200) [pfexpr] "<=" [pfexpr] => lteq(L,R)
          | (200) [pfexpr] ">"  [pfexpr] => gr(L,R)
@@ -268,8 +270,6 @@ parser pfnotnet ( pfront )
 
          | (300) [pfexpr] "+"  [pfexpr] => plus(L,R)
          | (300) [pfexpr] "-"  [pfexpr] => minus(L,R)
-	 | (300) [pfexpr] "<<" [pfexpr] => lshift(L,R)
-	 | (300) [pfexpr] ">>" [pfexpr] => rshift(L,R)
 
          | (400) [pfexpr] "*"  [pfexpr] => mul(L,R)
          | (400) [pfexpr] "/"  [pfexpr] => div(L,R)

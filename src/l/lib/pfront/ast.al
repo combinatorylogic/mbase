@@ -23,8 +23,8 @@
       (topfunction <ident:nm> <*ident:args> <expr:body>)
       (lispmacro <ident:nm> <*ident:args> <expr:body>)
       (topdefine <ident:nm> <expr:val>)
-      (ast3 <ident:nm> <*astpar:ps> <*astbody:defs>)
-      (ast2 <ident:nm> <*astbody:defs>)
+      (ast3 <astopt:opt> <ident:nm> <*astpar:ps> <*astbody:defs>)
+      (ast2 <astopt:opt> <ident:nm> <*astbody:defs>)
       (topsyntax <identpair:nm> <*ident:bor> <sytaxcode:c> <expr:body>)
       (othersyntax <ident:synt> <identpair:nm> <*ident:bor>
                    <sytaxcode:c> <expr:body>)
@@ -85,6 +85,7 @@
   (vtype (| (id <ident:tp>)
 	    (as <ident:nm>)
 	    (asonce <ident:nm>)
+            (withdst <vtype:t> <ident:dst>)
 	    ))
 
   (visitptn 
@@ -108,7 +109,14 @@
   (identptn
    (| (var <ident:nm>)
       (ptn <mpattern:f>)))
-  
+
+  (visitopt
+   (|
+    (recform)
+    (dst <ident:id>)
+    (listformsrc)
+    (listformdst)
+    ))
   (expr
    (| (cons <expr:a> <expr:b>)
       (easyconstr <symbol:tag> . <*ecexpr:args>)
@@ -125,8 +133,8 @@
       (loc <loc:L>)
       (call <expr:fn> . <*expr:args>)
       (match <expr:e> . <*matchpattern:ps>)
-      (visit <ident:ast> <ident:top> <expr:e> . <*visitptn:ps>)
-      (viter <ident:ast> <ident:top> <expr:e> . <*visitptn:ps>)
+      (visit <*visitopt:os> <ident:ast> <ident:top> <expr:e> . <*visitptn:ps>)
+      (viter <*visitopt:os> <ident:ast> <ident:top> <expr:e> . <*visitptn:ps>)
       (collector <ident:addname> <ident:getname> <expr:body>)
       (mknode . <*llpair:args>)
 

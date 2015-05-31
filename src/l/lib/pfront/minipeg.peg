@@ -59,6 +59,8 @@ parser minipeg extends pfcommon (
 
    term miniexpr "PEG expression" :=
        { minielt:e '/' cslist<minielt,'/'>:els => palt(e,@els) }
+    /  { minielt:e '$!!' '[' tIdent:nm ':' cslist<miniast,",">:args ']' slist<minielt>:els => seq(e,ordie(seq(@els),$sval(nm),@args))}
+    /  { minielt:e '$!!' '[' tIdent:nm ']' slist<minielt>:els => seq(e,ordie(seq(@els),$sval(nm))) }
     /  { minielt:e slist<minielt>:els => seq(e,@els)}
     /  minielt
     ;
@@ -73,14 +75,17 @@ parser minipeg extends pfcommon (
     ;
 
     term miniatom "PEG atom" :=
-       { miniatomx:at ':' tIdent:nm => {state=pattern} bind($sval(nm),at) }
-       / miniatomx
-       ;
+        { miniatomx:at ':' tIdent:nm => {state=pattern} bind($sval(nm),at) }
+     /  { miniatomx:e '$!' '[' tIdent:nm ':' cslist<miniast,",">:args ']' 
+              => {state = pattern} ordie(e, $sval(nm), @args) }
+     /  { miniatomx:e '$!' '[' tIdent:nm ']' => {state = pattern} ordie(e, $sval(nm)) }
+     / miniatomx
+     ;
 
     term miniatomx :=
        { tIdent:i '<' cslist<miniatomx,','>:args '>'
           => {state=pattern}  macroapp($sval(i),@args) }
-    /  { '~' ident:nm  '(' ecslist<constrarg,','>:args ')' => [[action]](nm, args) }
+    /  { '~' ident:nm  '(' ecslist<miniast,','>:args ')' => [[action]](nm, args) }
     /  { '#' ident:nm '<' cslist<ident,','>:args '>' => [[highorder]](args,nm) }
     /  { '(' '?' ':' tIdent:i ')' => [[check]]($sval(i)) }
     /  { '[' tIdent:i ']' => {state=pattern} {ctoken = keyword} terminal($sval(i)) }
@@ -91,8 +96,8 @@ parser minipeg extends pfcommon (
     /  { tIdent:i => {ctoken=const} {state=pattern} [[rule]](`keyword, $val(i)) }
     /  { string0:s => {ctoken=const} {state=pattern} trivial(sstring(s)) }
     /  { '[' tIdent:i ':' string0:s ']' => {state=pattern} [[rule]]($sval(i),s) }
-    /  { '{' miniexpr:e mTO miniastx:a '}' => lift(e,a) }
-    /  { '{' miniexpr:e '}' => lift(e,$list($nil(),$nil())) }
+    /  { '{' miniexpr:e mTO miniastx:a '}' => lift($nil(), e,a) }
+    /  { '{' miniexpr:e '}' => lift($nil(), e,$list($nil(),$nil())) }
     /  { '(' miniexpr:es ')' => es }
     /  { number:n => trivial(char(n)) }
     /  { hexnumber:n => trivial(char(n)) }
@@ -109,12 +114,16 @@ parser minipeg extends pfcommon (
     term miniast0 "PEG constructor" :=
        { mpsymbol:id '(' '...' ')' => [[auto]](id) }
     /  { mpsymbol:id '...' => [[auto]](id) }
+    /  { mpsymbol:nd ":" mpsymbol:id '(' '...' ')' => [[dauto]](nd,id) }
+    /  { mpsymbol:nd ":" mpsymbol:id '...' => [[dauto]](nd,id) }
     /  { '...' => [[auto]]() }
     /  { miniast:a => a}
     ;
 
     term miniast "PEG constructor" :=
        { mpsymbol:ctr '(' ecslist<miniastc,','>:args ')' => constr(ctr,@args) }
+    /  { mpsymbol:nde ":" mpsymbol:ctr '(' ecslist<miniastc,','>:args ')' => dconstr(nde,ctr,@args) }
+    /  { '[' ecslist<miniastc,','>:args ']' => list(@args) }
     /  { '$' mpsymbol:fn '(' ecslist<miniast,','>:args ')' => fcall(fn,@args) }
     /  { '`' mpsymbol:c => const(c) }
     /  { '`' number:n => const(n) }
@@ -123,7 +132,9 @@ parser minipeg extends pfcommon (
     ;
 
     term miniastc "PEG constructor argument" :=
-       { miniast:a => set($gensym(),a) }
+       { ident:v '=' miniast:a => set(v,a) }
+     / { '@' ident:v '=' miniast:a => append(v,a) }
+     / { miniast:a => set($gensym(),a) }
      / { '@' miniast:a => append($gensym(),a) }
      ;
 
@@ -150,20 +161,29 @@ parser minipeg extends pfcommon (
      /  { miniexpr:e => simple(e) }
      ;
 
+    term dtype "Resulting AST annotations" :=
+       ecslist<dtypeelt,",">;
 
+    term dtypeelt "AST ctor annotation" :=
+       { '>>' ident:nm => target(nm) }
+    /  { 'listform' => listform() }
+    /  { 'recform' => recform() }
+    /  { 'nosloc' => nosloc() }
+    ;
 
     term mininode "PEG parser entry" :=
-       { 'binary' ident:nm report:r mLEFT cslist<minibin,'|'>:bins =>
-            [[src-binaries]](`[[term]],nm, bins, @r) }
-    /  { ident:nm report:r mLEFT miniexpr:e mTO miniastx:a  => terminal(`[[term]],nm,e,a,@r) }
-    /  { ident:nm report:r mLEFT miniexpr:e => terminal(`[[term]],nm,e,$list($nil(),$nil()),@r) }
+       { 'binary' ident:nm report:r dtype:dt mLEFT cslist<minibin,'|'>:bins =>
+            [[src-binaries]](dt,`[[term]],nm, bins, @r) }
+    /  { 'target' ident:nm => targetast(nm) }
+    /  { ident:nm report:r  dtype:dt mLEFT miniexpr:e mTO miniastx:a => terminal(dt,`[[term]],nm,e,a,@r) }
+    /  { ident:nm report:r  dtype:dt mLEFT miniexpr:e => terminal(dt,`[[term]],nm,e,$list($nil(),$nil()),@r) }
     /  { '&' ident:nm => dynahook(nm) }
     /  { '@@' ident:nm report:r mLEFT miniexpr:e mTO slist<miniannotation>:a
-           => terminal(`[[normal]],nm,e,$list(a,$nil()),@r) }
-    /  { '@@' ident:nm report:r mLEFT miniexpr:e => terminal(`[[normal]],nm,e,$list($nil(),$nil()),@r) }
+           => terminal($nil(),`[[normal]],nm,e,$list(a,$nil()),@r) }
+    /  { '@@' ident:nm report:r mLEFT miniexpr:e => terminal($nil(),`[[normal]],nm,e,$list($nil(),$nil()),@r) }
     /  { '@' ident:nm report:r mLEFT miniexpr:e  mTO slist<miniannotation>:a  
-           => terminal(`[[token]],nm,e,$list(a,$nil()),@r) }
-    /  { '@' ident:nm report:r mLEFT miniexpr:e => terminal(`[[token]],nm,e,$list($nil(),$nil()),@r) }
+           => terminal($nil(),`[[token]],nm,e,$list(a,$nil()),@r) }
+    /  { '@' ident:nm report:r mLEFT miniexpr:e => terminal($nil(),`[[token]],nm,e,$list($nil(),$nil()),@r) }
     /  { '!!' ident:nm => [[with-ignore]](nm) }
     /  { '[' ident:nm ':' ']' mLEFT miniexpr:e mTO miniastx:a
          => [[rule]](nm, e, a) }

@@ -108,10 +108,10 @@ parser pfront extends minipeg (
        tTO exprwrap:els)? '}' %indent(pop,firsttab) => case(e,opts,els) }
   / { |'cond'|  %indent(push,firsttab) '|'? cslist<condpair,'|'>:opts ('|' |'else'|
        tTO exprwrap:els)? %indent(pop,firsttab) => cond(opts,els) }
-  / { |'visit'| ':' ident:ast '(' ident:top ':' exprwrap:e ')' '{' %indent(push,tab) visitbody:b %indent(pop,tab) '}' 
-      => visit(ast,top,e,@b) }
-  / { |'iter'| ':' ident:ast '(' ident:top ':' exprwrap:e ')' '{' %indent(push,tab) visitbody:b %indent(pop,tab) '}' 
-      => viter(ast,top,e,@b) }
+  / { |'visit'| ':' ident:ast vsopts:ops '(' ident:top ':' exprwrap:e ')' '{' %indent(push,tab) visitbody:b %indent(pop,tab) '}' 
+      => visit(ops,ast,top,e,@b) }
+  / { |'iter'| ':' ident:ast vsopts:ops '(' ident:top ':' exprwrap:e ')' '{' %indent(push,tab) visitbody:b %indent(pop,tab) '}' 
+      => viter(ops,ast,top,e,@b) }
   / { |'mk'| ':' |'node'| '(' %indent(push,firsttab) cslist<argpair,','>:args %indent(pop,firsttab) ')' => mknode(@args) }
   / { |'if'| exprwrap:e |'then'|? %indent(push,tab) exprwrap:tr ';'? %indent(pop,tab) |'else'| %indent(push,tab) exprwrap:fl %indent(pop,tab)
       => if3(e,tr,fl) }
@@ -155,12 +155,23 @@ parser pfront extends minipeg (
   / { qsymbol:s '(' ecslist<ecexpr,','>:args ')' => easyconstr(s,@args) }
   / { qsymbol:s => vquote(s) }
   / { ident:e => var(e) }
+  / { hexnumber:n => number(n) }
   / { number:n => number(n) }
   / { string:s => string(s) }
   / { '::expr' '\' ident:i '\' => {qstate = unquote} unquote(i) }
   / { '\' ident:i '\' => {qstate = unquote} unquote(i) }
   / expr_end
   ;
+
+  term vsopts := { '/' ecslist<vsopt,','>:ops '/' => some(@ops) }
+            /  { empty => none() }
+            ;
+            
+  term vsopt :=    { 'rec' => recform() }
+           /  { 'dst' ident:id => dst(id) }
+           /  { 'listform' => listformsrc() }
+           /  { 'listform_dst' => listformdst() }
+           ;
 
   term ecexpr "expr | @expr" := { '@' expr:e => append(e) }
                              /  { expr:e => normal(e) }
@@ -193,6 +204,7 @@ parser pfront extends minipeg (
    / { ident:i |'when'| expr:e => guard(i,binding(i),e) }
    / { ident:i => binding(i) }
    / { '_' => any() }
+   / { hexnumber:n => number(n) }
    / { number:n => number(n) }
    / { string:s => string(s) }
    ;
@@ -223,7 +235,10 @@ parser pfront extends minipeg (
             (visielse:ee)?
        '}' => elsedeep(ps,ee) }; 
 
-  term visitype "<visitor type>" := { tvisitype:t => id($sval(t)) }
+  term visitype := { visitypenode:nd '>>' ident:dst => withdst(nd,dst) }
+                /  visitypenode
+                ;
+  term visitypenode "<visitor type>" := { tvisitype:t => id($sval(t)) }
                 /  { ident:i |'as'| |'once'| => asonce(i) }
                 /  { ident:i |'as'| => as(i) }
 		;
@@ -250,11 +265,11 @@ parser pfront extends minipeg (
    / { docstring:ds? |'function'| qident:nm '(' %indent(push,firsttab)  ecslist<qident,','>:args %indent(pop,firsttab) ')' expr:b
       => { mode=topexpr } topfunction(nm, args, $makelocbegin(b)) }
    / { |'define'| qident:nm %indent(push,firsttab) '=' exprwrap:v %indent(pop,firsttab) => { mode=topexpr } topdefine(nm, $makelocbegin(v)) }
-   / { |'ast'| ident:nm ':' cslist<astparent,','>:pars '{' %indent(push,tab)
-       cslist<astdef,';'>:defs ';'? %indent(pop,tab) '}' => ast3(nm, pars, defs) }
-   / { |'ast'| ident:nm  '{'
+   / { |'ast'| ident:nm ':' cslist<astparent,','>:pars astopt:opt '{' %indent(push,tab)
+       cslist<astdef,';'>:defs ';'? %indent(pop,tab) '}' => ast3(opt, nm, pars, defs) }
+   / { |'ast'| ident:nm astopt:opt '{'
          cslist<astdef,';'>:defs ';'? '}'
-        => ast2(nm, defs) }
+        => ast2(opt, nm, defs) }
    / { |'include'| string:nm ';'? => hlinclude(nm) }
    / { |'litinclude'| '(' string:texnm ')' string:nm ';'? => litinclude(texnm, nm) }
    / { |'litinclude'| string:nm ';'? => litinclude(nm, nm) }
@@ -264,6 +279,11 @@ parser pfront extends minipeg (
    / { '::top' '\' ident:i '\' => {qstate = unquote} unquote(i) }
    / top_middle
    / { expr:e => expr(e) }
+   ;
+
+  term astopt :=
+     { |'recform'| => recform() }
+   / { empty => none() }
    ;
 
   term mqident "Macro argument" :=

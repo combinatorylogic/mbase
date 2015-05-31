@@ -406,7 +406,7 @@
 
 (define _ast_parse_sym 
    (let ((r 
-          (<r> ( ("<"  (?? ("*" -> (fun (x) `(*))))
+          (<r> ( ("<"  (?? (("*" | "?") -> (fun (x) `(*))))
                   ( ( (p.ast.ident +*) :-> list->symbol )
                     ( ( ( (_ ":") ( p.ast.ident +*) ) :-> 
                         list->symbol )

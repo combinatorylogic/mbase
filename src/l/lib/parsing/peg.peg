@@ -37,13 +37,13 @@ parser pegparser extends pegbasics (
           => [[packrat-ast]](nm,$nil(),@es) };
    term expr :=
         { |'token'| ident:n report:r ':=' peg:p '=>' annots:a ';'
-          => terminal(`[[token]], n, p, $list(a,$nil()),@r) }
+          => terminal($nil(),`[[token]], n, p, $list(a,$nil()),@r) }
      /  { |'token'| ident:n report:r ':=' peg:p ';'
-          => terminal(`[[token]], n, p, $list($nil(),$nil()),@r) }
+          => terminal($nil(),`[[token]], n, p, $list($nil(),$nil()),@r) }
      /  { |'term'| ident:n report:r ':=' peg:p '=>' constrtop:ctr ';'
-          => terminal(`[[term]],n,p,ctr,@r) }
+          => terminal($nil(),`[[term]],n,p,ctr,@r) }
      /  { |'term'| ident:n report:r ':=' peg:p ';'
-          => terminal(`[[term]],n,p, $list($nil(),$nil()),@r) }
+          => terminal($nil(),`[[term]],n,p, $list($nil(),$nil()),@r) }
      /  { |'ignoring'| ident:igname ';'
           => [[with-ignore]](igname) }
      /  { |'define'| ident:defname '<' cslist<ident,','>:as '>'
@@ -58,14 +58,14 @@ parser pegparser extends pegbasics (
           => [[rule]](name,p,$list($nil(),$nil())) }
      /  { |'binary'| ident:name report:r ':='
               cslist<pegbin,'|'>:bins =>
-          [[src-binaries]](`[[term]],name,bins,@r) }
+          [[src-binaries]]($nil(),`[[term]],name,bins,@r) }
      /  { |'dynhook'| ident:name ';'
           => [[dynahook]](name)}
 
      /  { ident:n report:r ':=' peg:p '=>' annots:a ';'
-          =>terminal(`[[normal]],n,p,$list(a,$nil()),@r) }
+          =>terminal($nil(),`[[normal]],n,p,$list(a,$nil()),@r) }
      /  { ident:n report:r ':=' peg:p ';'
-          => terminal(`[[normal]],n,p,$list($nil(),$nil()),@r) }
+          => terminal($nil(),`[[normal]],n,p,$list($nil(),$nil()),@r) }
 
      ;
 
@@ -133,8 +133,8 @@ parser pegparser extends pegbasics (
 
    term patomx :=
       { '{' peg:a '=>' constrtop:ctr report:r '}'
-        => lift(a,ctr,@r) }
-    / { '{' peg:a report:r '}' => lift(a,$list($nil(),$nil()),@r) }
+        => lift($nil(), a,ctr,@r) }
+    / { '{' peg:a report:r '}' => lift($nil(), a,$list($nil(),$nil()),@r) }
     / psimplex;
 
    term psimplex :=

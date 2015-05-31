@@ -71,6 +71,7 @@
       (GotoLabel <labelident:id>)
       (FixLocal <ident:id> <ident:oldid>)
       (DebugPoint . <*debugdata:d>)
+      (Ghost <expr:e>)
 
 ;= Performance stuff:
       (Car <expr:e>)

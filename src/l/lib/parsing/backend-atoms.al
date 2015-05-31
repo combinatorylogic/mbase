@@ -45,6 +45,30 @@
         (if (peg-success? ,tmp) ,tmp
             ,next))))
 
+(not.class PegException (extends System.Exception)
+     (field object loc (public))
+     (field object env (public))      
+     (field object payload (public))
+     )
+
+(not.function peg-fatal-exception ((object Env) (object source) (object msg))
+  (e = (new PegException))
+  (e#env <- Env)            
+  (e#loc <- source)
+  (e#payload <- msg)
+  (throw e))
+
+(macro peg-ordie (e m . args)
+  (with-syms (tmp)
+    `(let ((,tmp ,e))
+       (if (peg-success? ,tmp) ,tmp
+           (peg-fatal-exception
+            Env
+            source 
+            (,(Sm<< "peg-error-" m) Env saved source
+             (list ,@(foreach-map (a args)
+                       `(peg-constr-compile ,a ())))))))))
+
 (macro peg-call-checker (id)
   (with-syms (tmp)
      `(let ((,tmp (,(Sm<< "peg-checkfunction-" id) 

@@ -347,3 +347,16 @@ syntax in expr, start: ' collect [qident]:ast "(" [qident]:entry ":" [expr]:v ")
 
 --------------
 
+
+syntax in expr, start: ' symcase [exprwrap]:e "{"
+      "|"? cslist<[symcasepair],"|">:opts ("|"
+      else [tTO] [exprwrap]:els)? "}" '
+   + {
+       symcasepair := cslist<[qident],"|">:ss [tTO] [exprwrap]:e 
+       => $cons(ss,$cons(e,$nil()));
+     }
+{
+  return 'case'(e,opts,els) 
+}
+
+

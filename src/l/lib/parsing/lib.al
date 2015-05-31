@@ -13,6 +13,8 @@
 (ctimex
  (#define packrat-hist nil))
 
+(include "../../core/ast2.al")
+
 (include "./ast.al")
 (include "./util.al")
 (include "./ranges.al")

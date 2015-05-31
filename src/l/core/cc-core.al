@@ -69,6 +69,9 @@
       ((inner.debugpoint . $x)
        `(DebugPoint ,@x))
 
+      ((inner.ghost $x)
+       `(GhostValue ,x))
+
 ;= Use with caution
       ((inner.verbatimcore ($_ $x)) x)
 

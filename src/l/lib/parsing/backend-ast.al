@@ -15,6 +15,9 @@
  
   (pegexpr 
    (| (peg-ignore <*term:ts> <pegexpr:code>)
+
+      (peg-ordie <pegexpr:e> <ident:msg> . <*any:rest>)
+      
       (peg-node <pegexpr:code>)
       (peg-if <pegexpr:quest> <pegexpr:tru> <pegexpr:fals>)
       (peg-check <pegexpr:first> <pegexpr:next>)
@@ -73,7 +76,9 @@
                   <*ident:parents>
                   <*termfundef:defs>
                   <*ident:exports>
-                  <*ident:dhooks>)
+                  <*ident:dhooks>
+                  <?ident:target>
+                  )
       (none)
       ))
   )

@@ -47,6 +47,8 @@
     ((id deep) `(,node DEEP))
     ((as $i) `((,node ,i) DEREF))
     ((asonce $i) `((,node ,i) DEREFT))
+    ((withdst $t $d) (let* ((t0 (vtp node t))) 
+                       `(,(car t0) -> ,d ,@(cdr t0))))
     ))
 
 (function normal-or-append (consfun appendfun rnil args)
@@ -59,6 +61,20 @@
       (((append $x) . $rest)
        (appendfun x (loop rest)))
       (else (ccerror `(WHAT? ,a))))))
+
+
+ (function hlevel-gen-visit-ops (ops)
+   (foreach-mappend (o ops)
+     (hlevel:visit visitopt o
+        (visitopt DEEP
+           ((recform nil)
+            (dst `((dst ,id)))
+            (listformsrc `((listform_src)))
+            (listformdst `((listform_dst))))))))
+                  
+                  
+ (function hlevel-gen-visit (ops ast top e ps)
+   `(ast:visit:new ,ast ,(hlevel-gen-visit-ops ops) ,top ,e ,@ps))
 
  (function hlevel-compile-expr (c)
   (hlevel:visit expr c
@@ -112,8 +128,14 @@
        (match `(p:match ,e ,@ps))
        (case `(case ,e ,@es ,@(if els `((else ,@els)))))
        (cond `(cond ,@es ,@(if els `((else ,@els)))))
-       (visit `(,(Sm<< ast ":visit") ,top ,e ,@ps))
-       (viter `(,(Sm<< ast ":iter") ,top ,e ,@ps))
+       (visit
+        (p:match os
+          ((none)
+           `(,(Sm<< ast ":visit") ,top ,e ,@ps))
+          ((some . $ops)
+           (hlevel-gen-visit ops ast top e ps))))
+       (viter
+        `(,(Sm<< ast ":iter") ,top ,e ,@ps))
        (if3 `(if ,e ,tr ,fl))
        (if2 `(if ,e ,tr))
        (lambda `(fun ,args ,body))
@@ -265,9 +287,17 @@
        (topdefine
         `(define ,nm ,val))
        (ast3
-        `(def:ast ,nm ,ps ,@defs))
+        (p:match opt
+          ((recform)
+           `(def:ast:new ,nm ,ps ,@defs))
+          (else
+           `(def:ast ,nm ,ps ,@defs))))
        (ast2
-        `(def:ast ,nm () ,@defs))
+        (p:match opt
+          ((recform)
+           `(def:ast:new ,nm () ,@defs))
+          (else 
+           `(def:ast ,nm () ,@defs))))
        (topsyntax
         (p:match c
           ((mpeg $cde $rst)

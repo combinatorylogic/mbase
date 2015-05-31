@@ -159,9 +159,9 @@
                  (foreach (c code)
                    (p:match
                        (p:match c
-                         ((binaries $_ $name $v . $_)
+                         ((binaries $_ $_ $name $v . $_)
                           `(T ,name ,v))
-                         ((terminal $_ $name $v . $_)
+                         ((terminal $_ $_ $name $v . $_)
                           `(T ,name ,v)))
                      ((T $name $v)
                       (hashput env (S<< " skip: " name)
@@ -175,9 +175,9 @@
       (p:match d (($nm $rng) (hashput env nm rng))))
     (foreach (c code)
       (p:match c
-        ((terminal $_ $name $v . $_)
+        ((terminal $_ $_ $name $v . $_)
          (hashput env name 'undef))
-        ((binaries $_ $name $v . $_)
+        ((binaries $_ $_ $name $v . $_)
          (hashput env name 'undef))
         ))
     (let loop ((cnt 0))

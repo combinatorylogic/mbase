@@ -74,13 +74,13 @@ function ssa_loops_classify_edges(DT, edges, loops)
         fl = ohashget(bbh, ef);
 	tl = ohashget(bbh, et);
 	// Loops, for which ef -> et is an exit edge:
-	exitedge = [ x | x <- fl where not(memq(x, tl)) ];
+	exitedge =  [x | x <- fl where not(memq(x, tl)) ];
 	// Loops, for which ef -> et is an entry edge:
 	entryedge = [x | x <- tl where not(memq(x, fl)) ];
 	// Loops, for which ef -> et is inner transitions:
 	inneredge = [y | x <- fl, y <- tl where x === y ];
 	// Issue annotations
-	iter L in exitedge do add('exitedge'(L, ef, et));
+	iter L in exitedge  do add('exitedge'(L, ef, et));
 	iter L in entryedge do add('entryedge'(L, ef, et));
 	iter L in inneredge do add('inneredge'(L, ef, et));
      };
