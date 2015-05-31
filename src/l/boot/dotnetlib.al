@@ -240,6 +240,14 @@
      (ctimex (bootlib:pop-module-env))
      ))
 
+(define target-deps-list (cons nil nil))
+(function register-target-dependency (path)
+  (set-car! target-deps-list (cons path (car target-deps-list))))
+(function flush-target-dependencies ()
+  (let* ((deps (car target-deps-list)))
+    (set-car! target-deps-list nil)
+    deps))
+
 (macro include (fnm)
   ("Expands into the list of values from a given file,"
    "enclosed into [(top-begin ...)] statement.")
@@ -260,7 +268,8 @@
 	       )))
     (xio-close fi)
     (if (shashget (getfuncenv) 'debug-display-include-paths)
-	(println (buildstring "include file: " fn)))
+        (println (buildstring "include file: " fn)))
+    (register-target-dependency fn)
     res))
 
 (function generic-filepath (fnm)
@@ -278,11 +287,13 @@
                ,@code
 	       (ctimex (corelib:set-lookup-path ,oxpath))
 	       )))
+    (register-target-dependency fn)
     res))
 
 (function include-alc (fnm)
   (let* ((oxpath (corelib:get-lookup-path))
-	 (fn (buildstring oxpath "/" fnm)))
+         (fn (buildstring oxpath "/" fnm)))
+    (register-target-dependency fn)
     (load-alc fn)
     (corelib:set-lookup-path oxpath)))
 

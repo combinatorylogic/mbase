@@ -105,6 +105,7 @@
    (r! **hlevl-file-path** (cons fp (deref **hlevl-file-path**)))
    (if (shashget (getfuncenv) 'debug-display-include-paths)
        (println (buildstring "include file: " fp)))
+   (register-target-dependency fp)
    (alet ret
      `(top-begin
 	(ctimex (corelib:set-lookup-path ,(_getpath fp)))
@@ -138,6 +139,7 @@
    (r! **hlevl-file-path** (cons fp (deref **hlevl-file-path**)))
    (if (shashget (getfuncenv) 'debug-display-include-paths)
        (println (buildstring "include file: " fp)))
+   (register-target-dependency fp)
    (alet ret
      `(top-begin
 	(ctimex (corelib:set-lookup-path ,(_getpath fp)))

@@ -84,12 +84,15 @@ temporary-source.al: repl.exe $(LIB)/lib/parsing/pegtemp.al
 	$(MONO) ./repl.exe /b $(LIB)/lib/parsing/pegtemp.al
 	cp temporary-source.al $(LIB)/lib/parsing/
 
+-include MBasePackrat.dll.d
 MBasePackrat.dll: repl.exe temporary-source.al $(LIB)/lib/parsing/packrat.al
 	$(MONO) ./repl.exe /b /emit $(LIB)/lib/parsing/packrat.al
 
+-include MBaseFront.dll.d
 MBaseFront.dll: MBasePackrat.dll
 	$(MONO) ./repl.exe /b /emit $(LIB)/lib/pfront/front.al
 
+-include MBaseLogic.dll.d
 MBaseLogic.dll: pfront.exe
 	$(MONO) ./pfront.exe $(LIB)/lib/wam/mbaselogic.hl
 

@@ -451,6 +451,14 @@
             ))
     nil))
 
+(function cc:save-dependencies (asmname lst)
+  (if lst
+    (let* ((fname (S<< asmname ".d")))
+      (call-with-output-file fname
+        (fun (fo)
+          (fprintln fo
+            (S<< asmname ": " 
+                 (strinterleave lst " "))))))))
 
 (function cc:dump-module (env)
   (let* ((get (env:get: env modcollector-get))
@@ -460,8 +468,11 @@
 	 (rnl ((env:get: env modcollector-get)))
          (dlltyp (env:get: env dotnet-type))
 	 (deps (_Get_Deps))
+         (srcdeps (flush-target-dependencies))
 	 )
     (cc:emit-runner env nn0 asm mdl rnl deps dlltyp)
+    (cc:save-dependencies (env:get: env dotnet-aname)
+                          srcdeps)
     (asm-save (env:get: env dotnet-assembly)
 	      (env:get: env dotnet-aname))
     nil))

@@ -44,6 +44,7 @@
       (cc:env:defmodule:strong env (S<< name) (if r (car r) 'dll) sver kfile)
       (shashput (getfuncenv) '*current-cc-env* env)
       (add-assembly-inner (env:get: env dotnet-assembly))
+      (flush-target-dependencies)
       `(top-begin )))
 
 (function n.save.f ()
