@@ -1387,11 +1387,8 @@ function cc_ssa_backend_passes(code) {
 
 function cc_ssa_backend_plugin(code)
 {
-  writeline(#`(PRE-SSA: ,code));
   tmp = #(cc_ssa_backend_passes (cc_flat_to_ssa code));
-  writeline(#`(POST-SSA: ,tmp));
   tmp1 = %cc:lifted-reschedule(tmp);
-  writeline(#`(SCHED: ,tmp1));
   return tmp;
 }
 

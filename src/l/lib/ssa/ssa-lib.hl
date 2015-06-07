@@ -1,0 +1,11 @@
+#(include "../../version.al")
+#(n.module MBaseExtra)
+
+include "ssa-ast.hl"
+include "domtree.hl"
+include "ssa-trans.hl"
+include "ssa-analysis.hl"
+include "ssa-backend.hl"
+
+#(force-class-flush)
+#(n.save)

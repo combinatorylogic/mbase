@@ -19,7 +19,7 @@ MBASE = $(MONO) ./mb0.exe
 
 all: repl.exe mbweave.exe pfront.exe pfrepl.exe pfprint.exe pftexprint.exe \
 	mlrepl.exe mlcomp.exe pfhighlight.exe prologrepl.exe MBaseLogic.dll \
-	doc
+	doc MBaseExtra.dll
 
 clean:
 	rm -f *.dll *.alc *.exe
@@ -95,6 +95,10 @@ MBaseFront.dll: MBasePackrat.dll
 -include MBaseLogic.dll.d
 MBaseLogic.dll: pfront.exe
 	$(MONO) ./pfront.exe $(LIB)/lib/wam/mbaselogic.hl
+
+-include MBaseExtra.dll.d
+MBaseExtra.dll: pfront.exe
+	$(MONO) ./pfront.exe $(LIB)/lib/ssa/ssa-lib.hl
 
 pfront.exe: MBaseFront.dll $(LIB)/lib/pfront/pfront.al
 	$(MONO) ./repl.exe /b /emit $(LIB)/lib/pfront/pfront.al
