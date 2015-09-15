@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -34,7 +34,7 @@
 (function compile (ex)
     (calc04:visit expr ex
       (expr DEEP
-	((const `((Ldc_R8 ,(flt:parse v))))
+        ((const `((Ldc_R8 ,(flt:parse v))))
          (var   `((Ldloc (var ,nm))))
          (let   `((local ,nm ,t_Double)
                   ,@val
@@ -89,7 +89,7 @@
   )
 ;}}
 
-;- 
+;-
 
 ;- MBase has a
 ;- possibility to inline IL code ([[n.asm]]), so we will wrap our
@@ -104,9 +104,9 @@
 (writeline (calc04# "let x = 2*2 in let y = 1.1 in (2+x)/y"))
 
 ;- A curious reader can print out the compiled code:
-(iter writeline 
-      (compile 
-       (lex-and-parse calclexer calcparser 
-		      "let x = 2*2 in let y = 1.1 in (2+x)/y"
+(iter writeline
+      (compile
+       (lex-and-parse calclexer calcparser
+                      "let x = 2*2 in let y = 1.1 in (2+x)/y"
                       )))
 

@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -37,8 +37,8 @@
 (function fsm-next-token (tks)
   (if (null? tks) '(STOP () . ())
       (begin
-	(p-lookahead-a-bit tks) ;; use the same "lazy list" unrolling thing as we did for the lexing stuff
-	(car tks))))
+        (p-lookahead-a-bit tks) ;; use the same "lazy list" unrolling thing as we did for the lexing stuff
+        (car tks))))
 
 (function fsm-rest (tks)
   (if (null? tks) tks (cdr tks)))
@@ -58,13 +58,13 @@
     (else tk)))
 
 (function fsm-marktoken (tk) (cons tokentag tk))
-(function fsm-markbroken (tk) 
+(function fsm-markbroken (tk)
   (format tk ((nm) . rst)
     `(,brokentag ,nm ,@rst)))
 
 (function splitlistrev (i ls)
   (let loop ((n 0) (l ls) (rv nil) (fak nil))
-    (if (< n i) 
+    (if (< n i)
         (let ((vv (car l)))
           (if (broken? vv)
               (loop n (cdr l) rv (cons (cons tokentag (cdr vv)) fak))
@@ -97,7 +97,7 @@
                    (let ((ttt (loop cdss (fsm-get-state fsm cdss)
                                     (cons cdss nrec))))
                      (if (null? ttt) (loop sn (cdr s) nrec)
-                         (if (null? (cdr s)) 
+                         (if (null? (cdr s))
                              (cons nil ss) ;R
                              (cons (list (cons sn (cdr s))) ss) ;R
                              )))))
@@ -117,29 +117,29 @@
  (if (eqv? 'T (car state))
   (format state (_ sn cd)
        (letf (( (slc nstk fakstk) (splitlistrev sn rstack)))
-	 (let* ((reslt (cd (cons slc (cons fakstk parsenv))
+         (let* ((reslt (cd (cons slc (cons fakstk parsenv))
                            (map fsm-token-value slc))))
-             (if (null? istack) 
+             (if (null? istack)
                  (cons reslt tokens)
                  (fsm-parse parsenv
-			    fsm (car istack)
-			    (cdr istack)
-			    (cons reslt nstk)
-			    tokens
+                            fsm (car istack)
+                            (cdr istack)
+                            (cons reslt nstk)
+                            tokens
                             btstack
                             err
                             )))))
   (let* ((tk (fsm-next-token tokens))
          (v (fsm-select fsm state staten tk)))
-    (if (not v) 
+    (if (not v)
         (if (null? btstack)
             (begin
-              (if err 
+              (if err
                   (fsm-raise (car err) (cdr err))
                   (fsm-raise (list staten state (fsm-get-state fsm staten))
                              tokens))
               )
-            (btstack (if err err (cons (list staten state 
+            (btstack (if err err (cons (list staten state
                                              (fsm-get-state fsm staten))
                                        tokens))))
         (alet newbs
@@ -154,10 +154,10 @@
          ((S)
           (_ n)
             (fsm-parse parsenv
-		       fsm n 
-		       istack 
-		       (cons (fsm-marktoken tk) rstack)
-		       (fsm-rest tokens)
+                       fsm n
+                       istack
+                       (cons (fsm-marktoken tk) rstack)
+                       (fsm-rest tokens)
                        newbs
                        err
                        ))
@@ -193,7 +193,7 @@
 ; (XT <n> <code>)
 
 (notaruntime
-                     
+
 (function fsm-add (fsm rev v)
   (let ((cnm (hashget rev '*COUNTER*)))
       (hashput rev '*COUNTER* (+ cnm 1))
@@ -225,7 +225,7 @@
                        (g nil))
               (if (null? nds) g
                 (let* ((nd0 (caar nds))
-		       (nd (if (null? nd0) nil (car nd0))))
+                       (nd (if (null? nd0) nil (car nd0))))
                   (letf (( (l r)
                            (if (null? nd) (list (list (car nds)) (cdr nds))
                             (list-split (fun (x)
@@ -238,11 +238,11 @@
               (fun (grp)
                  `(,(let ((cc (caar grp))) (if (null? cc) cc (car cc)))
                    ,(if (null? (cdr grp))
-			(if (null? (caar grp))
-			    (format (car grp) (_ term)
-				    (bnf-to-trivtree nil term))
-			    (format (car grp) ((_ . rst) term)
-				    (bnf-to-trivtree rst term)))
+                        (if (null? (caar grp))
+                            (format (car grp) (_ term)
+                                    (bnf-to-trivtree nil term))
+                            (format (car grp) ((_ . rst) term)
+                                    (bnf-to-trivtree rst term)))
                         (bnf-to-tree (map-over grp
                            (fmt ((n1 . rst) term)
                               `(,rst ,term)))))))))
@@ -255,13 +255,13 @@
                 (if (null? nd) ; terminal-1
                     (begin
                        (hashput rev '*TCOUNTER*
-                          (+ 1 (hashget rev '*TCOUNTER*))) 
+                          (+ 1 (hashget rev '*TCOUNTER*)))
                        `(T ,@nx))
                     (let ((ndv (hashget rev nd))
                           (nnx (if (list? nx)
                                    (begin
                                       (hashput rev '*TCOUNTER*
-                                         (+ 1 (hashget rev '*TCOUNTER*))) 
+                                         (+ 1 (hashget rev '*TCOUNTER*)))
                                       (fsm-add fsm rev `(T ,@nx))
                                    )
                                    nx)))
@@ -273,10 +273,10 @@
          (let ((nn (hashget rev ndn)))
              (hashput fsm nn v)
              nn))))
-      
+
 (function bnf-emit-terminal (ndn fsm rev nd nm cd)
    (hashput rev '*TCOUNTER*
-         (+ 1 (hashget rev '*TCOUNTER*))) 
+         (+ 1 (hashget rev '*TCOUNTER*)))
    (let ((tnum (fsm-add fsm rev `(T ,nm ,cd))))
       (bnf-emit-nodes ndn fsm rev (list (list nd tnum)))))
 
@@ -289,7 +289,7 @@
                ((S) (nod trest)
                   (let ((nx (loop trest nil)))
                      (bnf-emit-nodes ndn fsm rev (list (list nod nx) ))))
-               ((R) stree 
+               ((R) stree
                   (bnf-emit-nodes ndn fsm rev (map-over stree
                                                (fmt (nd trx)
                                                    (list nd (loop trx nil))))))
@@ -314,7 +314,7 @@
      (if (shashget (getfuncenv) 'compiler-fsm-dots)
        (let ((cnt (hashget rev '*COUNTER*))
              (tcnt (hashget rev '*TCOUNTER*)))
-        (print (buildstring "[BNF: " (length ndes) "/" 
+        (print (buildstring "[BNF: " (length ndes) "/"
                             (- cnt tcnt) " nodes, "
                             tcnt " terminals]"))))
      (cons fsm rev)))
@@ -339,16 +339,16 @@
                     (let* ((varsx (map bnf-node-parser vars0))
                            (vars  (map car varsx))
                            (fmtb  (mapi (fun (i x)
-                                          (if (null? (cdr x)) 
+                                          (if (null? (cdr x))
                                             (string->symbol (buildstring "$" i))
                                             (cadr x)))
                                         varsx)))
                     `(,vars ,(list (length vars)
-				   (list 'unquote
-					 `(fun (env stack)
-					    (format stack
-						    ,fmtb ,termbody)))))
-		    )))))))
+                                   (list 'unquote
+                                         `(fun (env stack)
+                                            (format stack
+                                                    ,fmtb ,termbody)))))
+                    )))))))
 
 (function bnf-firstentry-name (entrs)
   (format entrs ((e n)) n))
@@ -371,13 +371,13 @@
   (letf (( (fsm . rev) (bnf-compile-1 (bnf-compile-2 bnf)) ))
     (let* ((s (Sm<< (bnf-firstentry-name entrs) "--array"))
            (fsm-ll (hashget rev '*COUNTER*))
-           (fsm-l 
+           (fsm-l
                (hashmap (fun (i l)
                          `(asetx ,s ,(S->N i) (quasiquote ,l)))
                 fsm))
            (fsm-ls (let loop ((l fsm-l) (n 0) (sps nil) (cur nil))
                      (if (null? l) (if (null? cur) sps (cons cur sps))
-                         (if (> n 60) 
+                         (if (> n 60)
                              (loop l 0 (cons (reverse cur) sps) nil)
                              (loop (cdr l) (+ n 1) sps (cons (car l) cur))))))
            (syms (map-over fsm-ls (fun (_) (gensym))))
@@ -389,7 +389,7 @@
                 (cons `(function ,(car x) () ,@(car y))
                       (loop (cdr x) (cdr y)))))
         (begin
-          ,@(map-over 
+          ,@(map-over
              syms
              (fun (zxz)
                   `(,zxz))))
@@ -410,8 +410,8 @@
         (do
            (if (p-success? rslt)
                (append (p-result rslt) (loop (p-rest rslt) (+ cnt 1)))
-               (r_raise 
-                  (new t_MBaseException 
+               (r_raise
+                  (new t_MBaseException
                      (object `(SYNTAX-ERROR: ,(genlist->string (p-rest l)))))))
            (where (rslt (lxer l)))
         ))))))
@@ -419,18 +419,18 @@
 (function make-very-lazy-lexer (lxer)
     (fun (l0)
        (let loop ((l l0))
-	 (if (null? l) nil
-	     (do
-		 (if (p-success? rslt)
-		     (if (null? (p-result rslt)) (loop (p-rest rslt))
-			 (let* ((ll (p-result rslt))
-				(lt (lasttail ll)))
-			   (set-cdr! lt (fun () (loop (p-rest rslt))))
-			   ll))
-		     (r_raise 
-		      (new t_MBaseException 
-			   (object `(SYNTAX-ERROR: ,(genlist->string (p-rest l)))))))
-		 (where (rslt (lxer l))))))))
+         (if (null? l) nil
+             (do
+                 (if (p-success? rslt)
+                     (if (null? (p-result rslt)) (loop (p-rest rslt))
+                         (let* ((ll (p-result rslt))
+                                (lt (lasttail ll)))
+                           (set-cdr! lt (fun () (loop (p-rest rslt))))
+                           ll))
+                     (r_raise
+                      (new t_MBaseException
+                           (object `(SYNTAX-ERROR: ,(genlist->string (p-rest l)))))))
+                 (where (rslt (lxer l))))))))
 
 (function lex-and-parse (lxer prser src)
    ("For given lexer, parser and string, return the result of parsing."
@@ -439,10 +439,10 @@
 
    (do (car (prserx l))
        (where
-	   (prserx (prser nil))
-           (l ((make-lazy-lexer lxer) 
-               (if (list? src) 
-                   src 
+           (prserx (prser nil))
+           (l ((make-lazy-lexer lxer)
+               (if (list? src)
+                   src
                    (string->list src)))))))
 
 
@@ -451,5 +451,5 @@
        (where
            (prserx (prser nil))
            (l ((make-very-lazy-lexer lxer)
-	       (xread-stream-list-big src))))))
+               (xread-stream-list-big src))))))
 

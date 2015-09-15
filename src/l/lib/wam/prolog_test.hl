@@ -5,7 +5,7 @@ include "./lib.hl";
 %force-class-flush()
 
 function test() {
- src0 = " test(V) :- X = [a,b,c,d,e], Y = [a,b], append(Y,V,X). test1(V) :- X = [a,b,c,d,e], Y = [d,e], append(V,Y,X). test2([V|Y]) :- X = [a,b,c], append(V,Y,X). 
+ src0 = " test(V) :- X = [a,b,c,d,e], Y = [a,b], append(Y,V,X). test1(V) :- X = [a,b,c,d,e], Y = [d,e], append(V,Y,X). test2([V|Y]) :- X = [a,b,c], append(V,Y,X).
 
  test3(V) :- X = [a,b], Y = [c], Z = append(X,Y,V), call(Z).
 
@@ -20,7 +20,7 @@ writeline(capp);
 writeline('--------------------1');
  t0 = map(prolog_codegen,capp);
  writeline(t0);
-  %read-compile-eval('begin'(@t0));  
+  %read-compile-eval('begin'(@t0));
 writeline('--------------------2');
   test2();
 }
@@ -53,7 +53,7 @@ function test4()
   env0 = 'env':[];
   cnt0 = fun(env) { return env; };
   tres = fn(env0, cnt0, res);
-  do loop(t = tres, i=0) 
+  do loop(t = tres, i=0)
     {
       if(t) {
          writeline('SOLUTION'(i));
@@ -84,7 +84,7 @@ function test7()
 {
    X = prolog_alloc_cell([]);
    tst <-? append($X,Y,[Z,b]), length($X, L).;
-   writeline(tst); 
+   writeline(tst);
    writeline('X='(prolog_decode_result(cdar(tst),X)));
    writeline('Y='(prolog_decode_result(cdar(tst),Y)));
    writeline('L='(prolog_decode_result(cdar(tst),L)));

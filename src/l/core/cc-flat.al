@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -46,19 +46,19 @@
                 cc:mbcoreast expr ; AST and top node
 ;= For a block of code, only the last expression can be a tail call.
       ((Begin
-        (let* ((pr (map 
-                    (cut tailloop <> 'drop escs) 
+        (let* ((pr (map
+                    (cut tailloop <> 'drop escs)
                     (cuttail es)))
-               (pst (list 
+               (pst (list
                      (tailloop (car (lasttail es))
                                target escs))))
           `(,@(foreach-mappend (x pr) x)
             ,@(foreach-mappend (x pst) x))))
 ;= Use a target value to set locals
-       (SLet 
+       (SLet
         (let* ((locls (map car defs))
                (cmpl (map (fmt (nm vl)
-                            (tailloop vl 
+                            (tailloop vl
                                       `(local ,nm) escs))
                           defs))
                (bdy (tailloop body target escs)))
@@ -70,8 +70,8 @@
        (SLetRec
         (let* ((locls (map car defs))
                (cmpl (map (fmt (nm vl)
-                            (tailloop vl 
-                                      `(local ,nm) escs)) 
+                            (tailloop vl
+                                      `(local ,nm) escs))
                           defs))
                (bdy (tailloop body target escs)))
           `(,@(foreach-map (l locls)
@@ -108,7 +108,7 @@
           `((Label ,lbll)
             ,@(tailloop cnd 'push escs) ; Escape does not work for condition.
             (Gotoifnot ,lble (Pop))
-            ,@(tailloop body 'drop 
+            ,@(tailloop body 'drop
                         (cons `(,escapename ,lble) escs))
             (Goto ,lbll)
             (Iflabel ,lble)
@@ -116,9 +116,9 @@
             )))
 ;= [[Escape]] is a companion to [[While]], it provides a way of premature loop termination.
        (Escape
-        (let* ((f (find (fmt (w) 
+        (let* ((f (find (fmt (w)
                              (eqv? w escapename)) escs)))
-          (if (null? f) 
+          (if (null? f)
               (cc:comperror `(CC02-ESC ,escapename)))
           (format (car f) (_ lbl)
             `((Goto ,lbl)))))
@@ -215,13 +215,13 @@
                 (p:match fn
 ;= A global function is referenced, so it is a simple static application case.
                   ((Glob $glb)
-                   (list 
+                   (list
                     aas0
                     (foreach-mappend (a args)
                      (tailloop a 'push nil)
                      )
                     `(Glob ,glb)))
-;= Recursive reference is a special case                  
+;= Recursive reference is a special case
                   ((Recref $rc)
                    (list
                     aas0
@@ -232,7 +232,7 @@
                     `(GlobRec ,rc)))
 ;= Function reference - simple one
                   ((Funref $glb)
-                   (list 
+                   (list
                     aas0
                     (foreach-mappend (a args)
                      (tailloop a 'push nil)
@@ -241,7 +241,7 @@
 ;= Function itself should be computed.
                   (else
                    (with-syms (nm)
-                     (list 
+                     (list
                       (cons '(Pop) aas0)
                       `(,@(tailloop fn 'push nil)
                         ,@(foreach-mappend (a args)
@@ -298,7 +298,7 @@
           (IntBox (Pop))
           ,@(cc:pop target)
           ))
-          
+
        (Eqv
         (with-syms (l1 l2)
           `(,@(tailloop a 'push nil)
@@ -324,7 +324,7 @@
             (Push (Nil)) (Goto ,l2)
             (Label ,l1) (Push (Bool #t)) (Label ,l2)
             ,@(cc:pop target))))
-                   
+
 
        (Not
         (let* ((lbl1 (gensym))
@@ -456,14 +456,14 @@
         (Funref node)
         (Simple
          (format e ("Fun" _ fargs cd)
-            `(Simple ,name ,usename ,fargs 
+            `(Simple ,name ,usename ,fargs
                      ,(cc:expr->flat2 cd))))
         (Closure
          (format e ("Fun" _ fargs cd)
-                 `(Closure  
-                   ,name ,usename ,args ,fargs 
+                 `(Closure
+                   ,name ,usename ,args ,fargs
                    ,(cc:expr->flat2 cd))))))
     (expr _
-          (forall 
+          (forall
            (cc:expr->flat2 node)))))
 

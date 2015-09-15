@@ -12,7 +12,7 @@ function graph_sym2num_map(gr)
       ohashput(ht, v, n);
       idx := n+1;
       return n
-    }  
+    }
   };
   add('entry'); // Must always be 0
   hashiter(fun(k,v) {
@@ -30,7 +30,7 @@ function graph_sym2num(gr)
    put(x,y) = {
      notnet(int[] arr, int x, int y, int n) {
         arr[x+y*n] = 1;
-	leave null;
+        leave null;
      }
    };
    get(x,y) = {
@@ -42,7 +42,7 @@ function graph_sym2num(gr)
      y = ohashget(m, k);
      iter v do {
         x = ohashget(m, v);
-	put(x,y)
+        put(x,y)
      }
     }, gr);
    return [get;put;n;m]
@@ -56,7 +56,7 @@ function graph_getpreds(gr, nd)
      do loop(y = 0) {
        if(y<n) {
          if(get(x,y)>0) a(y);
-	 loop(y+1)}};
+         loop(y+1)}};
      return g()}}
 
 function sets_intersect_add(gr, ls, nd1)
@@ -67,9 +67,9 @@ function sets_intersect_add(gr, ls, nd1)
    iter l in ls do {
      iter i in l do {
         notnet(int[] ar, int i) {
-	   ar[i] = ar[i]+1;
+           ar[i] = ar[i]+1;
            leave null;
-	}
+        }
      }};
    collector(Ad, Gt) {
      do loop(nn = 0) {
@@ -80,7 +80,7 @@ function sets_intersect_add(gr, ls, nd1)
       }};
      return Gt()
    }
-} 
+}
 
 function graph_dominators_inner(N, gr, nd)
 {
@@ -96,12 +96,12 @@ function graph_dominators_inner(N, gr, nd)
        chg := [];
        iter n in N1 do {
           Dom0 = ohashget(Dom, n);
-	  preds = map p in ohashget(car(gr),n) do ohashget(Dom, p);
+          preds = map p in ohashget(car(gr),n) do ohashget(Dom, p);
           Dom1 = if(preds) sets_intersect_add(gr, preds, n) else [n];
-	  if(not(length(Dom1)==length(Dom0))) {
-	     ohashput(Dom, n, Dom1);
-	     chg := true
-	  }
+          if(not(length(Dom1)==length(Dom0))) {
+             ohashput(Dom, n, Dom1);
+             chg := true
+          }
        };
        loop()
      }
@@ -121,7 +121,7 @@ function graph_dominators_i0(htgr, nd)
   return [preds;N;n;m]
 }
 
-function graph_dominators(htgr, nd) 
+function graph_dominators(htgr, nd)
 {
   gr = graph_dominators_i0(htgr, nd);
  <[preds;N;n;m]> = gr;
@@ -148,8 +148,8 @@ function graph_dominators(htgr, nd)
    return hashmap(fun(a,b) [%Sm<<(a);b], Dom);
  }
 
-.unittest 1: (test_dominators()) expect: 
-      #((b (entry b)) (e (entry e c)) (d0 (entry b d0)) 
-        (d (entry b d0 d)) (entry (entry)) (c (entry c)) 
+.unittest 1: (test_dominators()) expect:
+      #((b (entry b)) (e (entry e c)) (d0 (entry b d0))
+        (d (entry b d0 d)) (entry (entry)) (c (entry c))
         (f (entry e f c)))
 

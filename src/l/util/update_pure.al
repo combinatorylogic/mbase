@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -28,16 +28,16 @@
        ");"))
  (println
   (S<< "public interface AltClosure" i " {"))
- (println 
-  (S<< "  Object run(" 
+ (println
+  (S<< "  Object run("
        (if (> i 0) (strinterleave  (formap (j 0 i) (S<< "Object a" j)) ",") "")
        ");}"))
  )
 
 
 (println "}")
- 
 
-  
+
+
 
 

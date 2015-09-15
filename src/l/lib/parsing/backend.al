@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -38,7 +38,7 @@
 
 (macro peg-call-nr-terminal (name)
   `(__peg:sapply_ Env _lrstk ;;; may be: (mkref nil)
-                  source 
+                  source
                   (straise (__peg_xhashget (PegContext) (quote ,(Sm<< name))))))
 
 (macro peg-call (name)
@@ -127,7 +127,7 @@
                       (begin
                         (__peg:set-position_ source ,tsaved)
                         ,(loop b)))))
-          (() `(begin 
+          (() `(begin
                  (quote ,__peg-epic-fail__))))))))
 
 (macro peg-trivial-string str
@@ -186,9 +186,9 @@
       ;;   3) Otherwise, backtrack to the beginning of the infix expr
       ;;      entry
       (let* ((saved (__peg:get-position_ source))
-	     (_lrstk (__peg:get-hack-lrstk _lrstk_hack))
-	     (L ,lr))
-	(if (peg-success? L)
+             (_lrstk (__peg:get-hack-lrstk _lrstk_hack))
+             (L ,lr))
+        (if (peg-success? L)
             (begin
               ,@(p:match lr
                   ((peg-ignore $igcode $xcode)
@@ -260,11 +260,7 @@
                                   'AT (__peg:displaypos (__peg:get-position_ source)) 'WILL-DO (quote ,icode)
                                   ))))
        ,(rchk
-          `(let* (,@(if (or (eqv? ttype 'token)
-                        (shashget (getfuncenv) 'debug-compiler-peg)
-                        (not (p:match (cadr dcode) ((nop) #t) (else nil))))
-                   `((saved (__peg:get-position_ source)))
-                    nil)
+          `(let* ((saved (__peg:get-position_ source))
               ,@struc
               (finalresult nil)
               (result
@@ -284,7 +280,7 @@
                            ((term)
                             (if mkstruc `(list ,@mkstruc) 'finalresult))
                            ((token)
-                            `(__peg:get-delta saved 
+                            `(__peg:get-delta saved
                                               (__peg:get-position_ source))))
                         ,dtype
                         )
@@ -302,11 +298,10 @@
 (function __peg-compile-acode (name acode)
   (if acode
       `(if Env
-           (let* ((last (__peg:get-position_ source))
-                  (eslot (PegEnv.other Env)))
+           (let* ((last (__peg:get-position_ source)))
              ,@(map-over acode
                 (fmt (n l)
-                     `(peg:env-signal eslot (quote ,name) saved last 
+                     `(peg:env-signal Env (quote ,name) saved last
                                       (quote (,n ,l))))
                 )))
       nil
@@ -390,7 +385,7 @@
      x)
     (else
      (cons name rv))))
-  
+
 (function peg-list-exports (defs)
   (map car defs))
 
@@ -414,12 +409,12 @@
                     (fb
                      `(top-begin
                         (function ,fn (Context)
-                        ,(with-ast 
-                        `(with-macros 
+                        ,(with-ast
+                        `(with-macros
                          (
                           ,@(if targetast `((packrat-target-ast (fun (_) (quote ,targetast)))))
                           (PegContext (fun (_)
-                                        (quote 
+                                        (quote
                                          ,(Sm<< "peg_" entry "_Context")))))
                          ,@(foreach-map (d dfs)
                              (format d (n v)
@@ -442,7 +437,7 @@
      (list (fget)
            (fnget))))))
 
-(macro peg-parser (export? entry borrow defs exports dhooks targetast)
+(macro peg-parser (export? entry borrow defs exports dhooks targetast nodetypes)
  (let* ((initnm (if (not export?) (gensym) (Sm<< "peg_" entry "_init")))
         (initfns (__peg-parser_makeinitfunctions entry defs targetast))
         (ainits (car initfns))
@@ -460,7 +455,7 @@
                 `(alet cnt ,(Sm<< "peg_" b "_contents")
                    (if (list? cnt)
                        (foreach (i ,(Sm<< "peg_" b "_contents"))
-                         (ohashput Context i 
+                         (ohashput Context i
                                   (ohashget ,(Sm<< "peg_" b "_Context") i)))
                        (hashiter (fun (k v)
                                    (ohashput Context k v))
@@ -483,7 +478,7 @@
                                  )))
                        )))
                    (quote ,(Sm<< name))
-                   
+
                    ))))
           ,@(foreach-map (d binits)
               `(,d Context))
@@ -502,7 +497,7 @@
      ,@(if export?
         `((define ,(Sm<< "peg_" entry)
             (fun (Env stream)
-              (with-macros 
+              (with-macros
                (
                 ,@(if targetast `((packrat-target-ast (fun (_) (quote ,targetast)))))
                 (PegContext (fun (_)
@@ -521,6 +516,8 @@
               ))
           (define ,(Sm<< "peg-exportmacros-" entry "-src")
             (quote ,exports))
+          (define ,(Sm<< "peg-exportnodes-" entry "-src")
+            ,(S<< nodetypes))
           (define ,(Sm<< "peg-exportdepends-" entry)
             (quote ,borrow))
           (force-class-flush) ; make sure macros are available in the hash
@@ -546,7 +543,7 @@
 ;-----------------
 
 (function peg-alldead? (strm)
-  (or (null? strm) 
+  (or (null? strm)
       (null? (StreamEntry.chknext strm))
       (<= (StreamEntry.char strm) 0)
       ))
@@ -644,7 +641,7 @@
 (function peg-function-stringtolist (s) (string->list s))
 (function peg-function-chr (n) (n2s n))
 
-(function peg-function-charval(n) 
+(function peg-function-charval(n)
   (n2s (S->N (list->string (cuttail (string->list (cdr n)))))))
 
 (define scr-replacers (strreplacers* ("\\\\" "\\")

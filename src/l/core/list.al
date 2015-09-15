@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -21,7 +21,7 @@
        (else `(OTHER ,r)))))
 
 
-(bnf-parser 
+(bnf-parser
   ((comprexpr lch:parse-compr))
 
   (comprexpr
@@ -55,16 +55,16 @@
     (p:match v
       (() inner-expr)
       (((<- $vr $e) . $cdrv)
-       (let ((nvr (if (list? vr) (gensym) vr)))              
-	 `(,(if (null? cdrv) 'foreach-map 'foreach-mappend) (,nvr ,e)
-	   ,(if (list? vr) `(format ,nvr ,vr ,(loop cdrv)) (loop cdrv)))))
+       (let ((nvr (if (list? vr) (gensym) vr)))
+         `(,(if (null? cdrv) 'foreach-map 'foreach-mappend) (,nvr ,e)
+           ,(if (list? vr) `(format ,nvr ,vr ,(loop cdrv)) (loop cdrv)))))
       (((with ($_ $vr $e) . $qery) . $cdrv)
        `(,(if (null? cdrv) 'foreach-map-filter 'foreach-mappend-filter)
-	 (,vr ,e) (and ,@qery)
-	 ,(loop cdrv)
-	 )))))
+         (,vr ,e) (and ,@qery)
+         ,(loop cdrv)
+         )))))
 
-(macro <L> rest 
+(macro <L> rest
    (
     "A list comprehensions macro."
     ""

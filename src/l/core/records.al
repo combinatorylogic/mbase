@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -23,17 +23,17 @@
         (function ,(string->symbol (S<< nm ".new"))
                   ,fields
             (mkovector (list ,@fields)))
-	(macro ,(string->symbol (S<< nm ".make")) macroarg
-	   (list 'extra:with-optional-args macroarg
-		 (quote ,fields)
-		 (quote (mkovector (list ,@fields)))))
+        (macro ,(string->symbol (S<< nm ".make")) macroarg
+           (list 'extra:with-optional-args macroarg
+                 (quote ,fields)
+                 (quote (mkovector (list ,@fields)))))
        ,@(foreach-map (f fields)
            `(function ,(string->symbol (S<< nm "." f))
                       (*REC*)
                (aget *REC* ,(lookup-env-car ar f))))
        (function ,(Sm<< nm ".copy") (rc)
-		 (,(Sm<< nm ".new") ,@(foreach-map (f fields)
-					 `(,(Sm<< nm "." f) rc))))
+                 (,(Sm<< nm ".new") ,@(foreach-map (f fields)
+                                         `(,(Sm<< nm "." f) rc))))
        ,@(foreach-map (f fields)
            `(function ,(string->symbol (S<< nm "." f "!"))
                       (*REC* *VAL*)
@@ -60,7 +60,7 @@
   ""
   "This macro is particularry useful with AST visitors."
   )
- 
+
   `(format (mkcollector) (,(car nms) ,(cadr nms)) ,@body))
 
 
@@ -82,13 +82,13 @@
   "Creates a gensym sequence within the [body] context."
   (with-syms (stor)
   `(let* ((,stor (mkref 0))
-	  (,(car nam) (fun ()
-			(let* ((v (deref ,stor))
-			       (nv (+ v 1)))
-			  (r! ,stor nv)
-			  (string->symbol 
-			   (S<< ,(S<< "sequence_" (car nam) "_")
-				v "_"))))))
+          (,(car nam) (fun ()
+                        (let* ((v (deref ,stor))
+                               (nv (+ v 1)))
+                          (r! ,stor nv)
+                          (string->symbol
+                           (S<< ,(S<< "sequence_" (car nam) "_")
+                                v "_"))))))
      ,@body)))
 
 ; Unit tests for the functionality above

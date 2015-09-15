@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -22,7 +22,7 @@
 
 ; __peg:memo-entry(ans: Ast/LR, pos: Position)
 
-(nrec:def __peg:memo-entry ans pos signals)
+(nrec:def __peg:memo-entry ans pos signals inner first tag)
 
 
 (function __peg:set-add-rule_ (set rule)
@@ -37,7 +37,7 @@
             (r! res #t)
             (foreach-break))))
     (deref res)))
-  
+
 (function __peg:set-remove_ (rule set)
   (alet rn (cdr rule)
   (collector (add get)
@@ -62,7 +62,7 @@
 
 (function StreamEntry.new1 (heads memos idx char next)
   (ctime
-   `(StreamEntry.new heads memos idx char next 
+   `(StreamEntry.new heads memos idx char next
                      ,@(if ##packrat-hist `(0) nil)
                      )))
 
@@ -84,6 +84,8 @@
     (deref res)))
 
 (function __peg:memo! (P R mn)
+  (__peg:memo-entry.first! mn P)
+  (__peg:memo-entry.tag! mn (cdr R))
   (StreamEntry.memos! P (cons
                          (cons (cdr R) mn)
                          (StreamEntry.memos P))))
@@ -111,7 +113,7 @@
                (ch (StreamEntry.char.M P))
                (N (StreamEntry.chknext P)))
           (ctime
-           (if ##packrat-hist 
+           (if ##packrat-hist
                `(StreamEntry.count! P (+ (StreamEntry.count P) 1))
                'nil))
           (if (null? N)
@@ -157,7 +159,7 @@
       (StreamEntry.idx.M P2)))
 
 (function fail-memo-entry (P)
-  (__peg:memo-entry.new __peg-epic-fail__ P nil))
+  (__peg:memo-entry.new __peg-epic-fail__ P nil nil nil nil))
 
 (function __peg:is-lr? (ans)
   (if (null? ans) nil
@@ -192,11 +194,11 @@
         (alet n1 (StreamEntry.new1 nil nil i (ascii (car l)) nil)
               (StreamEntry.next! c n1)
               (if len (inc))
-              (loop (cdr l) 
+              (loop (cdr l)
                     (if (eq? #\Newline (car l)) (__peg:newline i) (+ i 1))
                     n1 p)))
        (else ;; continuation
-        (StreamEntry.next! c 
+        (StreamEntry.next! c
                            (let ((pn c))
                              (list (fun ()
                                      (loop (l) i pn pn)))))
@@ -268,21 +270,27 @@
     (cons lnum col)))
 
 
-(nrec:def PegEnv failure other ctrp signals)
+(nrec:def PegEnv failure other ctrp signals termstack)
 
-(nrec:def PegSignal slot tag first last signal)
+(nrec:def PegSignal tag first last signal)
 
-(macro peg:env-signal (slot tag first last signal)
-  `(,slot ,tag ,first ,last ,signal))
+(function peg:env-signal (env tag first last signal)
+  (let* ((sg (PegSignal.new tag first last signal))
+         (sigstk (PegEnv.signals env))
+         (dst (if sigstk (car sigstk)
+                  (let* ((m (mkref nil)))
+                    (PegEnv.signals! env (list m))
+                    m))))
+    (r! dst (cons sg (deref dst)))))
 
 (function peg:dummy-slot (tag first last signal)
   nil)
 
 (function peg:makeenv ()
-  (PegEnv.new nil peg:dummy-slot #t nil))
+  (PegEnv.new nil peg:dummy-slot #t nil nil))
 
 (function peg:makeenv-noctr ()
-  (PegEnv.new nil peg:dummy-slot nil nil))
+  (PegEnv.new nil peg:dummy-slot nil nil nil))
 
 (function peg:construct? (Env)
   (PegEnv.ctrp.M Env))
@@ -301,7 +309,7 @@
         (format prev (oloc opos onames)
                 (cond
                  ((> loc oloc)
-                  (PegEnv.failure! Env 
+                  (PegEnv.failure! Env
                                    (list loc pos (list (cons name rep)))))
                  ((eq? loc oloc)
                   (PegEnv.failure! Env

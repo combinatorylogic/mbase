@@ -4,8 +4,17 @@
 .prolog: {
    //Equality
    X=X.
+
+   // Logic
+   and(A,B) :- call(A), call(B).
+   or(A,B) :- call(A).
+   or(A,B) :- call(B).
+
+   failwith(M, T) :- call(T).
+   failwith(M, T) :- raise(M, T).
+
    // Lists
-   append([],L,L). 
+   append([],L,L).
    append([H|T],L,[H|A]) :- append(T,L,A).
    treclength([],N,N).
    treclength([H|T],L,N) :- isadd(NN,1,N), treclength(T,L,NN).
@@ -31,9 +40,9 @@
    setsub(A, [H|T], R) :- setsubelt(A, H, X), setsub(X, T, R).
    setadd(A, B, AB) :- setsub(A, B, X), append(X, B, AB).
 
-   setxor(A, B, XAB) :- setsub(A, B, AB), setsub(B, A, BA), 
+   setxor(A, B, XAB) :- setsub(A, B, AB), setsub(B, A, BA),
                         append(AB, BA, XAB).
-   setand(A, B, AAB) :- setadd(A, B, AB), setxor(A,B, XAB), 
+   setand(A, B, AAB) :- setadd(A, B, AB), setxor(A,B, XAB),
                         setsub(AB, XAB, AAB).
 
    unifiqinner([], R, R).
@@ -83,7 +92,7 @@
 
    natural_to_num(o,0).
    natural_to_num(s(N), I) :- natural_to_num(N, I1), isadd(I, I1, 1).
-   
+
    num_to_natural(0,o).
    num_to_natural(I, s(N)) :- issub(I1, I, 1), num_to_natural(I1, N).
 

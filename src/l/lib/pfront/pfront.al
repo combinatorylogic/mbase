@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -13,9 +13,9 @@
 
 (function __pfront_register-dumpcore (ofil)
   (let ((plugin
-	 (fun (core)
-	   (fprintln ofil (S<< `(inner.verbatimcore (quote ,(cc:core-sanitise-tokens core)))))
-	   core)))
+         (fun (core)
+           (fprintln ofil (S<< `(inner.verbatimcore (quote ,(cc:core-sanitise-tokens core)))))
+           core)))
     (cc:add-plugin 'pre-lift plugin)))
 
 (function main ()
@@ -41,7 +41,7 @@
        (read-int-eval `(n.module ,(Sm<< exenm)))
        (read-compile-eval `(hlevl-file ,fnm))
        (read-compile-eval `(n.save))))
-    
+
     (("/dbg" . $rest)
      (begin
        (read-int-eval `(define compiler-debug-enabled #t))
@@ -74,24 +74,24 @@
        (r! pfront-mkhist #t)
        (iloop rest)))
 
-    (($fnm . $_) 
+    (($fnm . $_)
      (begin
        (read-int-eval '(n.module frontrepl dll))
        (read-compile-eval `(hlevl-file ,fnm))))
 
     (else
      (iter println '
-        ("Usage:" 
-         " pfront [options] <filename>              : execute a file" 
-         " pfront [options] /c <exename> <filename> : compile a file" 
+        ("Usage:"
+         " pfront [options] <filename>              : execute a file"
+         " pfront [options] /c <exename> <filename> : compile a file"
          " pfront [options] /d <dllname> <filename> : compile a file into a dll"
-	 ""
-	 "Options are:"
-	 "   /dbg    : emit debugging info"
-	 "   /b      : exit on a first error"
-	 "   /dumpal <filename>  : dump the file as .al"
+         ""
+         "Options are:"
+         "   /dbg    : emit debugging info"
+         "   /b      : exit on a first error"
+         "   /dumpal <filename>  : dump the file as .al"
          ))))
     )
     (foreach (f (deref exitfile))
-	(io-wclose f))
+        (io-wclose f))
   ))

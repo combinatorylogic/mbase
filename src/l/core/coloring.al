@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -50,11 +50,11 @@
 
 (function set-substr (a b)
   (let loop ((aa a) (bb b) (rr nil))
-    (cond 
+    (cond
      ((null? aa) (append bb rr))
      (else (let ((x (car aa)))
-             (if (memq x bb) 
-                 (loop (cdr aa) 
+             (if (memq x bb)
+                 (loop (cdr aa)
                        (filter (fun (v) (not (eqv? x v))) bb)
                        rr)
                  (loop (cdr aa) bb (cons x rr))))))))
@@ -73,7 +73,7 @@
     (p:match s
       (() done)
       ((($vertex . $edges) . $next)
-       (let* ((spars (<L> clr | e <- edges | 
+       (let* ((spars (<L> clr | e <- edges |
                           clr <- (wrap2 (lookup-env-car done e))))
               (clr (findcolor gencolor spars)))
          (loop `((,vertex ,clr) ,@done)
@@ -125,7 +125,7 @@
     (format graphs (vs vf gs)
        (iter (cut hashput vf <> #t) registers)
        (foreach (g gs)
-          (let ((vars 
+          (let ((vars
                  (map-car (filter (fmt (_ t) (eqv? t (car g))) vs)))
                 (n (+ 1
                     (let ((nn (mkref 0)))
@@ -137,11 +137,11 @@
                      (deref nn)))))
             ;(writeline `(GG3: ,@vars ,n))
             ;; n is MAX COLORS
-            (r3:graphcoloring subst (cadr g) (car g) 
-                              (+ 1 (/ n 2)) 
+            (r3:graphcoloring subst (cadr g) (car g)
+                              (+ 1 (/ n 2))
                               (map-car (filter (fmt (_ t) (eqv? t (car g)))
                                                registers)) vf))
             ))
     ;; Return the resulting substitution hashtable
     subst))
-  
+

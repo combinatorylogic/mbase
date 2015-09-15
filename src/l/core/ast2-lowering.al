@@ -87,8 +87,13 @@
         ;;   add else handling if necessary
         (fuse-variants
          (fun (vs1 vs2 ds e)
-           (let* ((ex (p:match e
+           (let* ((isdeep?
+                   (or ds
+                       (p:match e
+                         ((vdelse . $x) #t) (else nil))))
+                  (ex (p:match e
                         ((nil) nil)
+                        ((vdelse $x) x)
                         (else e)))
                   (ht (hash-variants vs2)))
              (foreach-map (v vs1)
@@ -110,7 +115,7 @@
                                                )))))
                             ;; Leave an implicit processor, adjusting the order
                             ;;    and else handling
-                            (ast:mknode (o (if ds 'deep o))
+                            (ast:mknode (o (if isdeep? 'deep o))
                                         (e (if ex `(gotoelse dummy ,e)
                                                e)))
                             ))))))
@@ -120,14 +125,15 @@
         ((deep (p 'deep n os))
          (once (p 'once n os))))
      (visitorptn DEEP
-        ((forall (fun (o n os) `(forall ,os ,n
-                                     ,(if (eq? 'once o) nil
-                                          (foreach-map (v vsrc)
-                                            (v 'deep)))
-                                     ,(if (eq? 'once o) nil
-                                          (foreach-map (v vdst)
-                                            (v 'deep)))
-                                     ,e)))
+        ((forall (fun (o n os)
+                   `(forall ,os ,n
+                            ,(if (eq? 'once o) nil
+                                 (foreach-map (v vsrc)
+                                   (v 'deep o)))
+                            ,(if (eq? 'once o) nil
+                                 (foreach-map (v vdst)
+                                   (v 'deep o)))
+                            ,(to-code nil e))))
          (simple (fun (o n os) `(simple ,os ,o ,n ,ps ,pd ,(to-code `(simple ,pd) e))))
          (list   (fun (o n os) `(list ,os  ,n ,id)))
          (vars   (fun (o n os)
@@ -146,6 +152,7 @@
      (noderef DEEP ((id id) (as id)))
      (visitorelse DEEP
         ((velse (to-code nil e))
+         (vdelse `(vdelse ,(to-code nil e)))
          (none  `(nil))))
      ;; TODO: check if variants are exhaustive, etc.
      )))
@@ -180,6 +187,9 @@
     (foreach-count (t tags i) (ohashput ht t i))
     (return (list ht rt))))
 
+(function ast2-debug-p ()
+  (if (shashget (getfuncenv) 'debug-compiler-ast2) #t nil))
+
 (function ast-pattern-entries (p)
   (collector (add get)
   (visitorlang1x:iter pattern p
@@ -190,8 +200,8 @@
     (foreach-map-count (e es i)
       (p:match e
         (($nod $nm) `(,nod ,nm ,(+ i 1))))))))
-                
-             
+
+
 ;; visitorlang1x -> visitorlang2
 (function visitor-backend-lowering (src)
  (collector (add get)
@@ -210,7 +220,7 @@
                                           (thisnodesrc)))
                (make_label ,tg))
              )))
-        
+
         ;; Manage a set of nodes served by this visitor
         (nodes-map (mkhash))
         (nodeadd (fun (id) (ohashput nodes-map id id)))
@@ -223,7 +233,7 @@
               (list   (nodeadd id))
               (vars   (nodeadd id))))
            ))
-        
+
         ;; Compile a variant or simple entry
         (compile-pattern
          (fun (o p e tag nid)
@@ -242,52 +252,57 @@
                                ))))
                      ,(p:match e
                         ((goto_with . $rest) e)
-                        (else 
+                        (else
                          `(pop_stack_with ,e))))))
              (let* ((tg (gensym))
                     (macros
                      `((ast-node ,nid)
+                       (ast-node-is-top #t)
                        (ast-node-type ,(if tag 'variant 'simple))
                        (ast-node-format ,p)
                        ,@(if tag `((ast-variant ,tag))))))
                (add `(,tg (setup_macros ,macros
+                             ,@(if (ast2-debug-p)
+                                   `((debugmessage (ast2-debugmsg-node ENTERING-NODE-BUILDER))))
                              ,ecode)))
                ;; Will push an invocation record on stack
-            `(setup_macros ,macros
-              (begin
-                (transform_listform (thisnodesrc))
-                (push_stack_run
-                 ;; Saving the current node source
-                 (thisnodesrc)
-                 ;; Create a new node tuple to be filled by the
-                 ;;  referenced matchers, if needed
-                 ,(if (eqv? o 'deep)
-                      (if tag `(ast_make_tagged_tuple ,tag ,p)
-                              `(ast_make_tuple ,p))
-                      'nil)
-                 ;; Fill a list of continuation records, only
-                 ;;  for the nodes served by this visitor
-                 ,(foreach-map (e es)
-                     (p:match e
-                       (($nod $nm $pos)
-                        (if (node-served? nod)
-                            `(make_continuation_record
-                              ,nod ,pos
-                              ,(if tag
-                                   `(get_tagged_tuple (thisnodesrc) ,pos)
-                                   `(get_tuple (thisnodesrc) ,pos)
-                                   ))
-                            `(make_move_record
-                              ,nod ,pos
-                              ,(if tag
-                                   `(get_tagged_tuple (thisnodesrc) ,pos)
-                                   `(get_tuple (thisnodesrc) ,pos))
-                              )
-                            ))))
-                 ;; A continuation label - when all continuation records
-                 ;;  are evaluated, carry on to this label to finish the
-                 ;;  current node processing.
-                 (make_label ,tg)))))
+               `(setup_macros ,macros
+                  (begin
+                    (transform_listform (thisnodesrc))
+                    ,@(if (ast2-debug-p)
+                          `((debugmessage (ast2-debugmsg-node ENTERING-NODE))
+                            ,@(if tag `((debugmessage (list 'TAG: (quote ,tag)))))))
+                    (push_stack_run
+                     ;; Saving the current node source
+                     (thisnodesrc)
+                     ;; Create a new node tuple to be filled by the
+                     ;;  referenced matchers, if needed
+                     ,(if tag `(ast_make_tagged_tuple ,tag ,p)
+                          `(ast_make_tuple ,p))
+                     ;; Fill a list of continuation records, only
+                     ;;  for the nodes served by this visitor
+                     ,(foreach-map (e es)
+                        (p:match e
+                          (($nod $nm $pos)
+                           (if (and (node-served? nod)
+                                    (eqv? o 'deep))
+                               `(make_continuation_record
+                                 ,nod ,pos
+                                 ,(if tag
+                                      `(get_tagged_tuple (thisnodesrc) ,pos)
+                                      `(get_tuple (thisnodesrc) ,pos)
+                                      ))
+                               `(make_move_record
+                                 ,nod ,pos
+                                 ,(if tag
+                                      `(get_tagged_tuple (thisnodesrc) ,pos)
+                                      `(get_tuple (thisnodesrc) ,pos))
+                                 )
+                               ))))
+                     ;; A continuation label - when all continuation records
+                     ;;  are evaluated, carry on to this label to finish the
+                     ;;  current node processing.
+                     (make_label ,tg)))))
              )))
 
         ;; First translation stage: lift the variant else entries,
@@ -298,7 +313,7 @@
              ((visitor
                `(visitor   ,(if srcdef (ast-get-variant-tags (car srcdef)))
                            ,(if dstdef (ast-get-variant-tags (car dstdef)))
-                           
+
                            ,src
                            ,srctp
 
@@ -306,16 +321,20 @@
                            ,(if to (car to) from)
 
                            ,opts
-                           
+
                            (node_switch () ,@vs)))))
            (visitorentry DEEP
              ((forall
                (add `(,(Sm<< id "--else")
                       (label ,(Sm<< id "--else")
                         (setup_macros ((ast-node ,id)
+                                       (ast-node-is-top #t)
                                        (ast-node-type forall))
+                           ,@(if (ast2-debug-p)
+                                `((debugmessage (ast2-debugmsg-node ENTERING-NODE-BUILDER))))
+
                            (pop_stack_with ,e)))))
-               `(,id (variant_switch () ,@vsrc)))
+               `(,id (variant_switch () ,@(foreach-map (v vsrc) (v id)))))
               (simple
                `(,id ,(compile-pattern o ps e nil id)))
               (list
@@ -326,7 +345,10 @@
                  (else
                   (add `(,(Sm<< id "--else")
                         (setup_macros ((ast-node ,id)
+                                       (ast-node-is-top #t)
                                        (ast-node-type else))
+                          ,@(if (ast2-debug-p)
+                                `((debugmessage (ast2-debugmsg-node ENTERING-NODE-VARS-BUILDER))))
                           (pop_stack_with ,e))))))
                `(,id (variant_switch () ,@(foreach-map (v vs) (v id)))))))
            (visitorvar DEEP
@@ -352,6 +374,7 @@
     (visitorexpr _
       ((visitor srctags)))))
 
+
 ;; visitorlang2 -> visitorlang2x: lift the switch entries for convenience,
 ;;   store alongside with a full list of tags. This will be required for
 ;;   generating node-specific tag id translation maps.
@@ -366,7 +389,6 @@
        (ast:mknode (ids `(,(map car es) ,glb))))
       (else node)
       )))))
-       
 
 ;; l - variant-local list
 ;; g - global ast tags list
@@ -433,10 +455,11 @@
                      (ast-visitor-to ,dstast)
                      (ast-visitor-sourcetp ,srctp)
                      (node (ast2:thisnodeval (thisnode)))
+                     (alt-mknode ast2)
                      ;; TODO: remove the backend details from here
                      (ast-current-metadata (ast2:get_metadata (thisnodesrc)))
                      )
-                       
+
        (let ((,nextnodevar   (make_label ,(xmap srctp)))
              (,target        (dummy))
              (,targetslot    (dummyslot))
@@ -498,10 +521,14 @@
      (push_stack_run   `(push_stack_run (var ,stackid) (var ,target)
                                         (var ,targetslot)
                                         ,nod ,tpl ,deep ,cnt ,runner))
+     (nil              `(nil))
+     (vdelse            e)
      (make_list_collector `(allocate_list_collector))
      (listnode_complete   `(listnode_complete (var ,thisnode)))
 
      (pop_stack_with   `(begin
+                          ,@(if (ast2-debug-p)
+                                `((debugmessage (list 'POP-STACK-WITH))))
                           (set_target (var ,target) (var ,targetslot) ,ret)
                           (goto  ,popper)
                           ))
@@ -509,15 +536,15 @@
      (update_thisnode `(begin
                          (set ,thisnode ,c)
                          ,e))
-     
+
      (else node) ;; TODO!
      ;; ...
      ))
    (switchentry DEEP e)
    ))))
-                         
-                                       
-           
+
+
+
 
 
 

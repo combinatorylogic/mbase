@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -14,7 +14,7 @@
 ;;;;;;;;;;;;;
 
 ;; Bootstrap sequence, once boot.al is loaded:
-;; 
+;;
 ;;   boot.alc,initlib.al -> lib.alc
 ;;   boot.alc,lib.alc,dotnetlib.al -> lib1.alc
 ;;   boot.alc,lib.alc,lib1.alc,makeasmlib.al -> initial asmlib
@@ -64,7 +64,7 @@
    (println (to-string `(ERROR: ,arg))))
 
 (macro assert (cnd)
-  (if ##option-asserts 
+  (if ##option-asserts
       `(if ,cnd nil (ccerror (list 'ASSERT: (quote ,cnd))))
       '(Nop)))
 
@@ -76,21 +76,21 @@
 (function assert-function (nm x)
   (let* ((cnd (cadr x)))
     `(generic-assert ,(string->symbol (string-append "ASSERT-AT-function:" (any->string nm)))
-		     ,cnd)))
+                     ,cnd)))
 
 (function assert-macro (nm x)
   (let* ((cnd (cadr x)))
     `(generic-assert ,(string->symbol (string-append "ASSERT-AT-macro:" (any->string nm)))
-		     ,cnd)))
+                     ,cnd)))
 
 (macro with-macros (ml . body)
   (let* ((macs (mkshash))
          (rie (shashget (getfuncenv) 'read-int-eval)))
     (map (lambda (x)
-	    (let* ((nam (car x))
-		   (val (cadr x)))
-	      (shashput macs nam (rie val))))
-	  ml)
+            (let* ((nam (car x))
+                   (val (cadr x)))
+              (shashput macs nam (rie val))))
+          ml)
     `(inner-expand-with ,macs (begin ,@body))))
 
 (macro #eval (rest)
@@ -112,8 +112,8 @@
 
 (macro cli-mode (cbody _else_ ibody)
   `(expand-if-else (shashget (getfuncenv) 'compiled-environment)
-		   (top-begin ,@cbody)
-		   (top-begin ,@ibody)))
+                   (top-begin ,@cbody)
+                   (top-begin ,@ibody)))
 
 (int-only
   (macro topblock body `(top-begin ,@body))
@@ -160,10 +160,10 @@
 
 (function cuttail (lst)
   "Returns the copy of the list [lst] without the last head."
-	(let loop ((l lst))
-		(if (null? l) nil
-			(if (null? (cdr l)) nil
-				(cons (car l) (loop (cdr l)))))))
+        (let loop ((l lst))
+                (if (null? l) nil
+                        (if (null? (cdr l)) nil
+                                (cons (car l) (loop (cdr l)))))))
 
 (topblock
   (define *current-module-env* (cons nil nil))
@@ -197,7 +197,7 @@
               (append lst (car (cdr *current-module-env*)))))
   (function bootlib:get-module-namespace ()
     (car *current-module-env*))
-        
+
 )
 
 ; extend some core macros
@@ -206,35 +206,35 @@
   (let ((nm (name-in-a-module nm0))
         (d (doc.isdoc? body)))
     `(with-macros ((assert (lambda (x) (assert-function (quote ,nm) x) ))
-		   (this-context (lambda (x) (quote (quote (function ,nm))))))
-	,(if d
-	     (begin
-	       (doc.add 'def `(function ,nm ,args ,@d))
-	       `(core.function ,nm ,args ,@(cdr body)))
-	     `(core.function ,nm ,args ,@body)))
+                   (this-context (lambda (x) (quote (quote (function ,nm))))))
+        ,(if d
+             (begin
+               (doc.add 'def `(function ,nm ,args ,@d))
+               `(core.function ,nm ,args ,@(cdr body)))
+             `(core.function ,nm ,args ,@body)))
     ))
 
 (macro recfunction (nm0 args . body)
   (let ((nm (name-in-a-module nm0))
         (d (doc.isdoc? body)))
     `(with-macros ((assert (lambda (x) (assert-function (quote ,nm) x)))
-		   (this-context (lambda (x) (quote (quote (function ,nm))))))
+                   (this-context (lambda (x) (quote (quote (function ,nm))))))
        ,(if d
-	    (begin
-	      (doc.add 'def `(function ,nm ,args ,@d))
-	      `(core.recfunction ,nm ,args ,@(cdr body)))
-	    `(core.recfunction ,nm ,args ,@body)))))
+            (begin
+              (doc.add 'def `(function ,nm ,args ,@d))
+              `(core.recfunction ,nm ,args ,@(cdr body)))
+            `(core.recfunction ,nm ,args ,@body)))))
 
 (macro macro (nm0 args . body)
   (let ((nm (name-in-a-module nm0))
         (d (doc.isdoc? body)))
     `(with-macros ((assert (lambda (x) (assert-macro (quote ,nm) x)))
-		   (this-context (lambda (x) (quote (quote (macro ,nm))))))
+                   (this-context (lambda (x) (quote (quote (macro ,nm))))))
        ,(if d
-	    (begin
-	      (doc.add 'def `(macro ,nm ,args ,@d))
-	      `(core.macro ,nm ,args ,@(cdr body)))
-	    `(core.macro ,nm ,args ,@body)))))
+            (begin
+              (doc.add 'def `(macro ,nm ,args ,@d))
+              `(core.macro ,nm ,args ,@(cdr body)))
+            `(core.macro ,nm ,args ,@body)))))
 
 (macro define (nm0 . body)
   (let ((nm (name-in-a-module nm0))
@@ -262,7 +262,7 @@
 
 (unit-test 1 (buildstring "a" "b" "c") "abc")
 
-(macro build-any->string (arg) 
+(macro build-any->string (arg)
   ("Same as buildstring, but all non--string arguments are"
    "wrapped into [any->string].")
   (if (string? arg) arg
@@ -271,7 +271,7 @@
 (function char->string (ch)
   "Makes a string of one char."
   (list->string (list ch)))
- 
+
 (define Nop (lambda () nil))
 )
 
@@ -285,14 +285,14 @@
 (function @ (f g)
     "Functional composition: returns a function $\\lambda~x~.~f~(g~x)$"
    (lambda (x) (f (g x))))
-   
+
 ;; generic iteration
 (recfunction iter (f l)
   "Imperative iteration, applying [f] to all the [l] elements."
    (if (null? l) nil (begin (f (car l)) (iter f (cdr l)))))
 
 ;; left-fold
-(recfunction foldl (f i l) 
+(recfunction foldl (f i l)
   "Folds [l] with a given [f] and an initial accumulator value [i]."
    (if (null? l) i (foldl f (f i (car l)) (cdr l))))
 
@@ -306,7 +306,7 @@
 
 (unit-test 1 (foldr * 1 '(1 2 3 4 5)) 120)
 
-;; toplevel filtering   
+;; toplevel filtering
 (recfunction filter (f l)
   "Filters a list using a given predicate function."
    (if (null? l) nil
@@ -318,7 +318,7 @@
 
 (unit-test 1 (filter (fun (x) (> x 1)) '(0 10 1 -5 20 2)) (10 20 2))
 
-(recfunction find (f l) 
+(recfunction find (f l)
   "Returns the first value conforming to a given predicate or nil."
    (if (null? l) nil
        (if (list? l)
@@ -327,17 +327,17 @@
 
 (unit-test 1 (find (fun (x) (> x 1)) '(0 -5 1 4 5 6 20)) 4)
 
-  
-(recfunction lasthead (l) 
+
+(recfunction lasthead (l)
   "Returns the last head of a list or nil."
   (cond
     ((null? l) l)
-    ((null? (cdr l)) (car l)) 
+    ((null? (cdr l)) (car l))
     (else (lasthead (cdr l)))))
 
 (unit-test 1 (lasthead '(1 2 3 4)) 4)
 
-        
+
 ;; flatten a list to one single level
 (recfunction flatten (l)
   "Returns a flat list of all atoms in [l]."
@@ -351,15 +351,15 @@
 
 (unit-test 1 (flatten '((((1) 2 ((3) 4)) 5) 6)) (1 2 3 4 5 6))
 
-(recfunction first (i l) 
+(recfunction first (i l)
   "Returns first [i] elements of a given list [l]."
    (if (> i 0) (cons (car l) (first (- i 1) (cdr l)))
                nil))
 
 (unit-test 1 (first 3 '(a b c d e)) (a b c))
-    
-;;  zip two lists (using cons on elts)   
-(recfunction czip (a b) 
+
+;;  zip two lists (using cons on elts)
+(recfunction czip (a b)
   "Returns the list of ($a_i$ . $b_i$) for all elements of [a] and [b]."
    (if (or (null? a) (null? b)) nil
        (cons (cons (car a) (car b)) (czip (cdr a) (cdr b)))))
@@ -382,7 +382,7 @@
        (lasttail (cdr a)))))
 
 (unit-test 1 (lasttail '(1 2 3)) (3))
- 
+
 ;; imperative iteration with a counter
 (function iteri (f l)
   ("Performs an imperative iteration over [l] elements, giving an"
@@ -408,7 +408,7 @@
 
 (unit-test 1 (nth 2 '(x a b c d)) b)
 
-;; shortcuts to improve code readability in case of a lengthy iterator function             
+;; shortcuts to improve code readability in case of a lengthy iterator function
 (function iter-over (l f) "[iter] with swapped arguments." (iter f l))
 (function map-over (l f) "[map] with swapped arguments." (map f l))
 
@@ -416,14 +416,14 @@
 
 ;; gensym with a counter.
 
-(define *gensym-counter-storage* 
-  (cons nil 
-	(ctime
+(define *gensym-counter-storage*
+  (cons nil
+        (ctime
          (let* ((tst
                 (shashget (getfuncenv) '*gensym-counter-storage*)))
            (if tst (+ 100 (cdr tst)) 10000)))))
 
-(function gensym-counter-set (n) 
+(function gensym-counter-set (n)
   (let ((st (shashget (getfuncenv) '*gensym-counter-storage*)))
     (if (> n (cdr st))
         (set-cdr! st n)
@@ -436,7 +436,7 @@
       (string->symbol (string-append pfx (number->string x))))))
 
 (function gensym ()
-  ("Returns a unique symbol every time it is called." 
+  ("Returns a unique symbol every time it is called."
    "Uniqueness is guaranteed within one run only.")
   (let* ((dpfx0 (shashget (getfuncenv) '*globals*))
          (dpfx1 (if (null? dpfx0) "Z"
@@ -517,7 +517,7 @@
 
 
 
-(cli-only 
+(cli-only
  (ctimex
   (begin
    (define __modn (! _global_mname))
@@ -528,10 +528,10 @@
 ;; sets a "global variable" value
 (macro set! (nm vl)
    `(hashput *globals* (quote ,nm) ,vl))
-   
+
 ;; refers to the "global variable" value
 (macro ! (nm)
-   `(hashget *globals* (quote ,nm)))   
+   `(hashget *globals* (quote ,nm)))
 
 (cli-only
   (ctimex
@@ -548,7 +548,7 @@
      `(lambda (,nm) ,(let loop ((x funs))
                         (if (null? x) nm
                             (list (car x) (loop (cdr x))))))))
-                            
+
 
 (macro return (x)
   "Convinience macro, just expands into [x]."

@@ -1,9 +1,4 @@
 
-(function ast2:ast-var-name (id) (Sm<< "ast2::" id "::src"))
-
-(function ast2:default-ifun (id) (shashget (getfuncenv)
-                                           (ast2:ast-var-name id)))
-
 (macro def:ast:new (id . rest)
   (let* ((l1 (ast-front-lower `(def:ast:new ,id ,@rest)))
          (l2 (ast-merge-inherited ast2:default-ifun l1)))
@@ -25,7 +20,7 @@
                            (ohashput srch id h)
                            (gettag h tg))))))
          (l1 (ast-visitor-lower tgfun
-                `(ast:visit:new ,srcid ,@rest)))
+                                `(ast:visit:new ,srcid ,@rest)))
          (dstid (ast2:get-dstid l1))
          (srcast (ast2:default-ifun srcid))
          (dstast (ast2:default-ifun dstid))
@@ -60,7 +55,7 @@
         ,entry
         ,val
         ,@body)))
-                      
+
 
 (macro ast2:to-listform (srcid entry val)
   (let* ((src (ast2:default-ifun srcid))
@@ -94,6 +89,7 @@
                         ,nf
                         ()
                         ,dsttags
+                        ,astdst
                         )))
 
 (macro ast2:ctr (nd . args)
@@ -107,6 +103,8 @@
 
 (macro ast2:vctr-inner (args nd vrnt dsttags astdst)
   (let* ((ast (ast2:default-ifun astdst))
+         (_ (if (not ast)
+                (ccerror `(CANNOT-FIND-AST ,astdst))))
          (h (ast-make-cache ast))
          (nf (ast-get-variant-pattern h nd vrnt))
          )
@@ -116,6 +114,7 @@
                         ,nf
                         ,vrnt
                         ,dsttags
+                        ,astdst
                         )))
 
 (macro ast2:vctr (nd vrnt . args)
@@ -127,6 +126,17 @@
     (ast-visitor-to)
     ))
 
+(macro ast2:xctr (vrnt . args)
+  `(inner-expand-first
+    ast2:vctr-inner
+    (quote ,args)
+    (ast-node)
+    ,vrnt
+    (ast-dst-tags)
+    (ast-visitor-to)
+    ))
+
+
 (macro ast2:with-ast (id . body)
   (let* ((ast (ast2:default-ifun id))
          (tags (astlang:visit topdef ast (topdef _ ((defast taglist))))))
@@ -134,7 +144,7 @@
                          (ast-visitor-to ,id)
                          ;; todo: ...
                          )
-       (begin ,@body)))) 
+       (begin ,@body))))
 
 
 ;; Construct an ast node in a free form, knowing the destination AST structure and
@@ -143,6 +153,35 @@
 ;; pfront.
 
 ;(macro ast2:freeform-ctr (ast body)
-  
-  
-  
+
+
+
+
+
+(macro ast:visit:r2 (src0 dst0 srctop . entries)
+   (let* ((src (cadr src0)) (dst (cadr dst0))
+          (newsrcentry (format src (_ a e) e))
+          (newsrcid (format src (_ a e) a))
+          (newdstid (format dst (_ a x) a)))
+     `(ast:visit:new ,newsrcid ((dst ,newdstid)) ,newsrcentry ,srctop ,@entries)))
+
+(macro ast2:llctor (astnm nodenm tag . args)
+  (let* ((ast (ast2:default-ifun astnm))
+         (dsttags (astlang:visit topdef ast (topdef _ ((defast taglist)))))
+         (_ (if (not ast)
+                (ccerror `(CANNOT-FIND-AST ,astnm))))
+         (h (ast-make-cache ast))
+         (nf (ast-get-variant-pattern h nodenm tag))
+         (nf1 (ast-pattern-entries nf))
+         (newargs (foreach-map (x (zip args nf1))
+                      (format x (a1 (xtp xnm xpos))
+                       `(,xnm ,a1)))))
+    `(ast2:setup_macros ((ast-node-is-top ()))
+      (ast2:mknode-inner (quote ,newargs)
+                        ,nodenm
+                        variant
+                        ,nf
+                        ,tag
+                        ,dsttags
+                        ,astnm
+                        ))))

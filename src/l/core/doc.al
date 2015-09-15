@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -37,25 +37,25 @@
    (("[[" ((! "]]") *) "]]")
     ->
     (fun (str)
-	 (S<< "\\begin{verbatim}"
-	      ((M@ list->string cuttail cuttail cdr cdr string->list) str)
-	      "\\end{verbatim}")))
+         (S<< "\\begin{verbatim}"
+              ((M@ list->string cuttail cuttail cdr cdr string->list) str)
+              "\\end{verbatim}")))
    (("[" ((! "]") *) "]")
     ->
     (fun (str)
-	 (S<< "\\verb;"
-	      ((M@ list->string cuttail cdr string->list) str)
-	      ";{}")))
+         (S<< "\\verb;"
+              ((M@ list->string cuttail cdr string->list) str)
+              ";{}")))
    ))
 
 (function doc.texbody (str)
   (strapply* doc.sbody str))
-	      
+
 (function doc.write (channel rest)
   (let ((docfile (#eval '*documentation-file*)))
     (if (not (null? docfile))
       (if (eq? channel 'close) (docfile 'CLOSE nil)
- 
+
        (let* ((docplugin (#eval '*documentation-plugin*))
               (docstrings (docplugin rest)))
           (docfile channel docstrings))))
@@ -75,29 +75,29 @@
      (if (null? rslt) ""
       (S<< title "% "
         (strinterleave
-           rslt 
+           rslt
            ", ")
         "\n"
      ))))
 
 
 (function doc.funcfilt ( lst )
-  (map 
-     (fmt (_ x a) 
+  (map
+     (fmt (_ x a)
          (S<< x "(" (strinterleave a ",") ")"))
      ((cdr lst) (fun (x) (p:match x ((function . $_) #t) (else nil))))))
 
 (function doc.macrfilt ( lst )
-  (map 
-     (fmt (_ x a) 
+  (map
+     (fmt (_ x a)
          (S<< x "/" (to-string a) "/"))
      ((cdr lst) (fun (x) (p:match x ((macro . $_) #t) (else nil))))))
 
 (function doc.deffilt ( lst )
-  (map 
+  (map
      (fmt (_ x)  (->s x))
      ((cdr lst) (fun (x) (p:match x ((define . $_) #t) (else nil))))))
- 
+
 (function doc.texify (str) ;;TODO!
   (doc.texnic str)
   )
@@ -120,13 +120,13 @@
       ((section $title . $text)
        (S<< "\\mbsection{" title "}{" (ap.s text) "}\n\n"))
       ((index.functions $title)
-       (doc.index (S<< "% Functions " title "\n") doc.funcfilt stor))      
+       (doc.index (S<< "% Functions " title "\n") doc.funcfilt stor))
       ((index.macros $title)
-       (doc.index (S<< "% Macros " title "\n") doc.macrfilt stor))      
+       (doc.index (S<< "% Macros " title "\n") doc.macrfilt stor))
       ((index.defines $title)
        (doc.index (S<< "% Defines " title "\n") doc.deffilt stor))
       (else (writeline `(LLL: ,l))
-            "")))) 
+            ""))))
 
 (function doc.mkstor ()
    (let* ((lst (cons nil nil))
@@ -165,13 +165,13 @@
 
 (macro doc.files channels
   `(ctimex (define *documentation-file* (doc.mkoutput (quote ,channels)))))
-             
+
 (macro doc.defaults rest
   `(ctimex (define *documentation-plugin* (doc.mkdefplugin (doc.mkstor)))))
 
 (macro doc.flush _
   `(ctimex (begin
-              (foreach (i (reverse (hashget *documentation* 'D))) 
+              (foreach (i (reverse (hashget *documentation* 'D)))
                   (doc.write (car i) (cadr i)))
               (hashput *documentation* 'D nil)
               (doc.write 'def '(index.functions ""))

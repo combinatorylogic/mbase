@@ -2,8 +2,8 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-// This file is distributed under the terms of the Q Public License version 1.0.
+// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+//
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -34,13 +34,13 @@ parser mbsexp ( pfront ) {
   @@Letter := [a-z]/[A-Z];
   @@Digit  := [0-9];
   @@Digits  := [Digit]+;
-  @@SXSpace  := " " / [TAB] / [CR] / [NEWLINE] / [InlineTexComment] / 
+  @@SXSpace  := " " / [TAB] / [CR] / [NEWLINE] / [InlineTexComment] /
       [SingleLineTexComment] / [SingleLineComment];
   @@SXSpaces := [SXSpace]+;
   @@SingleLineComment := ";" (![NEWLINE] .)* [NEWLINE] => {state=comment};
   @@SingleLineTexCommentBegin := ";" "*" => {state = empty};
   @@SingleLineTexCommentRest := (![NEWLINE] .)* [NEWLINE] => {screen=none};
-  @@SingleLineTexComment := 
+  @@SingleLineTexComment :=
      [SingleLineTexCommentBegin] [SingleLineTexCommentRest];
   @@InlineTexComment := [TexComment2Begin] [TexComment2Rest] [TexComment2End];
   @@QUOTE := 39;
@@ -57,7 +57,7 @@ parser mbsexp ( pfront ) {
   @tString := [DQUOTE] ("\\"/[BSDQUOTE]/( ![DQUOTE] . )) * [DQUOTE];
   string := [tString]:t => {ctoken = const} $stringdescreen($stripval(t));
 // ///////////////////////////////////////////////////////////
-      
+
        @lspchar := "#\" . ([Letter] *);
 
        @@sxsymbegin := ([Letter] / "_" / "-" / "+" / "*" / "@" / "=" / "?" /
@@ -75,7 +75,7 @@ parser mbsexp ( pfront ) {
                    { [sxsymbol2]:s => {ctoken=lexic} $sval(s)}
                 /  { [sxsymbol1]:s => {ctoken=keyword} $sval(s)}
                 /  { [sxsymbol3]:s => {ctoken=ident} $sval(s)}
-		/  { [sxndots]:s => {ctoken=lexic} $sval(s) }
+                /  { [sxndots]:s => {ctoken=lexic} $sval(s) }
                 ;
 
        [lexical:] := [lexical] => {ctoken = lexic};
@@ -86,7 +86,7 @@ parser mbsexp ( pfront ) {
              /  {",@" [sxnde]:a => "unquote-splicing"(a) }
              /  {"," [sxnde]:a => "unquote"(a) }
              /  {"`" [sxnde]:a => "quasiquote"(a) }
-	     /  {"=pf:" [atopexpr]:e => "pfront_top_ast"(e)}
+             /  {"=pf:" [atopexpr]:e => "pfront_top_ast"(e)}
              /  {[tQUOTE] [sxnde]:a => "quote"(a) }
 
              /  {[lspchar]:c => $lspcharval(c) }

@@ -2,23 +2,23 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-     
+
 (define  t_runtime (dotnet "Runtime"))
 (function runfile (filename)
   ((r_tsbind t_runtime "runfile" string) filename))
-     
+
 ;; R5RS-alike
-    
+
 (function call-with-input-file (fn f)
   ("Opens an input stream for the file [fn] and passes it as an argument to [f]."
    "After [f] execution, closes the stream and returns [f] evaluation value.")
   (let* ((fi (io-open-read fn))
-         (res (f fi)))  
+         (res (f fi)))
     (io-close fi)
     res))
 
@@ -38,12 +38,12 @@
   ("Returns a list of strings from the text file [fn]."
    "Use it with caution!")
   (call-with-input-file fn read-stream))
-    
+
 (function call-with-output-file (fn f)
   ("Opens an output stream for the file [fn] and passes it as an argument to [f]."
    "After [f] execution, closes the stream and returns [f] value.")
   (let* ((fi (io-open-write fn))
-         (res (f fi)))  
+         (res (f fi)))
     (io-wclose fi)
     res))
 
@@ -51,11 +51,11 @@
   "Writes a string into [ostream]."
   ((r_tbind "System.IO.StreamWriter" "Write" t_string) ostream string))
 
-(function fprintln (fil str) 
+(function fprintln (fil str)
   "Writes a string and an endline into [ostream]."
   (fprint fil str) (fprint fil "\n"))
 
-      
+
 (define strNewline (list->string '(#\Newline)))
 
 (function read-stream-list-big (fi)
@@ -74,7 +74,7 @@
 (function xread-stream-list-big (xfi)
   (let loop ((rs (cons nil nil)))
     (let ((ns (xread xfi)))
-      (if (< ns 0) (begin 
+      (if (< ns 0) (begin
                           (set-cdr! rs nil)
                           nil)
           (let* ((ch (cons (mkchar ns) nil)))
@@ -82,7 +82,7 @@
             (set-cdr! ch (fun () (loop ch)))
             ch
             )))))
-    
+
 
 (function process-stream (fi fn)
   "Reads a stream [fi] line by line, applying a given function [fn] to each string."
@@ -101,26 +101,26 @@
          (clsd (cons nil nil))
          (rrs (cons 1 nil)))
        (let loop ((ns (readline fi)) (rs rrs) (cnt 0))
-          (if (> cnt 1000) 
+          (if (> cnt 1000)
             (begin
-	      (set-cdr! rs
-		(fun ()
-		  (if (cdr clsd) (cdr rrs)
-		      (loop ns rrs 0))))
-	      (let ((ret (cdr rrs)))
-		(set-cdr! rrs nil)
-		ret))
-	    (if (null? ns) (begin (io-close fi) (set-cdr! clsd #t) (cdr rrs))
-		(let ((ll (string->list (string-append ns strNewline))))
-		  (set-cdr! rs ll)
-		  (loop (readline fi) (lasttail ll) (+ cnt 1))))))
+              (set-cdr! rs
+                (fun ()
+                  (if (cdr clsd) (cdr rrs)
+                      (loop ns rrs 0))))
+              (let ((ret (cdr rrs)))
+                (set-cdr! rrs nil)
+                ret))
+            (if (null? ns) (begin (io-close fi) (set-cdr! clsd #t) (cdr rrs))
+                (let ((ll (string->list (string-append ns strNewline))))
+                  (set-cdr! rs ll)
+                  (loop (readline fi) (lasttail ll) (+ cnt 1))))))
        ))
 
 
 (function read-stream-big (fi final)
   (let ((trrs (cons 1 nil)))
        (let loop ((ns (readline fi)) (rs trrs) (rrs trrs) (cnt 0))
-          (if (> cnt 150) 
+          (if (> cnt 150)
             (begin
                (set-cdr! rs
                   (fun ()

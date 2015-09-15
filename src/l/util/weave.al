@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -11,15 +11,15 @@
 ;; Strings starting with ;- are literate comments
 ;; Strings starting with ;= are in-code literate comments
 ;; All other strings are code
-;; 
+;;
 ;; ;{{
 ;; Omitted code
 ;; ;}}
 ;;
-;; 
+;;
 (n.module mbweave exe)
 
-(define stdheader 
+(define stdheader
   "\\documentclass{article}
 \\usepackage{alltt}
 \\usepackage{listings}
@@ -78,18 +78,18 @@
 (define controllers (mkhash))
 
 (function add-some (tpe vlu)
-  (if (and (not (null? (cdr dtax))) 
-	   (not (eq? (cdr plux) tpe)))
+  (if (and (not (null? (cdr dtax)))
+           (not (eq? (cdr plux) tpe)))
       (let ((x (reverse (cdr dtax))))
-	(unless (null? (filter not-empty-line? x))
-		((hashget controllers (cdr plux)) x))
-	(set-cdr! dtax nil)))
+        (unless (null? (filter not-empty-line? x))
+                ((hashget controllers (cdr plux)) x))
+        (set-cdr! dtax nil)))
   (set-cdr! plux tpe)
   (set-cdr! dtax (cons vlu (cdr dtax))))
 
 (define CR (<r> "\n"))
 
-(define TabsX 
+(define TabsX
   (strreplacers*
    ("{" "{$\\{$}")
    ("}" "{$\\}$}")
@@ -113,21 +113,21 @@
 (function Coment (str)
   (S<< "{\\sl " str "}"))
 
-(define comentstring 
+(define comentstring
   (<r>
    (
     (((("\"" ((! "\"") *) "\"") | (! ";")) *) -> (M@ wrap Tabs list->string))
-    (?? (((";" (_ (";" *))) 
-	  ((! "\n") *))
-	 ->
-	 (M@ wrap Coment list->string)))
+    (?? (((";" (_ (";" *)))
+          ((! "\n") *))
+         ->
+         (M@ wrap Coment list->string)))
     (?? ("\n" -> (M@ wrap Tabs list->string))))
    -> (fun (l)
-	(foldl string-append "" l))))
+        (foldl string-append "" l))))
 
 (define includestring
   (<r>
-     ((_ ((p.space *) "(" (p.space *) "include" (p.space +*) "\"")) 
+     ((_ ((p.space *) "(" (p.space *) "include" (p.space +*) "\""))
       ((! "\"") +*)
       (_ ("\"" (p.space *) ");-I")))
      -> list->string
@@ -146,15 +146,15 @@
     ->
     (fun (ll)
       (let ((lx (list->string ll)))
-	(if (null? (strmatch* CR lx))
-	    (begin
-	      (print "\\verb~")
-	      (print lx)
-	      (print "~{}"))
-	    (begin
-	      (print "\\begin{verbatim}")
-	      (print (S<< ">" (strinterleave (get-strings lx) "\n>")))
-	      (println "\n\\end{verbatim}"))))))))
+        (if (null? (strmatch* CR lx))
+            (begin
+              (print "\\verb~")
+              (print lx)
+              (print "~{}"))
+            (begin
+              (print "\\begin{verbatim}")
+              (print (S<< ">" (strinterleave (get-strings lx) "\n>")))
+              (println "\n\\end{verbatim}"))))))))
 
 (define tex-process-x
   (<r>
@@ -171,31 +171,31 @@
   (tex-process-x lst))
 
 (hashput controllers 'code
-	 (fun (lst)
-	   (println "\n{\\noindent
+         (fun (lst)
+           (println "\n{\\noindent
 \\fbox{\\parbox{\\textwidth}{
 \\noindent\\raggedright\\tt
 ")
-;	   (print "\\begin{verbatim}")
-	   (iter print lst)
-	   (println "}}}\\vskip1mm")
-;	   (println "\\end{verbatim}")
-	   ))
+;           (print "\\begin{verbatim}")
+           (iter print lst)
+           (println "}}}\\vskip1mm")
+;           (println "\\end{verbatim}")
+           ))
 
 (hashput controllers 'tex
-	 (fun (lst)
-	   (println "")
-	   (let* ((dd (strinterleave lst "\n")))
-	     (tex-process (string->list dd)))
-	   (println "")))
+         (fun (lst)
+           (println "")
+           (let* ((dd (strinterleave lst "\n")))
+             (tex-process (string->list dd)))
+           (println "")))
 
 (hashput controllers 'inner
-	 (fun (lst)
-	   (print "{\\sl ")
-	   (let* ((dd (strinterleave lst "\n")))
-	     (tex-process (string->list dd)))
-	   (println "}")
-	   ))
+         (fun (lst)
+           (print "{\\sl ")
+           (let* ((dd (strinterleave lst "\n")))
+             (tex-process (string->list dd)))
+           (println "}")
+           ))
 
 (function print-tex-string (str)
   (add-some 'tex str))
@@ -219,8 +219,8 @@
      | (tex-string-inner -> print-tex-string-inner)
      | (code-omitted)
      | (((?? a-number-of-empty-lines)
-	 (((! "\n") *) "\n"))
-	-> (M@ print-code-line list->string))))
+         (((! "\n") *) "\n"))
+        -> (M@ print-code-line list->string))))
 
 (set-car! lit-ref literate)
 
@@ -236,12 +236,12 @@
      (loop rest))
     (($fn)
      (try (begin
-	    (processfile fn)
-	    (add-some 'end ""))
+            (processfile fn)
+            (add-some 'end ""))
       t_Exception
-	  (fun (e)
-	    (println (S<< "%%% Error while processing file '" fn "'"))
-	    )))
+          (fun (e)
+            (println (S<< "%%% Error while processing file '" fn "'"))
+            )))
     (else
      (println "Usage:\n mbweave [-h] <source-file>\n")))))
 

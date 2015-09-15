@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -29,29 +29,29 @@
    "," UNQUOTE "." DOT "'" QUOTE "`" BQUOTE
    )
   (regexp-tokens
-   (("#\\" (p.alpha *)) -> 
+   (("#\\" (p.alpha *)) ->
     (M@ (fun (x)
-	  (let* ((pos (genposition x))
-		 (vv
-		  (case (genvalue x)
-		    ((Space) #\Space)
-		    ((Newline) #\Newline)
-		    ((Tab) #\Tab)
-		    ((LBR) #\LBR)
-		    ((RBR) #\RBR)
-		    ((Semicolon) #\Semicolon)
-		    (else (car (string->list (any->string x)))))))
-	    (if pos (mkgen vv pos) vv)))
-	genlist->symbol
-	cddr
-	)) 
+          (let* ((pos (genposition x))
+                 (vv
+                  (case (genvalue x)
+                    ((Space) #\Space)
+                    ((Newline) #\Newline)
+                    ((Tab) #\Tab)
+                    ((LBR) #\LBR)
+                    ((RBR) #\RBR)
+                    ((Semicolon) #\Semicolon)
+                    (else (car (string->list (any->string x)))))))
+            (if pos (mkgen vv pos) vv)))
+        genlist->symbol
+        cddr
+        ))
        CHAR
      (((_ "\"") (((#\\ #\") | (! #\")) *) (_ "\"")) -> genlist->string)
        STRING
      p.integer.p INT
    )
   (ignore p.whitespace
-	  p.comment)
+          p.comment)
   )
 
 (bnf-parser
@@ -104,35 +104,35 @@
 (define _sethint (r_tbind "Meta.Scripting.ExtendedReader" "mkhint" t_object))
 (define _gethint (r_tbind "Meta.Scripting.ExtendedReader" "gethint"))
 (function new-aread ( strm )
-  (let ((doit 
-	 (fun (fx)
-	   (try
-	    (let ((val (fx)))
-	      (_sethint strm (cdr val))
-	      (car val))
-	    t_MBaseException
-	    (fun (e)
-	      (let ((err (mbaseerror e)))
-		(println (S<< "Parsing error:\n"
-			      (to-string err))))
-	      nil)))))
+  (let ((doit
+         (fun (fx)
+           (try
+            (let ((val (fx)))
+              (_sethint strm (cdr val))
+              (car val))
+            t_MBaseException
+            (fun (e)
+              (let ((err (mbaseerror e)))
+                (println (S<< "Parsing error:\n"
+                              (to-string err))))
+              nil)))))
     (cond
      ((xeof? strm) (_sethint strm nil) nil)
      ((null? (_gethint strm))
       (doit (fun () (lex-and-parse-stream sexp-lexer sexp-parser strm))))
      (else
       (doit (fun ()
-	      (sexp-parser (_gethint strm))))))))
+              (sexp-parser (_gethint strm))))))))
 
 (define mb-failure (Sm<< " sexpr parser failure "))
-(function mbase-parse-line (str) 
+(function mbase-parse-line (str)
   (try
    (lex-and-parse sexp-lexer sexp-parser str)
    t_MBaseException
    (fun (ex)
      (p:match (mbaseerror ex)
        ((PARSE-ERROR . $x)
-	mb-failure)
+        mb-failure)
        (else (r_raise ex))))))
 
 (function mbase-parse-normal (str)
@@ -143,14 +143,14 @@
     (let ((nxt (rdr)))
       (cond
        ((null? nxt)
-	(if (string=? buf "") nil
-	    (mbase-parse-normal buf)))
-       (else 
-	(let* ((nbuf (S<< buf " " nxt))
-	       (atmpt (mbase-parse-line nbuf)))
-	  (if (eq? atmpt mb-failure)
-	      (begin (if prompt (prompt)) (loop nbuf))
-	      atmpt)))))))
+        (if (string=? buf "") nil
+            (mbase-parse-normal buf)))
+       (else
+        (let* ((nbuf (S<< buf " " nxt))
+               (atmpt (mbase-parse-line nbuf)))
+          (if (eq? atmpt mb-failure)
+              (begin (if prompt (prompt)) (loop nbuf))
+              atmpt)))))))
 
 ;; Unit tests
 

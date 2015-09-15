@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -13,11 +13,11 @@
 (def:ast lltnet ()
   (*TOP* <class>)
   (class ((<ident:name> <ident:parent> . <*ident:interfaces>)
-	 . <*classmember:members>))
+         . <*classmember:members>))
   (classmember
    (|
     (method <*access:acc> (<type:ret> <ident:name> . <*mtdarg:args>)
-	    <mtdbody:body>)
+            <mtdbody:body>)
     (field <*access:acc> <type:tp> <ident:name> <nnnexpression:init>)
     (initfield <*access:acc> <ident:name> . <*mess:mess>)
     (custom <any:thing>)
@@ -39,7 +39,7 @@
     (tailreturn <expression:e>)
     (leave <expression:e>)
     (vreturn)
-    
+
     (if <expression:value> <mtdbody:iftr> . <*mtdbody:iffls>)
     (case <expression:value> .  <*casebody:b>)
 
@@ -59,14 +59,14 @@
 
     ;;; Higher level expressions to be expanded before any other steps:
     (for ((<ident:var> <expression:init>)
-	  <expression:step>
-	  <expression:cont>)
-	 <mtdbody:body>)
+          <expression:step>
+          <expression:cont>)
+         <mtdbody:body>)
     (foreach (<ident:var> <expression:init>) <mtdbody:body>)
     (while <expression:cont>
-	   <mtdbody:body>)
+           <mtdbody:body>)
     (dowhile <expression:cont>
-	     <mtdbody:body>)
+             <mtdbody:body>)
 
     (embedd-asm . <somestuff:code>)
 
@@ -82,7 +82,7 @@
 
     (vf <ident:nm> <fldinfo:fld>)
     (vaf <type:tp> <expression:e> <expression:idx> <fldinfo:fld>)
-    
+
     (ar <expression:e> <expression:idx>)
     ))
 
@@ -97,7 +97,7 @@
   (expression
    (|
     (pass <verbatim:v>) ;; fall through
-    
+
     (am <bool:tailp> <expression:e> <mtdinfo:mtd> . <*expression:args>)
     (avm <bool:tailp> <vvaluet:e> <mtdinfo:mtd> . <*expression:args>)
     (asm <bool:tailp> <mtdinfo:mtd> . <*expression:args>)
@@ -123,7 +123,7 @@
 
     (sf <fldinfo:fld>)
     (ar <expression:e> <expression:idx>)
-    
+
     (ic <string:v>)
     (i64c <string:v>)
     (fc <string:v>)
@@ -136,7 +136,7 @@
 
     (bin op <expression:l> <expression:r>)
     (un op <expression:v>)
-    
+
     (type <type:tp> <expression:e>)
     (typecast <type:tp> <expression:e>)
     (typetoken <type:tp>)
@@ -183,7 +183,7 @@
     (T . <string:path>)))
 
   (mtdarg (<type:t> <ident:nm>))
-  
+
   (access (| (private) (public) (protected) (static) (virtual)))
 
   (mtdinfo ((<type:t> <type:ret> . <*type:args>) <ident:name>))

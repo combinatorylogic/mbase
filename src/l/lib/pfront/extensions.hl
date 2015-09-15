@@ -2,8 +2,8 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-// This file is distributed under the terms of the Q Public License version 1.0.
+// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+//
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -44,7 +44,7 @@ syntax in expr, start:
 syntax in expr, start:
   'symbols "(" cslist<[qident],",">:args ")" [expr]:body'
 {
-   ('begin':(map a in args do 
+   ('begin':(map a in args do
                `\a\ = gensym()`)) :: [body]
 }
 
@@ -59,7 +59,7 @@ syntax in expr, start:
    do loop ( e = entries ) {
       if (e) {
          match car(e) with
-           [ex;pt] -> {inner = loop(cdr(e)); 
+           [ex;pt] -> {inner = loop(cdr(e));
                        'match'(ex,[pt;inner])}
       } else body
    }
@@ -113,18 +113,18 @@ syntax in expr, start : ' "[" [expr]:e "|" cslist<[lcclause],",">:cls "]" '
  return
   'lisp'('<L>'(pfront_expr(e),'|'
      ,@({c2 = (
-          map cls do 
+          map cls do
            format(cls : c(id,ee,cl))
-	     {
-              [id;'<-';pfront_expr(ee)] :: 
-	        (if cl then ['&';pfront_expr(car(cl))] else [])
-	     });
-	  map append c in interleave(c2,['|']) do c}
+             {
+              [id;'<-';pfront_expr(ee)] ::
+                (if cl then ['&';pfront_expr(car(cl))] else [])
+             });
+          map append c in interleave(c2,['|']) do c}
         )))
 }
 
-syntax of pfnotnet in nnstmt, start: 
-' for "(" cslist<[pfdecl],",">:initdecls ";" [pfexpr]:condn ";" 
+syntax of pfnotnet in nnstmt, start:
+' for "(" cslist<[pfdecl],",">:initdecls ";" [pfexpr]:condn ";"
           cslist<[pfeqstatement],",">:steps ")" [pfstatement]:body '
 + {
     // Copypasted from notnet.hl:
@@ -140,8 +140,8 @@ syntax of pfnotnet in nnstmt, start:
   symbols(replabel) {
    'begin'
    (initdecls::
-     [.net-statement 
-      `{ 
+     [.net-statement
+      `{
          \replabel\:
            if( \condn\ ) { \body\; \stepsx\; goto \replabel\;}
        }`])
@@ -152,7 +152,7 @@ syntax in top, start (pliter): ' "%" "literate:" slist<[pliter]>:rest &[EOF] '
 {
   collector(add,get)
   {
-     iter rest do match rest with 
+     iter rest do match rest with
         pltopexpr(e) -> iter e do add(e)
       | plqhexpr(e) -> iter e do add(e);
      return 'begin':get();
@@ -182,11 +182,11 @@ syntax in expr, bin1: '[eterm]:l "/." "{" [matchbody]:mb "}" '
 macro pfront_rewrite_rules(rep,l,mb)
 {
    symbols(nm,arg) {
-     defptn = [['cons'('binding'('l'),'binding'('r')); 
+     defptn = [['cons'('binding'('l'),'binding'('r'));
                ` cons(\nm\ (l), \nm\ (r)) `];
                [['any'];'var'(arg)]];
-     mb1 = if (rep) then map mb do 
-              (match mb with 
+     mb1 = if (rep) then map mb do
+              (match mb with
                  [ptn;str] -> [ptn;` \nm\ (\str\)`])
            else mb;
      mtch = 'match'('var'(arg),@(mb1 :: defptn));
@@ -207,12 +207,12 @@ macro pfront_rewrite_rules(rep,l,mb)
 syntax in expr, start:
   ' [qident]:nm "(" ecslist<[qident],",">:args ")" "=" [expr]:i '
 {
-	'def'(nm, 'lambda'(args,i));
+        'def'(nm, 'lambda'(args,i));
 }
 
 
 syntax in top, start:
-  ' ".unittest" ([number]:level)? ":" 
+  ' ".unittest" ([number]:level)? ":"
     "(" [expr]:e ")" "expect" ":" [expr]:res '
 {
    lev = if(level) car(level) else 1;
@@ -230,7 +230,7 @@ syntax in top, start:
    'expr'('lisp'('unit-test-defn'(lev, ec)));
 }
 
-syntax in expr, bin2: 
+syntax in expr, bin2:
   ' [basicexpr]:l ":=" [expr]:r '
  {  return ` %r!( \l\ , \r\ ) ` }
 
@@ -265,8 +265,8 @@ function quote_wrap(e) { return 'quote'(e) }
 
 ----------------------
 
-syntax in expr, start: 
-  ' "$" "<" [qident]:pname "," [qident]:ename (":" [qident]:fname)? ">" "{" 
+syntax in expr, start:
+  ' "$" "<" [qident]:pname "," [qident]:ename (":" [qident]:fname)? ">" "{"
      #inlineparser<pname, ename>:res "}" '
 {
    proc = if(fname) shashget(getfuncenv(), car(fname)) else quote_wrap;
@@ -281,27 +281,27 @@ syntax in expr, start:
 + {
     roman := { [ratom]:a [roman]:b => $addnumber(a, b) }
           /    [ratom]
-	  ;
+          ;
     ratom := {"M" => `1000 }
           /  [rhundreds]
-	  /  [rtens]
-	  /  [rones]
-	  ;
-    rhundreds := {"CM" => `900 }          
-          /      {"CD" => `400 }          
+          /  [rtens]
+          /  [rones]
+          ;
+    rhundreds := {"CM" => `900 }
+          /      {"CD" => `400 }
           /      {"C" => `100 }
           /      {"D" => `500 }
-	  ;
+          ;
     rtens := {"XC" => `90}
-	  /  {"XL"  => `40}
-	  /  {"X"  => `10}
-	  /  {"L"  => `50}
-	  ;
+          /  {"XL"  => `40}
+          /  {"X"  => `10}
+          /  {"L"  => `50}
+          ;
      rones := {"IV" => `4}
-	  /   {"IX" => `9}
-	  /   {"I" => `1}
-	  /   {"V" => `5}
-	  ; }
+          /   {"IX" => `9}
+          /   {"I" => `1}
+          /   {"V" => `5}
+          ; }
  { return 'number'(rnum) }
 
 
@@ -352,11 +352,93 @@ syntax in expr, start: ' symcase [exprwrap]:e "{"
       "|"? cslist<[symcasepair],"|">:opts ("|"
       else [tTO] [exprwrap]:els)? "}" '
    + {
-       symcasepair := cslist<[qident],"|">:ss [tTO] [exprwrap]:e 
+       symcasepair := cslist<[qident],"|">:ss [tTO] [exprwrap]:e
        => $cons(ss,$cons(e,$nil()));
      }
 {
-  return 'case'(e,opts,els) 
+  return 'case'(e,opts,els)
 }
 
 
+----------------------
+
+// A better syntax errors reporting
+
+module pfront_err
+       export highlight_error;
+
+define col_reset = %S<<(n2s(27),"[0m");
+define col_1 = %S<<(n2s(27),"[31m");
+define col_2 = %S<<(n2s(27),"[32m");
+
+function display_error(slist, posf, post, msg) {
+  sn = car(posf);
+  nl = if(sn>3) sn - 3 else 0;
+  nslist = do loop(s = slist, n = 0) if(n>nl) s else loop(cdr(s),n+1);
+
+  println("-------------------------------------");
+  iter (linen:s) in nslist do {
+     println(s);
+     if (linen == sn) {
+        iter i in [0..cdr(posf)] do print(" ");
+        print(col_1);
+        if (car(post) == sn) {
+          iter i in [0..cdr(post)-cdr(posf)] do print("^")
+        } else println("^"); // TODO: do something better?
+        print(col_reset);
+
+        println("");
+        print(col_2);
+        print(%S<<("[",sn,"]: "));
+        println(msg);
+        print(col_reset);
+        println("")}};
+  println("-------------------------------------");
+}
+
+%"Highlight an error location"
+function highlight_error(stream, f, t, msg)
+  do loop(state = 'nope', linen = 0, string = [], strings = [], pos = 0, posf = [], post = [], s = stream) if(s) {
+     idx = %StreamEntry.idx(s);
+     nstate = mkref(state);
+     npos = mkref(pos); nposf = mkref(posf); npost = mkref(post);
+     nstring = mkref(string); nstrings = mkref(strings);nlinen = mkref(linen);
+     chr = %StreamEntry.char(s);
+     if (chr == 10) { // EOL
+        nstrings := (linen:%list->string(reverse(string))):strings;
+        npos := 0; nlinen := ^nlinen + 1; nstring := [];
+     } else {
+        npos := ^npos + 1;
+        nstring := n2s(chr) : ^nstring;
+     };
+     match state with
+        'nope' -> { if (idx >= f) {  /* starting an error region */
+                       nstate := 'error';
+                       nposf := linen:pos;}}
+      | 'error' -> { if (idx >= t) { /* done */
+                       nstate := 'tailing';
+                       npost := linen:pos;}}
+      | 'tailing' -> { if (linen > car(post)+4) {
+                          nstate := 'enough';}}
+      | 'enough' -> []
+      | else -> ccerror('WAT?'(state));
+     if (state === 'enough') display_error(reverse(^nstrings), ^nposf, ^npost, msg)
+     else loop(^nstate, ^nlinen, ^nstring, ^nstrings, ^npos,
+               ^nposf, ^npost, %StreamEntry.next(s))}
+    else display_error(reverse(strings), posf, post, msg)
+
+function error_hook(stream, res)
+  match car(res) with
+    'FAIL:'([pos;@rest],@exs) -> {
+      f = pos;
+      t = %StreamEntry.idx(cdr(res));
+      msg = %S<<("Syntax error. Expecting: ",
+                  strinterleave(map (tg:m) in exs do m, ", "), ";");
+      highlight_error(stream, f, t, msg);
+    }
+  | else -> println(car(res))
+
+// Register it
+#(r! pfront-report-syntax-error-hook error_hook)
+
+endmodule.

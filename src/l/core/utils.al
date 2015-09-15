@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -44,7 +44,7 @@
   `(M@ ,@(reverse body)))
 
 (unit-test 2 (alet inc (fun (x) (+ x 1)) ((pipeline> inc inc inc) 3)) 6)
-    
+
 (macro mapn (fn . lsts)
   (let* ((nms (map (fun (x) (cons x (gensym))) lsts))
          (len (length lsts))
@@ -71,5 +71,5 @@
                           `(null? (car ,n))))
                   (cdr ,rresn)
                   (,loopn)))))))
-          
+
 (unit-test 2 (mapn + '(1 2 3) '(3 2 1)) (4 4 4))

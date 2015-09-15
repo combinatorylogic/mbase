@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -20,7 +20,7 @@
       ("aaaa"))
 (test (map S->N (strsplit (<r> ",") "1,2,3,4,5,6"))
       (1 2 3 4 5 6))
-(test ((M@ list->string reverse string->list) "123")    
+(test ((M@ list->string reverse string->list) "123")
       "321")
 (test (strreplace* (<r> "[" + (p.alpha +*) + "]") "<>" "[abc]1[def]2[][x]3")
       "<>1<>2[]<>3")
@@ -69,7 +69,7 @@
 (test (let ((a (cons 0 1))) (for (i 0 100) (set-cdr! a (+ (cdr a) i))) (cdr a))
       4951)
 
-(test (let ((a (cons 0 1))) (set-cdr! a a) (first 5 a)) 
+(test (let ((a (cons 0 1))) (set-cdr! a a) (first 5 a))
       (0 0 0 0 0))
 
 (test (postcompile nil '((lambda (x) (lambda (y) (+ x y))) 2))

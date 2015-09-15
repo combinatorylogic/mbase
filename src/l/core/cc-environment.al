@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -14,7 +14,7 @@
 ;-
 ;- A common name mangling definition:
 ;-
-(define escape.net 
+(define escape.net
  (let ((p0 (<r> (p.alpha | p.digit | (((! (p.alpha | p.digit)) +*) -> (fun (_) (wrap #\_)))) *)))
   (fun (sym)
     (let* ((n1 (any->string sym))
@@ -54,12 +54,12 @@
   (alet c (ohashget (env:get: env _nativshash) nm)
      (when c
       (alet m (r_mtdf t_Runtime (S<< c)
-		      (formap (i 0 nargs) t_object))
+                      (formap (i 0 nargs) t_object))
          (if (not m) (cc:comperror `(CC02:N_NARGS ,nargs ,nm ,c)))
-	 (alet v (cons nargs m)
-           (env:set: env 
-		     ((global nm) v))
-	   v)))))
+         (alet v (cons nargs m)
+           (env:set: env
+                     ((global nm) v))
+           v)))))
 
 ;- Generate a name for a new class for a current module.
 (function cc:env:newclassname (env)
@@ -72,7 +72,7 @@
      (Sm<< "c" (escape.net usename))))
 
 ;- Get a pair of a closure type and parent constructor, for a given number of arguments.
-(function cc:env:genericclosuretype (env nargs) 
+(function cc:env:genericclosuretype (env nargs)
   (alet tp (nth nargs AltClosures)
      (cons tp (dotnet:basic-constructor t_AltClosure))))
 
@@ -86,12 +86,12 @@
 ;- Generate a mangled name for a field
 (function cc:localenv:fieldname (lenv name usename)
   (env:check: (lenv (field name))
-	      (Sm<< "f" (escape.net usename))))
+              (Sm<< "f" (escape.net usename))))
 
 ;- Create a local environment to keep things relevant to a current output class
 (function cc:make:localenv (env clsname)
   (env:new: (parent-env env)
-	    (class-name clsname)))
+            (class-name clsname)))
 
 ;- Drop a local environment when the class is finished
 (function cc:localenv:dummy (lenv)
@@ -121,7 +121,7 @@
   (env:set: lenv
             (local
              (env:new:
-	      (type 'closure)
+              (type 'closure)
               (:gen (mapi (fun (i a)
                             `((argument ,a) ,(+ 1 i))) fargs))
               (:gen (mapi (fun (i a)
@@ -132,7 +132,7 @@
 ;- Check if we're in a closure context
 (function cc:localenv:isclosure? (lenv)
   (alet tt (env:get: (lenv local) type)
-	(if tt (eqv? tt 'closure) nil)))
+        (if tt (eqv? tt 'closure) nil)))
 
 ;- Define a method
 (function cc:localenv:defmethod (lenv name value)
@@ -165,7 +165,7 @@
          (at2 (if at1 nil (env:get: lenv (field  nm))))
          (at3 (if (or at1 at2) nil (env:get: lenv (global nm))))
          (at4 (if (or at1 at2 at3) nil
-                  (hashget 
+                  (hashget
                    (env:get: (lenv parent-env) -fun-cache-) (S<< nm " ref"))))
          )
     (cond
@@ -179,16 +179,16 @@
      (at3 at3)
      (else
       (let* ((env (env:get: lenv parent-env))
-             (at3 
+             (at3
               (alet n0 (hashget (env:get: env _funhash) nm)
                     (if n0 `(method ,n0)
                         (alet n1
                           (hashget (env:get: env _fldhash) nm)
                           (if n1 `(field ,n1) nil)))))
-	     (at4 (shashget (getfuncenv) nm)))
-	(cond
-	 (at3 at3)
-	 (at4 `(interp ,nm))
+             (at4 (shashget (getfuncenv) nm)))
+        (cond
+         (at3 at3)
+         (at4 `(interp ,nm))
          (else (cc:comperror `(CC03:MISSING-GLOBAL ,nm)))
          ))))))
 
@@ -199,13 +199,13 @@
     (cond
      (at1 at1)
      (at2 `(field ,at2))
-     (else 
-      (let ((tst (hashget 
+     (else
+      (let ((tst (hashget
                    (env:get: (lenv parent-env) -fun-cache-) (S<< nm " ref"))))
         (p:match tst
           ((method $mm) `(cached ,mm))
           ((class $cl) `(cached ,(cc:constr cl)))
-          (else 
+          (else
            (cc:comperror `(CC03:NONLOCAL ,nm)))))))))
 
 ;- Add a field to be emitted
@@ -220,11 +220,11 @@
 ;- Get a collected initialisation code
 (function cc:localenv:getinit (lenv mode)
   (let* ((res (reverse (env:get: lenv (init mode))))
-	 (chk0 (foreach-mappend (i res) i))
-	 (chk (filter (fun (x)
-			(p:match x
-			  ((debugpoint . $_) nil)
-			  (else #t))) chk0)))
+         (chk0 (foreach-mappend (i res) i))
+         (chk (filter (fun (x)
+                        (p:match x
+                          ((debugpoint . $_) nil)
+                          (else #t))) chk0)))
     (if chk res nil)))
 
 ;- Get a list of fields to be emitted
@@ -247,7 +247,7 @@
 (function cc:env:fcall-helper-chk2 (env lenv nm nargs)
   (alet n0 (hashget (env:get: env _funhash) nm)
    (cond
-    (n0 (cons 
+    (n0 (cons
          (hashget (env:get: env _nargshash) nm)
          `(method ,n0)))
     (else
@@ -258,7 +258,7 @@
          (alet nn (_cc:checknative env nm nargs)
            (cond
             (nn nn)
-            (else 
+            (else
              (alet tt (shashget (getfuncenv) nm)
                (if tt
                    `(_ intrvalue ,nm)
@@ -272,11 +272,11 @@
 (function cc:env:fcall-helper-mi (env lenv mi nm nargs tail?)
   (p:match mi
     ((method $minf)
-     `(,@(cc:tail tail?) 
+     `(,@(cc:tail tail?)
        (Call ,minf)))
     ((field $nm)
      `((Ldsfld (field ,nm))
-       ,@(cc:tail tail?) 
+       ,@(cc:tail tail?)
        (Call ,(nth nargs (car ms_Call_RevGenerics)))))
     ((gfield $finf)
      `((Ldsfld ,finf)
@@ -288,7 +288,7 @@
          ,@(if at1 `((Ldsfld (field ,at1)))
              (alet ss (gensym)
                 (cc:localenv:addfield lenv ss 'object)
-                (cc:localenv:addinit lenv 'zero 
+                (cc:localenv:addinit lenv 'zero
                                      `((Ldsfld ,f_Pc_symbols)
                                        ,@((car cc:emit-symbol-stub) lenv nm)
                                        (Call ,m_getSItem)
@@ -303,14 +303,14 @@
     ))
 
 (function cc:env:function-call (env lenv nm nargs tail?)
-  
+
   (let* ((chk1  (env:get: lenv (method nm)))
          (chk11 (env:get: lenv (global nm)))
          (chk2 (if chk11 (cons '_ chk11)
                    (cc:env:fcall-helper-chk2 env lenv nm nargs)
                    ))
-         (at4 
-          (hashget 
+         (at4
+          (hashget
            (env:get: (lenv parent-env) -fun-cache-) (S<< nm " ref")))
          )
     (alet res
@@ -335,13 +335,13 @@
            )))
       (chk2
        (alet mi (cc:methodinfo chk2)
-             (when mi 
+             (when mi
                    (cc:check-method-args chk2 nm nargs))
              (cc:env:fcall-helper-mi env lenv mi nm nargs tail?)
              ))
       (else
        (cc:comperror `(CC03:UNKNOWN-METHOD ,nm))))
-     
+
      res
      )))
 
@@ -353,12 +353,12 @@
 
 (function cc:localenv:closurerunner (lenv nm0)
   (let* ((nm (cc:localenv:getname lenv nm0))
-	 (cls (cc:env:innerclassname lenv nm nm)))
+         (cls (cc:env:innerclassname lenv nm nm)))
     `(method ,(Sm<< cls "/run"))))
 
 (function cc:dotnet:nofargs (mtdi)
   (length (a->l (__get_Parameters mtdi))))
-  
+
 
 (function cc:env:delegate (lenv mtdi)
   (p:match mtdi
@@ -394,7 +394,7 @@
 (function cc:localenv:symbol (lenv value)
   (let ((at1
          (env:get: lenv (symbol value)))
-        (at2 
+        (at2
          (env:get: (lenv parent-env) (symbol value))))
     (if at1 `(field ,at1) at2)))
 
@@ -410,23 +410,23 @@
 
 (function cc:env:defmodule:strong (env nm dll? version keyfile)
   (let* ((asm (if (and version keyfile)
-		   (make-strong-assembly nm version keyfile)
-		   (make-assembly nm)))
-	 (dbg (if (shashget (getfuncenv) 'compiler-debug-enabled) #t bool-false))
-	 (_ (if dbg (clr:mark-assembly-debuggable asm)))
-	 (aname (if (eqv? dll? 'dll)
-		    (S<< nm ".dll")
-		    (S<< nm ".exe")))
-	 (mdl (make-module-s asm (S<< aname) aname dbg)))
+                   (make-strong-assembly nm version keyfile)
+                   (make-assembly nm)))
+         (dbg (if (shashget (getfuncenv) 'compiler-debug-enabled) #t bool-false))
+         (_ (if dbg (clr:mark-assembly-debuggable asm)))
+         (aname (if (eqv? dll? 'dll)
+                    (S<< nm ".dll")
+                    (S<< nm ".exe")))
+         (mdl (make-module-s asm (S<< aname) aname dbg)))
     (env:set: env (dotnet-module mdl))
     (env:set: env (dotnet-assembly asm))
     (env:set: env (dotnet-aname aname))
     (env:set: env (dotnet-a0name nm))
     (env:set: env (dotnet-type dll?))
     (collector (add get)
-	       (env:set: env
-			(modcollector-add add)
-			(modcollector-get get)))
+               (env:set: env
+                        (modcollector-add add)
+                        (modcollector-get get)))
     ))
 
 (function cc:env:defmodule (env nm dll?)

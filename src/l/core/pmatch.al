@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -18,17 +18,17 @@
 (notaruntime
 (define pm:ptn-parse-p
    (<r> (
-	 (((_ "[") ((! "]") +*) (_ "]")) -> (fun (x) `(S ,(list->symbol x))))
+         (((_ "[") ((! "]") +*) (_ "]")) -> (fun (x) `(S ,(list->symbol x))))
        |
          (((_ "$$") ((p.ucalpha +*)  :-> list->symbol) (_ ":") ((p. *) :-> list->symbol))
           -> (fmt (a b) `($$ ,a ,b)))
-       | 
+       |
          (((_ "$$") ((p.ucalpha +*) :-> list->symbol)) -> (fmt (a) `($$1 ,a)))
        |
          (((_ "$") ((p. *) :-> list->symbol)) -> (fmt (a) `($ ,a)))
-       | 
+       |
          (((_ "=") ((p. *) :-> list->symbol)) -> (fmt (a) `(= ,a)))
-       | 
+       |
          ((p. *) -> (fun (x) `(S ,(list->symbol x))))
        )))
 )
@@ -46,7 +46,7 @@
          ((FFF)  `(match-guard ,@b))
          ((FF)  `(match-post-function ,@b))
          ((F)  `(match-function ,@b))
-	 ((RP) `(match-many ,@b))
+         ((RP) `(match-many ,@b))
          ((R)  `(match-range ,@b))
          ((L)  `(match-any-list ,@b))
          ((N)  `(match-any-number ,@b))
@@ -67,27 +67,27 @@
     ((and (list? ptn) (symbol? (car ptn)))
      (let ((ss (pm:ptn-parse (car ptn))))
        (fccase ss
-	 ((match-anybutnext) rest
-	  `(match-anybutnext 
-	    ,(if (null? rest) nil (car rest))
-	    ,(pm:ptn-process (cdr ptn))))
-	 ((match-function match-range) rest
-	  `(,(car ss) ,(if (null? rest) nil (car rest)) ,@(cdr ptn)))
+         ((match-anybutnext) rest
+          `(match-anybutnext
+            ,(if (null? rest) nil (car rest))
+            ,(pm:ptn-process (cdr ptn))))
+         ((match-function match-range) rest
+          `(,(car ss) ,(if (null? rest) nil (car rest)) ,@(cdr ptn)))
          ((match-as) rest
           (if (null? rest) (pm:ptn-process (cdr ptn))
               `(match-as ,(car rest)
                          ,(pm:ptn-process (cdr ptn)))))
-	 ((match-many) rest
-	  `(match-many ,(if rest (car rest) nil)
-		       ,(pm:ptn-process (cadr ptn))
-		       ,(pm:ptn-process (cddr ptn))
-		       ))
+         ((match-many) rest
+          `(match-many ,(if rest (car rest) nil)
+                       ,(pm:ptn-process (cadr ptn))
+                       ,(pm:ptn-process (cddr ptn))
+                       ))
          ((match-guard) rest
           `(match-guard ,(pm:ptn-process (cadr ptn)) ,(caddr ptn)))
-	 ((match-post-function) rest
-	  `(match-post-function ,(if (null? rest) nil (car rest))
-				,(cadr ptn) ,(pm:ptn-process (cddr ptn)))) 
-	 (else `(match-cons ,ss ,(pm:ptn-process (cdr ptn)))))))
+         ((match-post-function) rest
+          `(match-post-function ,(if (null? rest) nil (car rest))
+                                ,(cadr ptn) ,(pm:ptn-process (cddr ptn))))
+         (else `(match-cons ,ss ,(pm:ptn-process (cdr ptn)))))))
     ((list? ptn)
      `(match-cons ,(pm:ptn-process (car ptn)) ,(pm:ptn-process (cdr ptn))))
     ((string? ptn)
@@ -122,46 +122,46 @@
                ,(pm:ptn-unroll hd ch (pm:ptn-unroll tl ct body)) ))))
       ((match-anybutnext) (bnd ptn2)
        (let* ((bbnd (if (null? bnd) (gensym) bnd))
-	      (lop (gensym))
-	      (larg (gensym))
-	      (ltst (gensym)))
-	 `(let ,lop ((,larg ,pas) (,bbnd nil))
-	    (let ((,ltst (with-macros ((pm:ptn-failed-m (fun (_)
-					   'pm:ptn-failed))) ,(pm:ptn-unroll ptn2 larg body))))
-	      (if (eqv? pm:ptn-failed ,ltst)
-		  (if (or (null? ,larg)
-			  (not (list? ,larg)))
-		      (pm:ptn-failed-m)
-		      (,lop (cdr ,larg) (append ,bbnd (list (car ,larg)))))
-		  ,ltst
-		  )))))
+              (lop (gensym))
+              (larg (gensym))
+              (ltst (gensym)))
+         `(let ,lop ((,larg ,pas) (,bbnd nil))
+            (let ((,ltst (with-macros ((pm:ptn-failed-m (fun (_)
+                                           'pm:ptn-failed))) ,(pm:ptn-unroll ptn2 larg body))))
+              (if (eqv? pm:ptn-failed ,ltst)
+                  (if (or (null? ,larg)
+                          (not (list? ,larg)))
+                      (pm:ptn-failed-m)
+                      (,lop (cdr ,larg) (append ,bbnd (list (car ,larg)))))
+                  ,ltst
+                  )))))
       ((match-as) (bnd pattern)
        `(let ((,bnd ,pas)) ,(pm:ptn-unroll pattern bnd body)))
       ((match-many) (bnd ptn2 ptnr)
        (let* ((bbnd (if (null? bnd) (gensym) bnd))
-	      (lop (gensym))
-	      (larg (gensym))
-	      (clarg (gensym))
-	      (ltst (gensym)))
-	 `(let ,lop ((,larg ,pas) (,bbnd nil))
-	    (let ((,ltst (if (and ,larg (list? ,larg)) 
-			      (let ((,clarg (car ,larg)))
-				(with-macros ((pm:ptn-failed-m (fun (_)
-						'pm:ptn-failed)))
-					     ,(pm:ptn-unroll ptn2 clarg '(quote x))))
-			      pm:ptn-failed
-			      )))
-	      (if (eqv? pm:ptn-failed ,ltst)
-		  ,(pm:ptn-unroll ptnr larg body)
-		  (if (or (null? ,larg)
-			  (not (list? ,larg)))
-		      (pm:ptn-failed-m)
-		      (,lop (cdr ,larg) (append ,bbnd (list (car ,larg)))))
-		  )))))
+              (lop (gensym))
+              (larg (gensym))
+              (clarg (gensym))
+              (ltst (gensym)))
+         `(let ,lop ((,larg ,pas) (,bbnd nil))
+            (let ((,ltst (if (and ,larg (list? ,larg))
+                              (let ((,clarg (car ,larg)))
+                                (with-macros ((pm:ptn-failed-m (fun (_)
+                                                'pm:ptn-failed)))
+                                             ,(pm:ptn-unroll ptn2 clarg '(quote x))))
+                              pm:ptn-failed
+                              )))
+              (if (eqv? pm:ptn-failed ,ltst)
+                  ,(pm:ptn-unroll ptnr larg body)
+                  (if (or (null? ,larg)
+                          (not (list? ,larg)))
+                      (pm:ptn-failed-m)
+                      (,lop (cdr ,larg) (append ,bbnd (list (car ,larg)))))
+                  )))))
       ((match-function) (bnd fn)
          `(pm:ptn-try (,fn ,pas) ,(if bnd `(let ((,bnd ,pas)) ,body) body)))
       ((match-guard) (ptn fn)
-        (pm:ptn-unroll ptn pas `(pm:ptn-try (,fn ,pas) ,body))) 
+        (pm:ptn-unroll ptn pas `(pm:ptn-try (,fn ,pas) ,body)))
       ((match-post-function) (bnd fn ptn2)
         (with-syms (sss)
           `(let (,@(if (null? bnd) nil `((,bnd ,pas))) (,sss (,fn ,pas))) ,(pm:ptn-unroll ptn2 sss body))))
@@ -214,8 +214,8 @@
     " | ($$R[:<ident>] . <symbol>*) - matches any of the given symbols"
     " | ($$XXX[:<ident>] . <pattern>) - any number of list elements before"
     "          pattern is matched"
-    " | ($$FFF <pattern> <fun(x)>) - applies a pattern and additionally applies a guard function" 
-    " | ($$FF[:<ident>] <fun(x)> . <pattern>) - checks if <fun> is not nil, and" 
+    " | ($$FFF <pattern> <fun(x)>) - applies a pattern and additionally applies a guard function"
+    " | ($$FF[:<ident>] <fun(x)> . <pattern>) - checks if <fun> is not nil, and"
     "              applies pattern to a function value."
     "              This feature is a tribute to Don Syme's banana brackets."
     " | (<pattern> . <pattern>) - matches a cons cell, applies patterns"
@@ -227,21 +227,21 @@
    (with-syms (top res)
      `(let ((,top ,val))
         ,(let loop ((ps ptns))
-           (cond 
+           (cond
               ((null? ps) 'nil)
               ((eqv? 'else (caar ps)) (cadar ps))
-              (else `(let ((,res 
-                            ,(pm:ptn-unroll 
+              (else `(let ((,res
+                            ,(pm:ptn-unroll
                               (pm:ptn-process (caar ps))
                               top `(begin ,@(cdar ps)))))
-                       (if (eqv? ,res pm:ptn-failed) 
+                       (if (eqv? ,res pm:ptn-failed)
                           ,(loop (cdr ps))
                           ,res))))))))
 
 
 ;;; Unit tests for pattern matching:
 
-(unit-test 1 (p:match '(a b c) (($x $y $z) (list z x y))) (c a b)) 
+(unit-test 1 (p:match '(a b c) (($x $y $z) (list z x y))) (c a b))
 
 (unit-test 1 (p:match '(a b a) (($x $y =x) (list x y))) (a b))
 

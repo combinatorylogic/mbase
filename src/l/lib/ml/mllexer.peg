@@ -2,8 +2,8 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-// This file is distributed under the terms of the Q Public License version 1.0.
+// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+//
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -14,7 +14,7 @@ parser mbasemlcore (
 
  mbasemlcore := 'nop';
 
- define cslist<a,b> := 
+ define cslist<a,b> :=
                         {a:head b cslist:tail => $cons(head,tail)}
                       / {a:head => $wrap(head)};
 
@@ -34,7 +34,7 @@ parser mbasemlcore (
  Digits  := Digit+;
  Space  := ' ' / TAB / CR / NEWLINE / SingleLineComment / MultiLineComment;
  Spaces := Space+;
- 
+
  MultiLineComment  := '(*' ((!('*)')) . )* '*)' => {state=comment};
  SingleLineComment := '//' (!(NEWLINE) .)* NEWLINE => {state=comment};
 
@@ -54,12 +54,12 @@ parser mbasemlcore (
                           '+'/'!'/'.'/','/
                           '/'/'%'/'&'/'|'/'=');
  token InfixIdent := ('<' infixInner * '>') => {ctoken = ident} ;
- term tInfixIdent := {InfixIdent:i => $sval(i)} 
+ term tInfixIdent := {InfixIdent:i => $sval(i)}
                    / {"`" Ident:i "`" => $sval(i) }
                    / {Ident:i check(ml_check_infix) => $sval(i)};
 
- token Char := 39 . 39 => {ctoken = const} ; 
- token String := '"' ( !'"' . ) * '"' => {ctoken = const} ; 
+ token Char := 39 . 39 => {ctoken = const} ;
+ token String := '"' ( !'"' . ) * '"' => {ctoken = const} ;
  token Int := '-'? Digits => {ctoken = const} ;
 )
 

@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -55,9 +55,9 @@
   (let loop ((e tcode) (ignor nil))
     (alet add (fun (v) (add0
                          (if ignor `(IGNORE ,ignor ,v) v)))
-                            
+
     (packrat:iter expr e
-      (expr _ 
+      (expr _
         ((seq (if es (loop (car es) ignor)))
          (palt (foreach (ee es) (loop ee ignor)))
 
@@ -79,4 +79,34 @@
 
 ;(function peg-terminal-packrange (range)
 ;  (foldl peg-range-merge '(nop) range))
-    
+
+
+
+;;;; Benchmarking tools
+
+(function mkstopwatch ()
+  (not.neth ()
+            (leave ((object)(new System.Diagnostics.Stopwatch)))))
+
+(function stopwatch-start (sw)
+  (not.neth ((System.Diagnostics.Stopwatch sw))
+            (sw@Start)
+            (leave null)))
+
+(function stopwatch-stop (sw)
+  (not.neth ((System.Diagnostics.Stopwatch sw))
+            (sw@Stop)
+            (leave null)))
+
+(function stopwatch-elapsed (sw)
+  (not.neth ((System.Diagnostics.Stopwatch sw))
+            (leave ((sw@get_Elapsed)@ToString))))
+
+(macro swbenchmark (msg code)
+    (with-syms (sw ret)
+       `(let* ((,sw (mkstopwatch))
+               (_ (stopwatch-start ,sw))
+                      (,ret ,code))
+          (stopwatch-stop ,sw)
+          (println (S<< "Elapsed time (" ,msg "): " (stopwatch-elapsed ,sw)))
+          (return ,ret))))

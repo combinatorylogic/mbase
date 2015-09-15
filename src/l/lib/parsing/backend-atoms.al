@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -35,9 +35,8 @@
 
 (macro peg-backend-hint (nm args)
   `(if Env
-       (let* ((last (__peg:get-position_ source))
-              (eslot (PegEnv.other Env)))
-         (peg:env-signal eslot 'HINT last last (quote (,nm ,args))))))
+       (let* ((last (__peg:get-position_ source)))
+         (peg:env-signal Env 'HINT last last (quote (,nm ,args))))))
 
 (macro peg-check (e next)
   (with-syms (tmp)
@@ -47,13 +46,13 @@
 
 (not.class PegException (extends System.Exception)
      (field object loc (public))
-     (field object env (public))      
+     (field object env (public))
      (field object payload (public))
      )
 
 (not.function peg-fatal-exception ((object Env) (object source) (object msg))
   (e = (new PegException))
-  (e#env <- Env)            
+  (e#env <- Env)
   (e#loc <- source)
   (e#payload <- msg)
   (throw e))
@@ -64,15 +63,15 @@
        (if (peg-success? ,tmp) ,tmp
            (peg-fatal-exception
             Env
-            source 
+            source
             (,(Sm<< "peg-error-" m) Env saved source
              (list ,@(foreach-map (a args)
                        `(peg-constr-compile ,a ())))))))))
 
 (macro peg-call-checker (id)
   (with-syms (tmp)
-     `(let ((,tmp (,(Sm<< "peg-checkfunction-" id) 
-                   (__peg:get-delta saved 
+     `(let ((,tmp (,(Sm<< "peg-checkfunction-" id)
+                   (__peg:get-delta saved
                                     (__peg:get-position_ source)))))
         (if (peg-success? ,tmp) (peg-dummy) (peg-fail)))))
 
@@ -91,7 +90,7 @@
      `(let ((,sav (__peg:get-position_ source))
             (,tmp ,e)
             (,l1 (__peg:get-position_ source))
-            (,rst (begin 
+            (,rst (begin
                     (__peg:set-position_ source ,sav)
                     ,next)))
         (if (peg-success? ,tmp)
@@ -135,7 +134,7 @@
                            (if mlt
                                `(peg-collval ,tmp ,iname)
                                `(cons '*val* ,tmp))
-                           (if mlt 
+                           (if mlt
                                `(cons ,tmp ,iname)
                                tmp))
                       )
@@ -144,22 +143,29 @@
           ,tmp)))))
 
 
-(macro peg-call-gen (name rec)
+(macro peg-call-gen (name rec ttype)
   (if rec
       `(peg-call ,name)
-      `(peg-call-nr ,name)))
+      (p:match ttype
+        (lterm `(peg-call-simple ,name))
+        (token `(peg-call-simple ,name))
+        (else
+         `(peg-call-nr ,name)))))
 
-(macro peg-call-terminal-gen (name rec)
+(macro peg-call-terminal-gen (name rec ttype)
   (if rec
       `(peg-call-terminal ,name)
-      `(peg-call-nr-terminal ,name)))
-
+      (p:match ttype
+        (lterm `(peg-call-simple ,name))
+        (token `(peg-call-simple ,name))
+        (else
+         `(peg-call-nr-terminal ,name)))))
 
 (macro peg-call-simple (name)
   `((straise (car (__peg_xhashget (PegContext) (quote ,(Sm<< name))))) Env _lrstk source))
 
 (macro peg-call-terminal (name)
-  `(__peg:apply_ Env _lrstk source 
+  `(__peg:apply_ Env _lrstk source
                  (straise (__peg_xhashget (PegContext) (quote ,(Sm<< name))))))
 
 (macro n.eq? (a b)
@@ -171,7 +177,7 @@
 (macro peg-trivial (tcode)
   (pktrivial:visit pred tcode
     (pred DEEP
-      ((char 
+      ((char
         `(if (const.eq? (__peg:get-advance source) ,chr)
              (peg-dummy)
              (peg-fail))

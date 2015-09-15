@@ -1,0 +1,137 @@
+%literate:
+
+\section{Generic liveness analysis}
+
+For each basic block, used variables are propagated to the incoming basic blocks
+and defined variables are propagated to the next basic blocks. This is repeated
+as long as any changes to the lists of defined and used variables are changing.
+Use lists are not propagated upwards from the basic blocks where the variables
+are destroyed. If the variable is used and destroyed in the same block, the
+order is taken into account.
+
+
+
+\pfcode{include "./genlive-ast.hl"}
+
+\pfcode{
+%"Genlivebb: detect use-kill sequences"
+function genlivebb_mark_usekill(bbs) {
+  visit:genlivebb(bbs: bbs) {
+     once bb {
+        genbb -> do loop(c = is, prev = []) {
+           match c with
+             'use'(id):rest -> car(c):loop(rest, id:prev)
+           | 'kill'(id):rest -> {
+                newprev = filter p in prev as not(p===id);
+                if(memq(id, prev)) 'usekill'(id):loop(rest, newprev)
+                   else car(c):loop(rest, newprev)}
+           | hd:rest -> hd : loop(rest, prev)
+           | [] -> []}}}}}
+
+\pfcode{
+%"Genlivebb: single iteration of liveness propagation"
+function genlivebb_iteration(cfg, defs, uses, bbids, updp) {
+  // For each bb, add uses from the nexts, execute instructions in reverse;
+  // then add defs from the prevs, execute instructions forwards;
+  // update the lists if necessary.
+
+   <[codes;nexts;prevs]> = cfg;
+
+    // Collect uses and defs from the relevant bbs
+    collect_fn(bb, dir, what) = {
+       ht = mkhash();
+       nn = ohashget(dir, bb);
+       iter n in nn do
+         iter u in ohashget(what, n) do ohashput(ht, u, u);
+       return hashmap(fun(k,v) k, ht)
+    };
+    collect_next_uses(bb) = collect_fn(bb, nexts, uses);
+    collect_prev_defs(bb) = collect_fn(bb, prevs, defs);
+
+    // Execute the instructions to propagate the lists
+    exec_def(lst, i) =
+       visit:genlivebb(instr: i) {
+          deep instr {
+             use -> lst
+           | kill -> id:lst
+           | usekill -> lst
+           | next -> lst}};
+
+    exec_use(lst, i) =
+       visit:genlivebb(instr: i) {
+          deep instr {
+             use -> id:lst
+           | kill -> filter l in lst as not(l===id)
+           | usekill -> id:lst
+           | next -> lst}};
+
+    exec_uses(code, ns) =
+      foldl(exec_use, ns, code);
+    exec_defs(code, df) =
+      foldl(exec_def, df, code);
+
+    // Update the uses and defs for bb if anything changed
+    update_gen(bb, dstht, lst) = {
+       rf = ohashget(dstht, bb);
+       nw = unifiq(rf :: lst);
+       nh = mkhash();
+       iter n in rf do ohashput(nh, n, n);
+       do loop(l = nw) {
+          match l with
+             hd:tl -> {
+                if(not(ohashget(nh, hd))) {
+                  ohashput(dstht, bb, nw);
+                  updp := true;
+                } else loop(tl)}}};
+    update_uses(bb, lst) = update_gen(bb, uses, lst);
+    update_defs(bb, lst) = update_gen(bb, defs, lst);
+
+    // Do one iteration for each of the basic blocks
+    iter bb in bbids do {
+      ns = collect_next_uses(bb);
+      df = collect_prev_defs(bb);
+     <code:revcode> = ohashget(codes, bb);
+      nuses = exec_uses(revcode, ns);
+      ndefs = exec_defs(code, df);
+      update_uses(bb, nuses);
+      update_defs(bb, ndefs);
+    }
+}}
+
+\pfcode{
+%"Exctract code and cfg from genlivebb"
+function genlivebb_extract(bbs) {
+  codes = mkhash(); nexts = mkhash(); prevs = mkhash();
+  visit:genlivebb(bbs: bbs) {
+     deep bb {
+       genbb -> {
+          rev = reverse(is);
+          ohashput(codes, lbl, is:rev);
+          iter i in is do match i with
+             next(dst) -> {
+               ohashput(nexts, lbl, dst:ohashget(nexts, lbl));
+               ohashput(prevs, dst, lbl:ohashget(prevs, dst));
+             }}}};
+  return [codes;nexts;prevs]}}
+
+\pfcode{
+%"Run the liveness analysis iterations until fixed point is reached"
+function genlivebb_analyse(bbs) {
+  cfg = genlivebb_extract(bbs);
+  htuses = mkhash();
+  htdefs = mkhash();
+  bbids = visit:genlivebb(bbs:bbs) { once bb { genbb -> lbl}};
+  do loop() {
+    updp = mkref([]);
+    genlivebb_iteration(cfg, htdefs, htuses, bbids, updp);
+    if(^updp) loop();
+  };
+  return visit:genlivebb(bbs:bbs) {
+    once bb {
+       genbb -> mk:node(uses = ohashget(htuses, lbl),
+                        defs = ohashget(htdefs, lbl))}}}}
+
+
+
+
+%%%%%%%%%%%%

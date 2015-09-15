@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -31,7 +31,7 @@
    "\\red0\\green0\\blue255;" ;; 8 blue
    "}\\f0\\fs24\\pard"))
 
-(define ___TabsX_RTF 
+(define ___TabsX_RTF
   (strreplacers*
    ("{" "\\{")
    ("}" "\\}")
@@ -83,14 +83,14 @@
      (ctoken=symbol "\\bf")
      (ctoken=keyword "\\tt")
      (ctoken=lexic "\\color{blue}")
-     
+
      (state=comment "\\it")
      (qstate=quote "\\color{cyan}")
      (qstate=unquote "\\color{black}")
      (state=lambda "")
      (state=pattern "\\color{light-gray}")
      (state=constr "")
-     
+
      (f:state=empty ,(fun (x) ""))
      (f:ctoken=doubleto ,(fun (x) "$\\Rightarrow$"))
      (f:ctoken=to ,(fun (x) "$\\rightarrow$"))
@@ -122,7 +122,7 @@
      (ctoken=symbol "\\cf2")
      (ctoken=keyword "\\b")
      (ctoken=lexic "\\cf2")
-     
+
      (state=comment "\\cf3")
      (qstate=quote "\\chcbpat6")
      (qstate=unquote "\\chcbpat6\\cf5")
@@ -147,24 +147,24 @@
 
 (recfunction ploop1 (outfile str p fn prevfail)
   (let* ((outenv (alist:new))
-	 (env (PegEnv.new nil 
-			(make-accept-signal-arlist outenv pp-mymerge)
-			#t
-			nil
-			))
-	 (res (peg:easyparse3 env p (deref str)))
+         (env (PegEnv.new nil
+                        (make-accept-signal-arlist outenv pp-mymerge)
+                        #t
+                        nil
+                        ))
+         (res (peg:easyparse3 env p (deref str)))
          (s (p:match (car res)
               ((FAIL: . $_) nil) (else #t)))
-	 (___Tabs (case (deref print-fmt)
-		    ((tex) ___Tabs_TEX)
-		    ((rtf) ___Tabs_RTF)))
-	 (pfrontcolours (case (deref print-fmt)
-			  ((tex) pfrontcolours_TEX)
-			  ((rtf) pfrontcolours_RTF)))
-	 )
+         (___Tabs (case (deref print-fmt)
+                    ((tex) ___Tabs_TEX)
+                    ((rtf) ___Tabs_RTF)))
+         (pfrontcolours (case (deref print-fmt)
+                          ((tex) pfrontcolours_TEX)
+                          ((rtf) pfrontcolours_RTF)))
+         )
     (if s
         (begin
-          (fn (car res)) 
+          (fn (car res))
           (print-rle-stream outfile
                             ___Tabs
                             pfrontcolours
@@ -174,7 +174,7 @@
           (if (peg-alldead? (cdr res)) nil
               (begin
                 (r! str (cdr res))
-                (ploop1 outfile str p fn (mergefailure 
+                (ploop1 outfile str p fn (mergefailure
                                           prevfail
                                           (peg:reportfailure env))))))
         (begin
@@ -189,17 +189,17 @@
 
 (recfunction hlevl-consume1 (dstream)
   (let* (
-	 (fname (if (not (deref outfile-name))
-		    (S<< "output." (deref print-fmt))
-		    (deref outfile-name)))
-	 (header (case (deref print-fmt)
-		   ((tex) header_TEX)
-		   ((rtf) header_RTF)))
-	 (footer (case (deref print-fmt)
-		   ((tex) footer_TEX)
-		   ((rtf) footer_RTF)))
-	 (outfile (io-open-write fname))
-	 (clect (mkref nil))
+         (fname (if (not (deref outfile-name))
+                    (S<< "output." (deref print-fmt))
+                    (deref outfile-name)))
+         (header (case (deref print-fmt)
+                   ((tex) header_TEX)
+                   ((rtf) header_RTF)))
+         (footer (case (deref print-fmt)
+                   ((tex) footer_TEX)
+                   ((rtf) footer_RTF)))
+         (outfile (io-open-write fname))
+         (clect (mkref nil))
          (reallyadd (fun (x)
                       (r! clect (cons (hlevel-compile x)
                                       (deref clect)))))
@@ -217,11 +217,11 @@
                         (else (reallyadd x))))))))
     (fprintln outfile header)
     (ploop1 outfile
-	    dstream peg_pfront
-	    (fun (x)
-	      (if x (cadd x)))
+            dstream peg_pfront
+            (fun (x)
+              (if x (cadd x)))
             nil
-	    )
+            )
     (fprintln outfile footer)
     (io-wclose outfile)
     (cget)))
@@ -237,7 +237,7 @@
                                          (System.IO.Directory@GetCurrentDirectory))))
   (let loop ((args (a->l *CMDLINE*)))
    (p:match args
-    (($fnm) 
+    (($fnm)
      (begin
        (read-compile-eval '(n.module front))
        (read-compile-eval `(hlevl-file1 ,fnm))))
@@ -267,14 +267,14 @@
 
     (else
      (iter println '
-        ("Usage:" 
-         " pfprint.exe [opts] <filename> - execute a file" 
-         " pfprint.exe [opts] /c <exename> <filename> - compile a file" 
+        ("Usage:"
+         " pfprint.exe [opts] <filename> - execute a file"
+         " pfprint.exe [opts] /c <exename> <filename> - compile a file"
          " pfprint.exe [opts] /d <dllname> <filename> - compile a file into a dll"
-	 " options are:"
-	 "  /tex - use LaTeX format "
-	 "  /rtf - use RTF format "
-	 "  /o <filename> - write output into a given file"
-	 "            the default is 'output.tex' or 'output.rtf'"
+         " options are:"
+         "  /tex - use LaTeX format "
+         "  /rtf - use RTF format "
+         "  /o <filename> - write output into a given file"
+         "            the default is 'output.tex' or 'output.rtf'"
          )))
     )))

@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -31,10 +31,10 @@
 (function genchar? (x)
   (if (char? x) #t
       (if (and
-	   (gen? x)
-	   (char? (cadr x)))
-	  #t
-	  nil)))
+           (gen? x)
+           (char? (cadr x)))
+          #t
+          nil)))
 
 (function genchar (x)
   (genvalue x))
@@ -63,23 +63,23 @@
   (if (null? lst) nil
   (let ((l0 (genposition (car lst))))
     (if l0
-	(let* ((ll (lazylasttail lst))
+        (let* ((ll (lazylasttail lst))
                (l1 (if ll (genposition (car ll)) (list -1 -1))))
-	  `(RANGE ,l0 ,l1))
-	nil))))
+          `(RANGE ,l0 ,l1))
+        nil))))
 
 (function genlist->string (lst)
   (if (null? lst) ""
   (let* ((pos (rangeposition lst))
-	 (s
-	  (list->string (map genchar lst))))
+         (s
+          (list->string (map genchar lst))))
     (if pos (mkgen s pos) s))))
 
 (function genapply (f v)
   (if (gen? v)
       (mkgen (f (genvalue v)) (genposition v))
       (f v)))
-	       
+
 (function genlist->symbol (lst)
   (genapply string->symbol (genlist->string lst)))
 

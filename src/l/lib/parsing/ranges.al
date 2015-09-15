@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -95,7 +95,7 @@
         (p:match r
           ((T $nm)
            (alet t (hashget env nm)
-              (if t 
+              (if t
                   (if (eqv? t 'undef)
                       (r! undef #t)
                       (packrat-expand-ranges add minus t)
@@ -127,7 +127,7 @@
         (merge
          (loop e))
         (seq
-         (p:match es 
+         (p:match es
            (($fst . $nxt)
             (begin
               (loop fst)
@@ -137,7 +137,7 @@
          (add `(T ,name)))
         (bind-terminal
          (add `(T ,tname)))
-        (simple 
+        (simple
          (add `(T ,name)))
         (andp (loop e))
         (plus (loop e))
@@ -189,6 +189,6 @@
     ))
 
 (function packrat-reckon-ranges (deps code)
-  (ctime (if ##packrat-optimised 
+  (ctime (if ##packrat-optimised
              `(packrat-reckon-ranges-0 deps code)
              `(mkhash))))

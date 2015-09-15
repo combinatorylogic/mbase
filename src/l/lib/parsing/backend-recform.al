@@ -18,7 +18,6 @@
   (collector (add-match get-matches)
   (let* ((match-entry
           (fun (ref name l)
-            ;; (writeline `(MATCH: ,ref ,name ,l))
             (p:match l
               ((list set $v $x) (add-match `(,ref ,name ,x))) ;; TODO: ?!?
               ((set $v $x) (add-match `(,ref ,name ,x)))
@@ -31,7 +30,6 @@
               (else (ccerror `(PEG-CONSTR-MATCH ,ref ,name ,l))))))
           (match-lists
            (fun (vs0 l0)
-             ;; (writeline `(MATCH-L: ,vs0 :: ,l0))
              (let loop ((vs vs0)
                         (l  l0))
                (p:match (list vs l)
@@ -52,7 +50,7 @@
                   (begin (f lf)
                          (loop r lr)))
                  (else nil))))))
-    
+
     (let* ((picker
             (astlang:visit pattern astfmt
               (pattern DEEP
@@ -68,27 +66,21 @@
                       (fun (l)
                         (match-entry ref name l))))
                  (nil (fun (l) nil)))))))
-      (writeline `(MATCHING: ,astfmt ,constr))
       (picker constr)
       (get-matches)
       ))))
 
 
 (function peg-constr-compile-recform-loop ( constr target-node target-ast )
-  (writeline `(RECFORML: ,constr ,target-node ,target-ast))
   (let* ((asrc (ast2:default-ifun target-ast))
-         ;; (_ (writeline `(AST= ,asrc)))
          (asth (ast-make-cache asrc)))
     (let loop ((c constr) (nd target-node))
       (let* ((dovarnode
               (fun (nd cname ars)
                 (let* ((frmt (ast-get-variant-pattern asth nd cname))
-                       (_ (writeline `(FRM: ,ars ::: ,frmt)))
                        (ms (peg-constr-match-args ars frmt))
-                       (_ (writeline `(MARGS: ,frmt :: ,ars ====> ,ms)))
                        (args2
                         (let iloop ((is ms))
-                          (writeline `(IL: ,is))
                           (foreach-map (m is)
                             (format m (tp nm v)
                               (p:match v
@@ -99,18 +91,18 @@
                                  `(,nm nil))
                                 (else
                                  `(,nm ,(loop v tp)))))))))
-                  `(cdr (ast2:vctr ,nd ,cname ,@args2))))))
+                  `(ast2:vctr ,nd ,cname ,@args2)))))
         (packrat:visit code c
           (code _
             ((constr (dovarnode nd cname ars))
              (dconstr (dovarnode nname cname ars))
              (var name)
              (const `(quote ,s))
-             
+
              (fcall `(,(Sm<< "peg-function-" fname)
                       ,@(foreach-map (a ars)
                           (loop a target-node))))
-             
+
              (else (ccerror `(PEG-CONSTR-RECFORM-UNSUPPORTED ,node)))
              )))
         ))))
@@ -131,18 +123,13 @@
 (macro peg-constr-compile-recform-inner (qconstr qsrcfmt qdtype target-ast
                                                  target-node)
   (p:match target-node
-    ((packrat-target-node) `(peg-constr-compile-listform ,(cadr qconstr)
-                                                         ,(cadr qsrcfmt)
-                                                         ,(cadr qdtype)))
     (else
      (let* ((ret (peg-constr-compile-recform-loop (cadr qconstr)
                    (peg-constr-get-target (cadr qdtype) target-node)
                    target-ast )))
-    ;; (writeline `(RCTR: ,ret))
        (with-syms (loc)
          `(with-macros ((ast-current-metadata (fun (_) (quote ,loc))))
             (let ((,loc (peg-constr-get-loc)))
               ,ret)))))))
 
 
-  

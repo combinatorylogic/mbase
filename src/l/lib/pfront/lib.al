@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -13,11 +13,11 @@
 (net.types Environment GC)
 (define pfront_time_now
    (let* ((tproc (sdotnet "System.Diagnostics.Process"))
-	  (curproc (fun () ((r_sbind tproc "GetCurrentProcess")))))
+          (curproc (fun () ((r_sbind tproc "GetCurrentProcess")))))
      (fun ()
        ((r_bind "System.TimeSpan" "get_TotalMilliseconds")
-	((r_bind tproc "get_UserProcessorTime")
-	 (curproc))))))
+        ((r_bind tproc "get_UserProcessorTime")
+         (curproc))))))
 
 (define pfront-mkhist (mkref nil))
 (define pfront-dump-alfile (mkref nil))
@@ -30,9 +30,9 @@
 (function __peg-function-makeloc (saved source)
   (if (shashget (getfuncenv) 'compiler-debug-enabled)
       (alet chk (deref **hlevl-file-path**)
-	    (if chk 
-		`((loc (,(car chk) ,saved ,source)))
-		nil))))
+            (if chk
+                `((loc (,(car chk) ,saved ,source)))
+                nil))))
 
 (function __peg-function-makelocbegin (e saved source)
   (let ((lc (__peg-function-makeloc saved source)))
@@ -49,6 +49,14 @@
 (include "./parser.al")
 (force-class-flush)
 
+(define pfront-report-syntax-error-hook (mkref nil))
+(function pfront-report-syntax-error (stream res)
+  (let* ((h (deref pfront-report-syntax-error-hook)))
+    (if h
+        (h stream res)
+        (println (car res)))
+    (ccerror `(SYNTAX-ERROR ,(car res)))))
+
 (recfunction ploop (env str p fn)
   (let* ((res (peg:easyparse3 env p (deref str)))
          (s (p:match (car res)
@@ -61,29 +69,29 @@
                 (r! str (cdr res))
                 (ploop env str p fn))))
         (begin
-          (println (car res))))))
+          (pfront-report-syntax-error (deref str) res)))))
 
 
 (function hlevl-consume (parser dstream rfun)
   (let* ((clect (mkref nil))
          (reallyadd (fun (x)
-		      (let ((cx 
-			     (if (deref pfront-benchmark-only)
-				 nil
-				 (hlevel-compile x))))
-			(if (deref pfront-dump-alfile)
-			    (fprintln (deref pfront-dump-alfile) 
-				      (S<< cx)))
-			(r! clect (cons cx
-					(deref clect))))))
+                      (let ((cx
+                             (if (deref pfront-benchmark-only)
+                                 nil
+                                 (hlevel-compile x))))
+                        (if (deref pfront-dump-alfile)
+                            (fprintln (deref pfront-dump-alfile)
+                                      (S<< cx)))
+                        (r! clect (cons cx
+                                        (deref clect))))))
          (cget (fun ()
                  (let ((res (reverse (deref clect))))
                    (r! clect nil)
                    res)))
          (flush (fun ()
                   (alet code (cget)
-		   (if (not (deref pfront-benchmark-only))
-		       (cc:flush-bypass-from-macro `(top-begin ,@code))))))
+                   (if (not (deref pfront-benchmark-only))
+                       (cc:flush-bypass-from-macro `(top-begin ,@code))))))
          (cadd (fun (x)
                  (hlevel:iter topexpr x
                     (topexpr _
@@ -91,41 +99,41 @@
                         (else (reallyadd x)))))))
          (xfun (rfun cadd flush)))
     (ploop (peg:makeenv) dstream parser xfun)
-    
+
     (cget)))
 
 (macro hlevl-file (nm)
   (let* ((fp (generic-filepath nm))
          (oxpath (corelib:get-lookup-path))
-	 (file-length (mkref 0))
-	 (fps (mkref (peg:file->stream2 fp file-length)))
-	 (fph (if (deref pfront-mkhist) (deref fps)))
-	 (begtime (pfront_time_now))
-	 )
+         (file-length (mkref 0))
+         (fps (mkref (peg:file->stream2 fp file-length)))
+         (fph (if (deref pfront-mkhist) (deref fps)))
+         (begtime (pfront_time_now))
+         )
    (r! **hlevl-file-path** (cons fp (deref **hlevl-file-path**)))
    (if (shashget (getfuncenv) 'debug-display-include-paths)
        (println (buildstring "include file: " fp)))
    (register-target-dependency fp)
    (alet ret
      `(top-begin
-	(ctimex (corelib:set-lookup-path ,(_getpath fp)))
-	,@(begin
-	    (corelib:set-lookup-path (_getpath fp))
-	    (hlevl-consume peg_pfront
-			   fps
-			   (fun (cadd flush)
-			     (fun (x) (if x (cadd x))))
-			   ))
-	(ctimex (corelib:set-lookup-path ,oxpath))
-	)
+        (ctimex (corelib:set-lookup-path ,(_getpath fp)))
+        ,@(begin
+            (corelib:set-lookup-path (_getpath fp))
+            (hlevl-consume peg_pfront
+                           fps
+                           (fun (cadd flush)
+                             (fun (x) (if x (cadd x))))
+                           ))
+        (ctimex (corelib:set-lookup-path ,oxpath))
+        )
      (r! **hlevl-file-path** (cdr (deref **hlevl-file-path**)))
      (if (deref pfront-mkhist)
-	 (iter println (__peg:stream-hist fph)))
+         (iter println (__peg:stream-hist fph)))
      (let* ((endtime (pfront_time_now))
-	    (time (f- endtime begtime))
-	    (speed (f/ (f* (f# "1000") (f/  (i->f (deref file-length)) (f# "1024.0"))) time)))
+            (time (f- endtime begtime))
+            (speed (f/ (f* (f# "1000") (f/  (i->f (deref file-length)) (f# "1024.0"))) time)))
        (if (deref pfront-benchmark-only)
-	   (println (S<< "PFront parsing: " speed " kb/sec"))))
+           (println (S<< "PFront parsing: " speed " kb/sec"))))
      (return ret)
      )))
 
@@ -134,7 +142,7 @@
 
 (macro hlevl-lfile-inner (tp texnm nm)
  (let* ((fp (generic-filepath nm))
-	(texpath (generic-filepath texnm))
+        (texpath (generic-filepath texnm))
         (oxpath (corelib:get-lookup-path)))
    (r! **hlevl-file-path** (cons fp (deref **hlevl-file-path**)))
    (if (shashget (getfuncenv) 'debug-display-include-paths)
@@ -142,16 +150,16 @@
    (register-target-dependency fp)
    (alet ret
      `(top-begin
-	(ctimex (corelib:set-lookup-path ,(_getpath fp)))
-	,@(begin
-	    (corelib:set-lookup-path (_getpath fp))
-	    ((if (eqv? tp 'literate) hlevl-consume1-tex
+        (ctimex (corelib:set-lookup-path ,(_getpath fp)))
+        ,@(begin
+            (corelib:set-lookup-path (_getpath fp))
+            ((if (eqv? tp 'literate) hlevl-consume1-tex
                                      hlevl-consume1-texinv)
-	                   texpath
-			   (mkref (peg:file->stream fp)))
-	    )
-	(ctimex (corelib:set-lookup-path ,oxpath))
-	)
+                           texpath
+                           (mkref (peg:file->stream fp)))
+            )
+        (ctimex (corelib:set-lookup-path ,oxpath))
+        )
      (r! **hlevl-file-path** (cdr (deref **hlevl-file-path**)))
      (return ret)
      )))
@@ -185,9 +193,9 @@
 (macro pfront-expand-string (str)
   (alet stream (peg:str->stream str)
   `(begin ,@(hlevl-consume peg_pfront (mkref stream)
-			       (fun (cadd flush)
-				 (fun (x) (if x (cadd x))))
-			       ))))
+                               (fun (cadd flush)
+                                 (fun (x) (if x (cadd x))))
+                               ))))
 
 
 (force-class-flush)
@@ -215,7 +223,7 @@
          (mbase-fn pfront-include fname)
          (return))
  (method ((static) (public)) object eval ((string code))
-	 (return (mbase-fn pfront-eval-string code)))
+         (return (mbase-fn pfront-eval-string code)))
  )
 
 (unit-test 4 (pfront-expand-string "2*2+1") 5)

@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -17,7 +17,7 @@
   (#define optimise-cache #t)    ; use code and const cache
   (#define optimise-cache-threshold 200)
   (#define optimise-cache-length-threshold 3000)
-  
-  (#define copyright    "(c) by Meta Alternative Ltd., 2005-2014")
+
+  (#define copyright    "(c) by Meta Alternative Ltd., 2005-2015")
 
   ))

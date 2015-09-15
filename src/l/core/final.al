@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -37,9 +37,9 @@
   ("Defines a module with a given {\tt name} and type. Default type is dll,"
    "other types available are: exe, winexe.")
     (let* ((env (alet tst (shashget (getfuncenv) '*current-cc-env*)
-		      (if tst tst (cc:newenv))))
-	   (sver (shashget (getfuncenv) 'assembly-version))
-	   (kfile (shashget (getfuncenv) 'assembly-keyfile)))
+                      (if tst tst (cc:newenv))))
+           (sver (shashget (getfuncenv) 'assembly-version))
+           (kfile (shashget (getfuncenv) 'assembly-keyfile)))
       (set-car! *toplevel-module-initp?* #t)
       (cc:env:defmodule:strong env (S<< name) (if r (car r) 'dll) sver kfile)
       (shashput (getfuncenv) '*current-cc-env* env)
@@ -56,10 +56,10 @@
 
 (macro n.report ()
   ("Print a compiler statistics for the current module to the standard output.")
-  `(late-ctime 
-    (begin 
+  `(late-ctime
+    (begin
       (cc:env:printreport
-       (cc:env:report 
+       (cc:env:report
         (shashget (getfuncenv) '*current-cc-env*)))
       '(top-begin)
       )))
@@ -69,4 +69,4 @@
 
 (function net.current-module ()
   (alet env (shashget (getfuncenv) '*current-cc-env*)
-	(cc:env:getmodule env)))
+        (cc:env:getmodule env)))

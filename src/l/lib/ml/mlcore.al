@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -46,11 +46,11 @@
     (expr DEEP (forall (cons (gensym) node)))
     (pattern DEEP (forall (cons (gensym) node)))))
 
-;- 
+;-
 ;- It is obvious that we need an environment to be able to resolve types from
 ;- type constructors and original type definitions from aliases. Simplest
 ;- way of dealing with environments is to put everything in a single hash table.
-;- 
+;-
 ;- We will use the same environment to keep types of global definitions as well.
 ;-
 
@@ -66,8 +66,8 @@
   (foreach-map (typ typs)
   (mlsrc:visit type typ
      (type DEEP
-           ((V (alet x (ht> nm) 
-                     (ast:mknode 
+           ((V (alet x (ht> nm)
+                     (ast:mknode
                       (nm
                        (if x x (alet nn (gensym)
                                      (ht! nm nn)
@@ -104,7 +104,7 @@
 (function mlnodetype (t) (car t))
 (function mlargstypes (t) (cdr t))
 
-;- 
+;-
 ;- Now we have everything that is necessary to produce type equations out of
 ;- a given ML source code.
 ;-
@@ -147,8 +147,8 @@
                  (ntype (mlnodetype ptype))
                  (atypes (mlargstypes ptype)))
             (eq-self (mlprologtype ntype))
-	    (if (not (= (length atypes) (length args)))
-		(ccerror `(ML:TYPING:CONSTR:NUMBER:OF:ARGS ,nm ,(length args))))
+            (if (not (= (length atypes) (length args)))
+                (ccerror `(ML:TYPING:CONSTR:NUMBER:OF:ARGS ,nm ,(length args))))
             (iter-over (zip (map mlprologtype atypes) (map car args))
                        (fmt (x y) (add `(equals ,x ,y))))))
          (tuple
@@ -160,11 +160,11 @@
 ;- For all the expression types other than pattern matching:
 (function mlequations ( env tsrc ieqs )
   (collector (add get)
-;= Some equations may be inherited from a top level 
+;= Some equations may be inherited from a top level
 ;= expression ([[let rec]] in particular)
     (iter add ieqs)
 ;= All other equations should be derived in an undefined order from the given
-;= source tree. 
+;= source tree.
     (mltagged:iter expr tsrc
       (oexpr DEEP
 ;= [[let]] defines a variable with the same type as its value (obviously)
@@ -203,8 +203,8 @@
          (char   (eq-selfq (char)))
          (string (eq-selfq (string)))
          (bool (eq-selfq (bool)))
-         (unit (eq-selfq (unit)))    
-;= Variable type is bound to its name. Some variables are global, in 
+         (unit (eq-selfq (unit)))
+;= Variable type is bound to its name. Some variables are global, in
 ;= this case type is taken from the environment.
          (var
           (alet a (mlgetnametype env nm)
@@ -218,8 +218,8 @@
                  (ntype (mlnodetype ptype))
                  (atypes (mlargstypes ptype)))
             (eq-self (mlprologtype ntype))
-	    (if (not (= (length atypes) (length args)))
-		(ccerror `(ML:TYPING:CONSTR:NUMBER:OF:ARGS ,nm ,(length args))))
+            (if (not (= (length atypes) (length args)))
+                (ccerror `(ML:TYPING:CONSTR:NUMBER:OF:ARGS ,nm ,(length args))))
             (iter-over (zip (map mlprologtype atypes) (map car args))
                        (fmt (x y) (add `(equals ,x ,y))))))
 ;= Tuple constructor generates a new anonymous type
@@ -249,7 +249,7 @@
      `(T ,nm ,@(map prolog->type rest)))
     ((var ($n . $$M:nm)) `(V ,(Sm<< nm "_" n)))))
 
-;- 
+;-
 ;- Equations are already in the embedded Prolog format, so, they can be
 ;- immediately evaluated (as a single goal with a default facts database).
 ;-
@@ -280,11 +280,11 @@
   (mltagged:visit topexpr texpr
     (topexpr _
       ((mlletrec
-        (ast:mknode 
-         (value (patch-types 
+        (ast:mknode
+         (value (patch-types
                  value
                  (solve-equations
-                  (mlequations env value 
+                  (mlequations env value
                     `((equals ,nm ,(car value)))))))))
        (mlletrecr
         (let* ((eqns (map-over dfs
@@ -296,9 +296,9 @@
                           (mlequations env value eqns))))
                (res (solve-equations alleqns)))
           (ast:mknode
-           (dfs (map-over dfs 
+           (dfs (map-over dfs
                    (fmt (nm value)
-                        `(,nm 
+                        `(,nm
                           ,(patch-types
                             value res))))))))
        (else
@@ -365,7 +365,7 @@
          (let
            (let* ((nname (gensym))
                   (nsubst `((,nm ,nname) ,@subst)))
-             (ast:mknode (nm nname) 
+             (ast:mknode (nm nname)
                          (value (loop value subst))
                          (body (loop body nsubst)))))
 ;= [[letrec]] node introduces new name --- [[nm]], it is visible both in body
@@ -373,7 +373,7 @@
          (letrec
            (let* ((nname (gensym))
                   (nsubst `((,nm ,nname) ,@subst)))
-             (ast:mknode (nm nname) 
+             (ast:mknode (nm nname)
                          (value (loop value nsubst))
                          (body (loop body nsubst)))))
 ;= [[letrecr]] node introduces a bunch of mutually referenced new names.
@@ -408,56 +408,56 @@
 (function ml-curry-expr ( expr )
   (mlsrc:visit expr expr
      (expr DEEP
-       ((uncurriedfun 
-	 (let loop ((a args))
-	   (p:match a
-	     (() body)
-	     (($hd . $tl) `(fun ,hd ,(loop tl))))))
-	(makelist
-	 (let loop ((e args))
-	   (p:match e
-	     (() `(constr Nil))
-	     (($hd . $tl) `(constr Cons ,hd ,(loop tl))))))
-	(cons
-	 `(constr Cons ,hd ,tl))
-	(append
-	 `(apply (apply (var append) ,a) ,b))
-	(matchfun
-	 (alet farg (gensym)
-	       `(fun ,farg (match (var ,farg) ,@ps))))
-	(if2
-	  `(match ,v ((bool #t) ,tr) ((bool #f) (unit))))
-	(if3
-	 `(match ,v ((bool #t) ,tr) ((bool #f) ,fl)))
-	(apply0
-	 (let loop ((a args) (f fn))
-	   (p:match a
-	     (($v) `(apply ,f ,v))
-	     (($ah . $r)
-	      (loop r `(apply ,f ,ah))))))
-	(else node)))
+       ((uncurriedfun
+         (let loop ((a args))
+           (p:match a
+             (() body)
+             (($hd . $tl) `(fun ,hd ,(loop tl))))))
+        (makelist
+         (let loop ((e args))
+           (p:match e
+             (() `(constr Nil))
+             (($hd . $tl) `(constr Cons ,hd ,(loop tl))))))
+        (cons
+         `(constr Cons ,hd ,tl))
+        (append
+         `(apply (apply (var append) ,a) ,b))
+        (matchfun
+         (alet farg (gensym)
+               `(fun ,farg (match (var ,farg) ,@ps))))
+        (if2
+          `(match ,v ((bool #t) ,tr) ((bool #f) (unit))))
+        (if3
+         `(match ,v ((bool #t) ,tr) ((bool #f) ,fl)))
+        (apply0
+         (let loop ((a args) (f fn))
+           (p:match a
+             (($v) `(apply ,f ,v))
+             (($ah . $r)
+              (loop r `(apply ,f ,ah))))))
+        (else node)))
      (pattern DEEP
-	((bindany
-	  `(bind ,nm (any)))
-	 (cons
-	  `(constr Cons ,a ,b))
-	 (else node)))
+        ((bindany
+          `(bind ,nm (any)))
+         (cons
+          `(constr Cons ,a ,b))
+         (else node)))
        ))
 
 ;= And a simple interface function to rescope top level expressions:
 (function ml-rescope ( texpr )
   (mlsrc:visit topexpr texpr
-     (expr _ (forall 
-	      (ml-rescope-expr 
-		      (ml-curry-expr
-		       node))))))
+     (expr _ (forall
+              (ml-rescope-expr
+                      (ml-curry-expr
+                       node))))))
 
 ;-
 ;- \subsubsection{Types pretty printing}
 ;-
 
 ;= A greek alphabet for type variables
-(define neat-args 
+(define neat-args
   '(alpha beta gamma delta epsilon zeta eta
     theta iota kappa lambda mu nu xi omicron
     pi rho sigma tau upsilon phi chi psi omega))
@@ -560,7 +560,7 @@
 ;= Register a global name type (a variable or a function)
 
 (function register-globname ( env name type )
-  (if (not (hashget env (S<< "rename: " name))) 
+  (if (not (hashget env (S<< "rename: " name)))
       (begin
         (println (S<< name "::" (mlpprint-type type)))
         (hashput env (S<< "rename: " name) (gensym))
@@ -583,7 +583,7 @@
                    (register-globname env nm (car value)))))
         (else nil)
         ))))
-        
+
 
 ;-
 ;- \subsubsection{Code generation}
@@ -615,24 +615,24 @@
       ((let
            `(alet ,nm ,value ,body))
        (letrec
-	   (p:match value
-	     ((fun $arg . $r)
-	      `(let ((,nm (inner.reclambda ,nm ,arg ,@r)))
-		 ,body))
-	     (else
-	      `(letrec ((,nm ,value)) ,body))))
+           (p:match value
+             ((fun $arg . $r)
+              `(let ((,nm (inner.reclambda ,nm ,arg ,@r)))
+                 ,body))
+             (else
+              `(letrec ((,nm ,value)) ,body))))
        (letrecr
            `(letrec ,dfs ,body))
        (begin
            `(begin ,@es))
-       (fun 
+       (fun
            `(fun (,arg) ,body))
        (apply
            `(,fn ,arg))
 ;= More expression types:
        (constr
-	(if (eqv? nm 'Deref)
-	   `(list 'Deref (fun (_) ,(car args)))
+        (if (eqv? nm 'Deref)
+           `(list 'Deref (fun (_) ,(car args)))
            `(list (quote ,nm) ,@args)))
        (tuple
            `(list ,@args))
@@ -641,9 +641,9 @@
        (char   v)
        (string v)
        (bool (p:match v
-	       (true #t)
-	       (false #f)
-	       (else v)))
+               (true #t)
+               (false #f)
+               (else v)))
        (unit 'nil)
        (match
         `(p:match ,arg ,@ps))))
@@ -656,8 +656,8 @@
           `(,(Sm<< "$$AS:" nm) ,@p))))
       (constr
        (if (eqv? nm 'Deref)
-	   `($$FF ml-deref-force ,@(car args))
-	   `(,nm ,@args)))
+           `($$FF ml-deref-force ,@(car args))
+           `(,nm ,@args)))
       (tuple args)
       (number v)
       (char   `($$F (fun (x) (eq? x ,v))))
@@ -689,14 +689,14 @@
        (mlexport
         (alet args (formap (i 0 nargs) (gensym))
          `(define ,(Sm<< exportname)
-            (fun ,args 
+            (fun ,args
               ,(let loop ((a args) (res (mlrenamed env nm)))
                  (p:match a
                    (($hd . $tl) (loop tl `(,res ,hd)))
                    (else res)))))))
        (mbinclude
-	(alet res `(include ,fname)
-	  res))
+        (alet res `(include ,fname)
+          res))
        (mllet `(define ,(mlrenamed env nm) ,value))
        (mlletrec (p:match value
                    ((fun ($a) . $b)
@@ -714,10 +714,10 @@
                              `(,(mlrenamed env nm) ,value))))))
                (tn (gensym)))
           `(top-begin
-             (define ,tn 
+             (define ,tn
                (letrec ,body
                  (list ,@(map car body))))
-             ,@(mapi 
+             ,@(mapi
                  (fun (i v)
                     `(define ,(car v) (nth ,i ,tn)))
                  body
@@ -750,9 +750,9 @@
                      (add (compile-ml-top env node))))
          (mlannotate (register-globname env nm tp))
          (mbinclude (add (compile-ml-top env node)))
-         (mlinclude (loop 
-		     (peg:easyparse peg_mbaseml
-				    (peg:file->stream fname))
+         (mlinclude (loop
+                     (peg:easyparse peg_mbaseml
+                                    (peg:file->stream fname))
                      ))
          (else nil))))
      t_MBaseException
@@ -770,7 +770,7 @@
           (mlinclude nil)
           (mbinclude nil)
           (mlexport nil)
-          (else 
+          (else
            (let* ((src (ml-rescope node))
                   (tpy (ml-typing env (tagify src))))
              (register-top env tpy)
@@ -780,15 +780,15 @@
        (writeline `(ERROR IN ,t : ,(mbaseerror x))))))
 ;= Return the collected compiled result:
   (get))))
-       
+
 ;-
 ;- And a macro interface to [[ml-driver]]:
 ;-
 
 (function ml-inner (envnm src)
   (try
-   (let* ((src1 
-	   (peg:easyparse peg_mbaseml src))
+   (let* ((src1
+           (peg:easyparse peg_mbaseml src))
           (res (ml-driver (shashget (getfuncenv) envnm) src1)))
      `(top-begin
         ,@res))
@@ -828,25 +828,25 @@
   (let loop ((v vlu) (i #f) (tl #f))
     (p:match v
       ((Cons $a (Nil)) (S<< (if tl "" "[")
-                            (loop a #f #f) 
+                            (loop a #f #f)
                             (if tl "" "]")))
       ((Cons $a $b) (S<< (if tl "" "[") (loop a #f #f) ";" (loop b #f #t)
                          (if tl "" "]")))
       ((Nil) "[]")
       (($$M:tag . $rest)
        (S<< (if i "(")
-            tag (if rest 
+            tag (if rest
                     (S<< " " (strinterleave (map (cut loop <> #t #f) rest) " "))
                     "")
             (if i ")")))
-      ($$L:rest 
+      ($$L:rest
        (S<< (if i "(")
             (if rest (strinterleave (map (cut loop <> #t #f) rest) " "))
             (if i ")")))
       ($$S:str
        (S<< "\"" str "\""))
       (() "NIL?")
-      (else 
+      (else
        (if (char? v) (S<< "'" v "'") (->s v))))))
 
 ;-
@@ -865,4 +865,4 @@
 
 ;-
 ;- \end{document}
-;-    
+;-

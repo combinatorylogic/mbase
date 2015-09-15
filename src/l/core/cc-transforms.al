@@ -2,32 +2,41 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;-
 ;- \subsection{Pre--compilation transforms}
 ;-
-
+(function cc:recentry-fix ( expr rentry )
+  (cc:mbcoreast:visit expr expr
+    (expr _
+      ((Fun
+        (if recname node
+            (ast:mknode (recname rentry))))
+       (else node)))))
 
 (function cc:scope-transform ( ast )
   (<> ast
-   (ast:revisit scopeloop ((substs nil) (rrec nil) (rentry nil)) cc:mbcoreast expr
+    (ast:revisit scopeloop ((substs nil) (rrec nil) (rentry nil))
+                   cc:mbcoreast expr
 ;= [[SLet]] introduces new variables, visible inside the body scope only.
-      ((SLet 
+      ((SLet
         (let* ((newnames (map (fun (_) (gensym)) defs))
-               (nsubs
-                (append (mapn 
+               (ntsubs (mapn
                           (fun (nn on)
                                `(,nn ,on loc))
-                          (map car defs) newnames)
+                          (map car defs) newnames))
+               (nsubs
+                (append ntsubs
                         substs))
-               (newdefs 
+               (newdefs
                 (map-over (czip newnames defs)
                    (fmt (nnm onm dfn)
-                        `(,nnm ,(scopeloop dfn substs rrec onm))))))
+                        `(,nnm ,(scopeloop (cc:recentry-fix dfn (Sm<< onm "_" nnm))
+                                           substs rrec onm))))))
           `(SLet ,newdefs ,(scopeloop body nsubs rrec nil))))
 ;= [[SLetRec]] introduces new variables, visible within the scope of all value definitions
 ;= as well as in the body scope.
@@ -49,21 +58,22 @@
                           (map car defs) newnames
                           )
                         substs))
-               (newdefs 
+               (newdefs
                 (map-over (czip newnames defs)
                    (fmt (nnm onm dfn)
-                        `(,nnm ,(scopeloop dfn nsubs1 nrrec onm))))))
+                        `(,nnm ,(scopeloop (cc:recentry-fix dfn onm)
+                                           nsubs1 nrrec onm))))))
           `(SLetRec ,newdefs ,(scopeloop body nsubs2 rrec nil))))
 ;= Lambda abstraction introduces new variables (arguments), visible inside
 ;= function body only.
        (Fun
-        (let* ((newnames 
+        (let* ((newnames
                 (map (fun (_) (gensym)) args))
-               (rrecname (if recname recname rentry))
-               (newrecname 
+               (rrecname recname)
+               (newrecname
                 (if rrecname
-                    (list 
-                     rrecname 
+                    (list
+                     rrecname
                      (if (eqv? rrecname rentry)
                          (alet fnd (find (fmt (onm) (eqv? onm rrecname))
                                          substs)
@@ -81,11 +91,11 @@
                            (fun (x)
                              (format x (nn on tp)
                                (case tp
-                                 ((rec) 
+                                 ((rec)
                                   (if (memq nn rrec) x
                                       `(,nn ,on loc)))
                                  (else x))))))
-               (nsubs0 
+               (nsubs0
                 (append nsubsa nsubsb))
                (nsubs (if newrecname (append nsubsa (cons newrecname nsubsb))
                           nsubs0))
@@ -94,7 +104,7 @@
           `(Fun ,nrn ,newnames ,(scopeloop body nsubs nil nil))))
 ;= [[Var]] is referencing to a local variable ([[SLet]]--defined), an
 ;= argument or a global variable, which is (by definition) any variable not in the local
-;= substitutions list. No environment is available at this stage, and we can't 
+;= substitutions list. No environment is available at this stage, and we can't
 ;= actually check if the global name is defined.
        (Var
         (let* ((fnd (find (fmt (onm) (eqv? onm id))
@@ -132,11 +142,11 @@
 ;= or a global one. Trying to modify an argument is an error.
        (Set
         (let* ((fnd (find (fmt (onm) (eqv? onm nm)) substs))
-               (ref 
+               (ref
                 (if fnd
                     (format fnd (_ nnm tp)
                       `(,(case tp ((loc) 'Var)
-                          ((arg) 
+                          ((arg)
                            (cc:comperror `(CC00-ARGM ,nnm))
                            )) ,nnm))
                     `(Glob ,nm))))
@@ -176,17 +186,17 @@
    (do `((Init retexpression ,rv) ,@(get))
     (where
      (rv
-      (<> ast
-       (ast:revisit liftloop ((bound nil) (rrec nil) (stickyname nil))
-                    cc:mbcoreast expr
+      (let liftloop ((expr ast) (bound nil) (rrec nil) (stickyname nil))
+        (cc:mbcoreast:visit expr expr
+         (expr _
 ;= [[SLet]] is the only mean of local variables definition, adding new bound names
 ;= to the current list of bound variables.
          ((SLet
            (let* ((nbound (append (map car defs) bound))
-                  (ndefs 
+                  (ndefs
                    (map-over defs
                     (fmt (nm vl)
-                         `(,nm ,(liftloop vl bound nil stickyname))))))
+                     `(,nm ,(liftloop vl bound nil stickyname))))))
              (ast:mknode
               (defs ndefs)
               (body (liftloop body nbound nil stickyname)))))
@@ -195,7 +205,7 @@
            (alet newvl (liftloop vl bound (if (eqv? recp 'rec)
                                               nm nil) nm)
              (add
-              `(Init funref 
+              `(Init funref
                      ,(ast:mknode (vl newvl))))
              (add
               `(Funref ,nm ,(p:match newvl
@@ -206,8 +216,8 @@
           (GSet
            (begin
              (add `(Global ,nm ,nm
-                           (GSet ,nm 
-                                 ,(liftloop vl bound nil 
+                           (GSet ,nm
+                                 ,(liftloop vl bound nil
                                             (Sm<< "glob+" nm)
                                             ))))
              '(Dummy)))
@@ -228,38 +238,39 @@
 ;= All [Fun] instances must be lifted, either as a direct reference to a new
 ;= globally defined function or as a closure generator application.
           (Fun
-           (let* ((vars 
+           (let* ((vars
                    (cc:count-refs body))
-                  (env 
+                  (env
                    (cc:intersection bound vars))
-                  (nbody (liftloop body 
+                  (nbody (liftloop body
                                    (append
                                     (if recname (list recname) nil)
                                     (append args bound))
                                    recname
                                    stickyname
                                    ))
-                  (newname 
+                  (newname
                    (if recname recname (gensym)))
                   )
              (if (null? env) ; Simple function
                  (begin
-                   (add 
+                   (add
                     `(Simple ,newname ,(cc:sticky stickyname newname)
                              (Fun ,newname ,args ,nbody)))
                    `(Funref ,newname))
                  (begin      ; Otherwise it is a closure
-                   (add 
-                    `(Closure ,newname ,(cc:sticky stickyname newname) 
-                              ,env (Fun ,newname ,args ,nbody)))
-                   `(App (Glob ,newname) 
+                   (add
+                    `(Closure ,newname ,(cc:sticky stickyname newname)
+                              ,env (Fun ,(Sm<< newname "_POOP") ,args ,nbody)))
+                   `(App (Glob ,newname)
                       ,@(foreach-map (e env)
                           (alet tp (hashget vars e)
                                 `(,tp ,e)))))
-                 ))))
-         ()
-         )))))))
-  )
+                 )))
+          (else-deep ((else node)))
+
+          ))))))))))
+
 
 (function cc:clean-dummy ( lifted )
   (cc:mbcoreast:visit lifted lifted
@@ -282,7 +293,7 @@
          (with-hash (h)
            (foreach (i args) (h! i #t))
            (ast:mknode
-            (e 
+            (e
              (cc:convert-tail-helper refname
                (cc:mbcoreast:visit expr e
                  (expr DEEP
@@ -297,10 +308,10 @@
                     (else node))))))))))
        (Simple
         (alet refname name
-          (ast:mknode 
+          (ast:mknode
            (e
-            (cc:convert-tail-helper 
-             name 
+            (cc:convert-tail-helper
+             name
              (cc:mbcoreast:visit expr e
                (expr DEEP
                 (

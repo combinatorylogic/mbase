@@ -2,8 +2,8 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-// This file is distributed under the terms of the Q Public License version 1.0.
+// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+//
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -11,7 +11,7 @@
 
  This is a collection of basic definitions for PFront syntax. It is written in
  the language defined by the MBasePackrat library, and it is somewhat different
- from MiniPEG language embedded into PFront itself. See the MBasePackrat 
+ from MiniPEG language embedded into PFront itself. See the MBasePackrat
  documentation for reference.
 
 */
@@ -26,12 +26,12 @@ parser pfcommon (
 
  EOF := -1;
 
- Space  := ' ' / TAB / CR / NEWLINE / TexComment 
+ Space  := ' ' / TAB / CR / NEWLINE / TexComment
          / SingleLineComment / MultiLineComment;
  Spaces := Space+;
  MultiLineComment  := '/*' (MultiLineComment/((!('*/')) . ))* '*/' => {state=comment};
  SingleLineComment := '//' (!(NEWLINE) .)* NEWLINE => {state=comment};
- TexComment := (TexCommentBegin TexCommentRest) / 
+ TexComment := (TexCommentBegin TexCommentRest) /
                (TexComment2Begin TexComment2Rest TexComment2End);
  TexCommentBegin := '///' => {state=empty};
  TexCommentRest := (!(NEWLINE) .)* NEWLINE => {screen = none} {state=texcomment};
@@ -51,7 +51,7 @@ parser pfcommon (
  token Ident := !pfKeyword iIdent;
  token tIdent := iIdent;
 
- pfKeywordI := 
+ pfKeywordI :=
                'function'
             /  'ast'
             /  'parser'
@@ -71,11 +71,11 @@ parser pfcommon (
  TAB := 9;
 
 
- define cslist<a,b> := 
+ define cslist<a,b> :=
                         {a:head b cslist:tail => $cons(head,tail)}
                       / {a:head => $wrap(head)};
 
- define ecslist<a,b> := 
+ define ecslist<a,b> :=
                         {a:head b cslist<a,b>:tail => $cons(head,tail)}
                       / {a:head => $wrap(head)}
                       / {!a => $nil() };
@@ -89,11 +89,11 @@ parser pfcommon (
 
  term ident := {Ident:i => {ctoken = ident} $sval(i)}
             /  {Ident1pfx Ident1:i Ident1tail => {ctoken = ident} $sval(i)}
-	    /  {Ident2:i => {ctoken = ident} $sccval(i)}
-	    ;
+            /  {Ident2:i => {ctoken = ident} $sccval(i)}
+            ;
 
  token dnetnstk := (Letter IdentRest* '.'?)+;
- term dnetns := dnetnstk:s => $sval(s); 
+ term dnetns := dnetnstk:s => $sval(s);
 
  token tNumber := '-'? Digit+;
  term number := tNumber:v => {ctoken = const} $nval(v);
@@ -117,7 +117,7 @@ parser pfcommon (
 
  token tBinOp0 := tLogAnd/tLogOr;
  token tBinOp1 := '+.'/'+'/'-.'/'-' => {ctoken = lexic};
- token tBinOp2 := '*.'/'*'/'/.'/'/'/'mod' => {ctoken = lexic};
+ token tBinOp2 := '*.'/'*'/'/.'/'/' => {ctoken = lexic};
  token tBinOp3R := '$=='/'==='/'!=='/'>='
                  /'<='/'<'/'>' => {ctoken = lexic};
  token tBinOp3 := tBinOp3R/tBinEq/tBinNeq;

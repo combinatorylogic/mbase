@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -14,7 +14,7 @@
    ((and (null? a) (null? b)) #t)
    ((and (list? a) (list? b))
     (and (deep-comp (car a) (car b))
-	 (deep-comp (cdr a) (cdr b)) ))
+         (deep-comp (cdr a) (cdr b)) ))
    (else (eq? a b))))
 
 (cmacro unit-test (level src exp)
@@ -28,7 +28,7 @@
      (when tests
        (set-car! tests (cons (list level 'I code nil) (car tests))))
      `(begin )))
-  
+
 
 (macro unit-tests-use ()
   (shashput (getfuncenv) 'unit-tests-destination (cons nil nil))

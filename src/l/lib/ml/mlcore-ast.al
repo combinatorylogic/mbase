@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -46,16 +46,16 @@
     (append <expr:a> <expr:b>)
     (if2 <expr:v> <expr:tr>)
     (if3 <expr:v> <expr:tr> <expr:fl>)
-    
+
 
 ;= Normal nodes
 
-    
+
     (apply <expr:fn> <expr:arg>)
     (match <expr:arg> . <*matchptn:ps>)
     (constr <ident:nm> . <*expr:args>)
     (tuple . <*expr:args>)
-    
+
     (var <ident:nm>)
     (number <num:v>)
     (char   <chr:v>)
@@ -88,7 +88,7 @@
 ;= or type variables.
   (type (| (T <ident:nm> . <*type:args>)
            (TPL . <*type:args>)
-	   (F <type:t> <type:r>)
+           (F <type:t> <type:r>)
            (V <ident:nm>)))
 
 ;= Type definitions can produce name aliases, named tuples and variants.

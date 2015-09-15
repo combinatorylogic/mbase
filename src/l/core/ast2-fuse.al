@@ -75,35 +75,51 @@
 
 
 (function ast-get-variant-node-full-pattern (ast ni)
-  (format ast (n p d v)
+  (format ast (nm p d v)
      (let* ((n (ohashget d ni)))
+       (if (not n) (ccerror `(MISSING-NODE1 ,ni)))
        (astlang:visit astnode n
           (astnode _
             ((varnode vs)
              (else (ccerror `(NOT-A-SIMPLE-NODE ,n)))))))))
 
 (function ast-get-simple-node-pattern (ast ni)
-  (format ast (n p d v)
+  (format ast (nm p d v)
      (let* ((n (ohashget d ni)))
+       (if (not n) (ccerror `(MISSING-NODE2 ,ni)))
        (astlang:visit astnode n
           (astnode _
             ((simple p)
              (else (ccerror `(NOT-A-SIMPLE-NODE ,n)))))))))
 
 (function ast-get-variant-node-body (ast ni)
-  (format ast (n p d v)
+  (format ast (nm p d v)
     (let* ((n (ohashget d ni)))
+       (if (not n) (ccerror `(MISSING-NODE3 ,ni)))
        (astlang:visit astnode n
           (astnode _
             ((varnode vs)
              (else (ccerror `(NOT-A-VARIANT-NODE ,n)))))))))
 
+(function ast-get-variant-node-body-tmp (ast ni)
+  (format ast (nm p d v)
+    (let* ((n (ohashget d ni)))
+      (if n
+       (astlang:visit astnode n
+          (astnode _
+            ((varnode vs)
+             (else (ccerror `(NOT-A-VARIANT-NODE ,n))))))
+       '()))))
+
 (function ast-get-variant-pattern (ast ni tag)
-  (format ast (n p d v)
+  (format ast (nm p d v)
     (let* ((n (ohashget v (Sm<< ni " : " tag))))
+       (if (not n) (ccerror `(MISSING-TAG ,ni ,tag)))
        (astlang:visit variant n
           (variant _
             ((v p)))))))
+
+
 
 (function ast-get-node (ast ni)
   (format ast (n p d v)
@@ -215,7 +231,7 @@
          `(deep (id ,id)
             () ; opts
             (vars ,vs
-              ,(ast-get-variant-node-body astD id)
+              ,(ast-get-variant-node-body-tmp astD id)
               ,(foreach-map (v vs)
                  (astlang:visit variant v
                     (variant _ ((v
@@ -271,8 +287,8 @@
                              ,e)))
           (vars   (fun (n os)
                     `(vars
-                      ,(ast-get-variant-node-body astS n)
-                      ,(ast-get-variant-node-body astD (tgtnode n os))
+                      ,(ast-get-variant-node-body-tmp astS n)
+                      ,(ast-get-variant-node-body-tmp astD (tgtnode n os))
                       ,vs ,ds ,e)))))
        (visitorexpr DEEP
          ((visitor
@@ -281,10 +297,10 @@
              ,from
              ,to
              ,opts
-             
+
              ,src
              ,srctp
-             
+
              (,srcast)
              (,dstast)
 

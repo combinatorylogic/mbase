@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -18,7 +18,7 @@
 
 ;; 1. System.Collections.Stack
 
-(function stack:new () 
+(function stack:new ()
   "New [Stack] instance"
   ((r_constr t_Stack)))
 
@@ -167,13 +167,13 @@
   (format aaa (addname . gets)
    (with-syms (que)
     `(let* ((,que (queue:new))
-	    (,addname (cut queue:add ,que <>))
-	    ,@(if (null? (car gets)) nil
-		  `((,(car gets) (fun () (queue:get ,que)))))
-	    ,@(if (null? (cdr gets)) nil
-		  `((,(cadr gets) 
-		     (fun () (let loop ()
-			       (if (< (queue:length ,que) 1) nil
-				   (cons (queue:get ,que) (loop)))))))))
+            (,addname (cut queue:add ,que <>))
+            ,@(if (null? (car gets)) nil
+                  `((,(car gets) (fun () (queue:get ,que)))))
+            ,@(if (null? (cdr gets)) nil
+                  `((,(cadr gets)
+                     (fun () (let loop ()
+                               (if (< (queue:length ,que) 1) nil
+                                   (cons (queue:get ,que) (loop)))))))))
        ,@body))))
 

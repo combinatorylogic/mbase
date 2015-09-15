@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -68,7 +68,7 @@
               (loop n (cons cv cuent) stk nil)
               )))))))
 
-(function tthashget (h v) 
+(function tthashget (h v)
   (alet r (hashget h v)
     (if r r "")))
 
@@ -77,7 +77,7 @@
          (rst (if m (cdr lst) lst)))
     (if m (fprint file (S<< "{" (tthashget colours m) "{")))
     (foreach (x rst)
-      (if (list? x) 
+      (if (list? x)
           (print-colored-stream file tabs colours x)
           (fprint file (tabs (S<< x)))))
     (if m (fprint file "}}"))))
@@ -120,10 +120,10 @@
                  ((deref tabsfun) str)
                  )))
     (fprint file tr)))
-    
+
 
 (function print-rle-stream (file tabs colour henv stream endstream)
-  (let loop ((p stream) (state "")  
+  (let loop ((p stream) (state "")
              (clean? #t)
              (clect nil) (xstate nil)
              )
@@ -178,7 +178,7 @@
           (if (eqv? (car ii) t)
               (cons (cons t (cdr s)) (cdr i))
               (cons ii (loop (cdr i) t)))))))
-          
+
 (function pp-defaultmerge2 (s l)
   (let loop ((i l) (t (car s)))
     (if (null? i) (list s)

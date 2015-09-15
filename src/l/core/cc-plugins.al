@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -17,7 +17,7 @@
   (let loop ((lst (cdr lst0)) (e e0))
    (if (null? lst) e
        (alet res ((car lst) e)
-	     (loop (cdr lst) res)))))
+             (loop (cdr lst) res)))))
 
 (function  cc:core-plugins (e)
   (cc:apply-plugins cc:core-plugins-list e))
@@ -30,7 +30,7 @@
 
 (function  cc:flat-plugins (e)
   (cc:apply-plugins cc:flat-plugins-list e))
- 
+
 (function  cc:dotnet-plugins (e)
   (cc:apply-plugins cc:dotnet-plugins-list e))
 

@@ -71,12 +71,12 @@ function prolog_repl_once(str, prev)
 #(function plg_read_eval_print_loop (redr)
   (let loop ((buf nil) (prev nil))
     (if (null? buf) (print "<< "))
-    (format 
+    (format
      (p:match buf
        (($a $b . $r) (list a b))
        (else (list 0 0)))  (a b)
      (if (and (eq? a sem) (eq? b sem))
-         (let ((nprev (prolog_repl_once 
+         (let ((nprev (prolog_repl_once
                    (list->string (reverse (cddr buf))) prev)))
            (loop nil nprev))
          (alet chr (not.neth ((System.IO.StreamReader redr))
@@ -91,13 +91,13 @@ function prolog_repl_once(str, prev)
 \pfcode{
 function main()
 {
-  #(corelib:set-lookup-path 
+  #(corelib:set-lookup-path
      (not.neth ()
          (leave
           (System.IO.Directory@GetCurrentDirectory))));
   #(plg_read_eval_print_loop
    (not.neth ()
-       (leave ((object)(new System.IO.StreamReader 
+       (leave ((object)(new System.IO.StreamReader
                             (System.Console@OpenStandardInput))))))}}
 
 %%%%%%%%%%%%%

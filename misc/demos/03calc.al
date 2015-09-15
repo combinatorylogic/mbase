@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -12,7 +12,7 @@
 ;-
 ;-
 
-;- In previous examples the AST was interpreted. Now we will translate it into MBase language so it 
+;- In previous examples the AST was interpreted. Now we will translate it into MBase language so it
 ;- can be compiled and executed as MBase code.
 ;-
 
@@ -30,13 +30,13 @@
     (const <number:v>))))
 ;}}
 
-;- This transform is simple again, simpler than the 
+;- This transform is simple again, simpler than the
 ;- previous interpreter, since it generates MBase code directly
 ;- and MBase itself will deal with variable bindings.
 (function compile (ex)
     (calc03:visit expr ex
       (expr DEEP
-	((const `(f# ,v))
+        ((const `(f# ,v))
          (var   nm)
          (let   `(alet ,nm ,val ,body))
          (plus  `(f+ ,a ,b))

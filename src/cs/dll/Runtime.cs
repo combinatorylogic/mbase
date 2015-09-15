@@ -2,8 +2,8 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-// This file is distributed under the terms of the Q Public License version 1.0.
+// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+//
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -32,83 +32,83 @@ namespace Meta.Scripting
       Precompiler.symbols[_ss("*MODULE-SEARCH-PATH*")] =
         new Pair(Symbol.make("bootlib"),
                  new Pair(Symbol.make("corelib"), null));
-      Precompiler.symbols[_ss("nil")] = null;    
+      Precompiler.symbols[_ss("nil")] = null;
       Precompiler.symbols[_ss("bool-false")] = _false;
-      n("+", new SimpleCode(add), "_add");  
-      n("-", new SimpleCode(sub), "_sub");  
+      n("+", new SimpleCode(add), "_add");
+      n("-", new SimpleCode(sub), "_sub");
 
-      n(">", new SimpleCode(gt), "_gt"); 
-      n("<", new SimpleCode(lt), "_lt"); 
-      n(">=", new SimpleCode(ge), "_ge"); 
-      n("<=", new SimpleCode(le), "_le"); 
-      n("=", new SimpleCode(eq), "_eq");  
-      n("eqv?", new SimpleCode(eqv), "_eqv"); 
-      n("eq?", new SimpleCode(eqp), "_eqp");  
+      n(">", new SimpleCode(gt), "_gt");
+      n("<", new SimpleCode(lt), "_lt");
+      n(">=", new SimpleCode(ge), "_ge");
+      n("<=", new SimpleCode(le), "_le");
+      n("=", new SimpleCode(eq), "_eq");
+      n("eqv?", new SimpleCode(eqv), "_eqv");
+      n("eq?", new SimpleCode(eqp), "_eqp");
 
-      n("cons", new SimpleCode(cons), "_cons"); 
-      n("car", new SimpleCode(car), "_car");  
+      n("cons", new SimpleCode(cons), "_cons");
+      n("car", new SimpleCode(car), "_car");
       n("cdr", new SimpleCode(cdr), "_cdr");
 
-      n("set-cdr!", new SimpleCode(setcdr)); 
-      n("set-car!", new SimpleCode(setcar)); 
+      n("set-cdr!", new SimpleCode(setcdr));
+      n("set-car!", new SimpleCode(setcar));
 
 
-      n("null?", new SimpleCode(nullp), "_nullp"); 
-      n("list?", new SimpleCode(pairp), "_Pairp"); 
-      n("pair?", new SimpleCode(pairp), "_Pairp"); 
-      n("string?", new SimpleCode(stringp), "_stringp"); 
-      n("symbol?", new SimpleCode(symbolp), "_symbolp"); 
-      n("char?", new SimpleCode(charp), "_charp"); 
-      n("number?", new SimpleCode(numberp), "_numberp"); 
-      n("boolean?", new SimpleCode(booleanp), "_booleanp"); 
+      n("null?", new SimpleCode(nullp), "_nullp");
+      n("list?", new SimpleCode(pairp), "_Pairp");
+      n("pair?", new SimpleCode(pairp), "_Pairp");
+      n("string?", new SimpleCode(stringp), "_stringp");
+      n("symbol?", new SimpleCode(symbolp), "_symbolp");
+      n("char?", new SimpleCode(charp), "_charp");
+      n("number?", new SimpleCode(numberp), "_numberp");
+      n("boolean?", new SimpleCode(booleanp), "_booleanp");
 
-      n("symbol->string", new SimpleCode(any2string), "_any2string"); 
-      n("any->string", new SimpleCode(any2string), "_any2string");    
-      n("string->symbol", new SimpleCode(string2symbol), "_string2symbol"); 
+      n("symbol->string", new SimpleCode(any2string), "_any2string");
+      n("any->string", new SimpleCode(any2string), "_any2string");
+      n("string->symbol", new SimpleCode(string2symbol), "_string2symbol");
       n("string-append", new SimpleCode(stringappend), "_stringappend");
 
-      n("ascii", new SimpleCode(ascii), "_ascii"); 
+      n("ascii", new SimpleCode(ascii), "_ascii");
       n("mkchar", new SimpleCode(mkchar), "_mkchar");
 
-      n("string->list", new SimpleCode(string_to_list), "_string_to_list"); 
-      n("list->string", new SimpleCode(list_to_string), "_list_to_string"); 
+      n("string->list", new SimpleCode(string_to_list), "_string_to_list");
+      n("list->string", new SimpleCode(list_to_string), "_list_to_string");
 
 
       n("eval", new SimpleCode(eval));
 
-      n("mkhash", new SimpleCode(mkhash), "_mkhash"); 
-      n("mkshash", new SimpleCode(mkshash), "_mkshash"); 
-      n("ohashget", new SimpleCode(ohashget), "_ohashget"); 
-      n("hashget", new SimpleCode(hashget), "_hashget"); 
-      n("ohashput", new SimpleCode(ohashput), "_ohashput"); 
-      n("hashput", new SimpleCode(hashput), "_hashput"); 
-      n("shashget", new SimpleCode(shashget), "_shashget"); 
+      n("mkhash", new SimpleCode(mkhash), "_mkhash");
+      n("mkshash", new SimpleCode(mkshash), "_mkshash");
+      n("ohashget", new SimpleCode(ohashget), "_ohashget");
+      n("hashget", new SimpleCode(hashget), "_hashget");
+      n("ohashput", new SimpleCode(ohashput), "_ohashput");
+      n("hashput", new SimpleCode(hashput), "_hashput");
+      n("shashget", new SimpleCode(shashget), "_shashget");
       n("shashput", new SimpleCode(shashput), "_shashput");
-      
-      
-      n("def", new SimpleCode(def), "_ccdef"); 
-      n("defmacro", new SimpleCode(defmacro), "_ccdefmacro"); 
+
+
+      n("def", new SimpleCode(def), "_ccdef");
+      n("defmacro", new SimpleCode(defmacro), "_ccdefmacro");
       n("ccdef", new SimpleCode(__ccdef), "_ccdef");
       n("ccdefmacro", new SimpleCode(defmacro), "_ccdefmacro");
       n("getmacroenv", new SimpleCode(getmacroenv));
       n("getfuncenv", new SimpleCode(getfuncenv));
 
-      n("symbol-starts-with", new SimpleCode(symbol_starts_with), "_symbol_starts_with"); 
-      n("string-escape", new SimpleCode(stringescape)); 
+      n("symbol-starts-with", new SimpleCode(symbol_starts_with), "_symbol_starts_with");
+      n("string-escape", new SimpleCode(stringescape));
 
       initreflection();
     }
-    
+
     private static void initreflection()
     {
-      n("aget", new SimpleCode(aget), "_aget"); 
-      n("aset", new SimpleCode(aset), "_aset"); 
-      n("anew", new SimpleCode(anew), "_anew"); 
-      n("alength", new SimpleCode(alength), "_alength"); 
-      n("mkvector", new SimpleCode(vector), "_vector");  
+      n("aget", new SimpleCode(aget), "_aget");
+      n("aset", new SimpleCode(aset), "_aset");
+      n("anew", new SimpleCode(anew), "_anew");
+      n("alength", new SimpleCode(alength), "_alength");
+      n("mkvector", new SimpleCode(vector), "_vector");
       n("mkovector", new SimpleCode(ovector), "_ovector");
-      
-      n("mkbytevector", new SimpleCode(mkbytevector), "_mkbytevector"); 
+
+      n("mkbytevector", new SimpleCode(mkbytevector), "_mkbytevector");
 
       n("r_gettype", new SimpleCode(getType), "_getType");
       n("r_typename", new SimpleCode(getTypeName), "_getTypeName");
@@ -123,28 +123,28 @@ namespace Meta.Scripting
       n("r_debool", new SimpleCode(r_debool), "_r_debool");
       initextra();
     }
-    
+
     private static void initextra()
     {
       Precompiler.symbols[_ss("*asms*")] = assmblys;
 
-      n("*", new SimpleCode(mul), "_mul"); 
-      n("/", new SimpleCode(div), "_div"); 
-      n("%", new SimpleCode(mod));         
+      n("*", new SimpleCode(mul), "_mul");
+      n("/", new SimpleCode(div), "_div");
+      n("%", new SimpleCode(mod));
 
       n("number->string", new SimpleCode(any2string), "_any2string");
 
-      n("set-lookup-path", new SimpleCode(setXpath),"_setXpath"); 
-      n("get-lookup-path", new SimpleCode(getXpath),"_getXpath"); 
+      n("set-lookup-path", new SimpleCode(setXpath),"_setXpath");
+      n("get-lookup-path", new SimpleCode(getXpath),"_getXpath");
 
-      n("bitand", new SimpleCode(bitand), "_bitand"); 
-      n("bitor", new SimpleCode(bitor), "_bitor");    
+      n("bitand", new SimpleCode(bitand), "_bitand");
+      n("bitor", new SimpleCode(bitor), "_bitor");
 
-      n("symhash", new SimpleCode(symhash), "_symhash"); 
+      n("symhash", new SimpleCode(symhash), "_symhash");
 
-      n("print", new SimpleCode(tprint),"_tprint"); 
+      n("print", new SimpleCode(tprint),"_tprint");
 
-      n("println", new SimpleCode(tprintln),"_tprintln"); 
+      n("println", new SimpleCode(tprintln),"_tprintln");
 
       n("int:apply", new SimpleCode(int_apply));
 
@@ -686,7 +686,7 @@ namespace Meta.Scripting
       if (p != null && p.car != null) t = p.car.GetType(); else t = Type.GetType("System.Object");
       if ( p == null || p.car == null )
         return Array.CreateInstance(t, 0);
-                
+
       int l = p.length();
       Array ar =
         Array.CreateInstance(t, l);
@@ -761,7 +761,7 @@ namespace Meta.Scripting
     static Object r_boolmethodp(Object[] f)
     {
       return _r_boolmethodp(f[0]);
-        
+
     }
 
     public static object _r_boolmethodp(object f0)
@@ -781,7 +781,7 @@ namespace Meta.Scripting
       if ((Boolean)f) return _true;
       return null;
     }
-     
+
 
     static Object getType(Object[] f)
     {
@@ -840,7 +840,7 @@ namespace Meta.Scripting
           i++;
         }
       return b;
-    }            
+    }
 
     static Object getTypeSName(Object[] f)
     {
@@ -1471,14 +1471,14 @@ namespace Meta.Scripting
 
   public class DebugHelper
   {
-    public static void 
+    public static void
     setDebuggable(System.Reflection.Emit.AssemblyBuilder assemblyBuilder)
     {
       Type daType = typeof(DebuggableAttribute);
-      ConstructorInfo daCtor = 
+      ConstructorInfo daCtor =
         daType.GetConstructor(new Type[] {
             typeof(DebuggableAttribute.DebuggingModes) });
-      CustomAttributeBuilder daBuilder = 
+      CustomAttributeBuilder daBuilder =
         new CustomAttributeBuilder(daCtor, new object[] {
             DebuggableAttribute.DebuggingModes.DisableOptimizations |
             DebuggableAttribute.DebuggingModes.Default });

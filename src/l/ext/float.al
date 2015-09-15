@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -22,7 +22,7 @@
 (define flt:abs (r_tsbind "System.Math" "Abs" "System.Double"))
 
 (macro f.op (nm op)
- `(function ,nm (a b) 
+ `(function ,nm (a b)
    (n.asm ( a b )
       (expr a)
       (Unbox ,t_Double)
@@ -64,7 +64,7 @@
 (define rnext (r_tbind "System.Random" "Next" int))
 (function random ()
   (let* ((n (rnext rgen 100000))
-	 (nf (f- (f/ (i->f n) (f# "50000")) (f# "1"))))
+         (nf (f- (f/ (i->f n) (f# "50000")) (f# "1"))))
     nf))
 
 (function gauss ()

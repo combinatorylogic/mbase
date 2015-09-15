@@ -1,0 +1,15 @@
+%literate:
+
+\pfcode{
+ast genlivebb {
+  bbs is (.*bb:bbs);
+  bb = genbb(lblident:lbl, *useident:uses, *defident:defs, *instr:is);
+  instr = use(ident:id)
+        | kill(ident:id)
+        | usekill(ident:id)
+        | next(lblident:dst)
+        ;
+}}
+
+%%%%%%%%%%%%%
+

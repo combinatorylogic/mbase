@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -61,14 +61,14 @@
 
 (function dhashput (ht key1 key2 val)
   (let* ((v (hashget ht key1))
-	 (h2 (if (null? v) (let* ((hh (mkhash))) (hashput ht key1 hh) hh)
-		 v)))
+         (h2 (if (null? v) (let* ((hh (mkhash))) (hashput ht key1 hh) hh)
+                 v)))
     (hashput h2 key2 val)))
 
 (function dhashget (ht key1 key2)
   (let ((h (hashget ht key1)))
     (if (null? h) nil
-	(hashget h key2))))
+        (hashget h key2))))
 
 
 (function cons-cdr! (l v)
@@ -78,11 +78,11 @@
 
 (function partition (f lst)
   (let* ((rst (cons nil nil))
-	 (r (let loop ((l lst))
-	      (cond
-	       ((null? l) l)
-	       ((f (car l)) (cons (car l) (loop (cdr l))))
-	       (else (set-cdr! rst l) nil)))))
+         (r (let loop ((l lst))
+              (cond
+               ((null? l) l)
+               ((f (car l)) (cons (car l) (loop (cdr l))))
+               (else (set-cdr! rst l) nil)))))
     (cons r (cdr rst))))
 
 (function alltrue (f lst)
@@ -95,11 +95,11 @@
 (function genunifiq (cmp lst)
   (let loop ((crnt nil) (l lst))
     (if (null? l) crnt
-	(let ((cl (car l)))
-	  (if (alltrue (fun (x) (not (cmp x cl))) crnt) 
-	      (loop (cons (car l) crnt) (cdr l))
-	      (loop crnt (cdr l))
-	      )))))
+        (let ((cl (car l)))
+          (if (alltrue (fun (x) (not (cmp x cl))) crnt)
+              (loop (cons (car l) crnt) (cdr l))
+              (loop crnt (cdr l))
+              )))))
 
 )
 
@@ -108,9 +108,9 @@
   (let ((v (gensym)))
     `(let ((,v (cons nil 'lazy:not-instantiated)))
        (fun ()
-	 (if (eqv? (cdr ,v) 'lazy:not-instantiated) (set-cdr! ,v ,ex))
-	 (cdr ,v)
-	 ))))
+         (if (eqv? (cdr ,v) 'lazy:not-instantiated) (set-cdr! ,v ,ex))
+         (cdr ,v)
+         ))))
 
 (macro lazyref (v)
   "Forces an evaluation of a lazy value."
@@ -128,23 +128,23 @@
 
 (macro __with-hash (o? names . body)
   (let ((Xhashput (if o? 'ohashput 'hashput))
-	(Xhashget (if o? 'ohashget 'hashget)))
+        (Xhashget (if o? 'ohashget 'hashget)))
   `(let ,(foreach-map (n names) `(,n (mkhash)))
      (with-macros (
-		   ,@(foreach-map (n names)
-		      `(,(Sm<< n "!")
-			(fmt (_ a b) (list (quote ,Xhashput) (quote ,n) a b))))
-		   ,@(foreach-map (n names)
-		      `(,(Sm<< n ">")
-			(fmt (_ a) (list (quote ,Xhashget) (quote ,n) a))))
-		   ,@(foreach-map (n names)
-		      `(,(Sm<< n "+!")
-			(fmt (_ a b) (list (quote ,Xhashput) (quote ,n) a
-					 (list 'cons b
-					       (list (quote ,Xhashget) (quote ,n) a))
-					 ))))
-		   )
-		  ,@body))))
+                   ,@(foreach-map (n names)
+                      `(,(Sm<< n "!")
+                        (fmt (_ a b) (list (quote ,Xhashput) (quote ,n) a b))))
+                   ,@(foreach-map (n names)
+                      `(,(Sm<< n ">")
+                        (fmt (_ a) (list (quote ,Xhashget) (quote ,n) a))))
+                   ,@(foreach-map (n names)
+                      `(,(Sm<< n "+!")
+                        (fmt (_ a b) (list (quote ,Xhashput) (quote ,n) a
+                                         (list 'cons b
+                                               (list (quote ,Xhashget) (quote ,n) a))
+                                         ))))
+                   )
+                  ,@body))))
 
 (macro use-hash (names . body)
   ("Creates shortcut macros for accessing listed hashtables.")
@@ -157,40 +157,40 @@
 (macro __use-hash (o? names . body)
   (let*
        ((outer (filter (M@ not null?)
-		       (foreach-map (n names) 
-			 (if (list? n) n nil))))
-	(Xhashput (if o? 'ohashput 'hashput))
-	(Xhashget (if o? 'ohashget 'hashget))
-	(iner
-	 `(with-macros 
-	   ,(foldl append nil
-		   (foreach-map (n (map (fun (x) (if (list? x) (car x) x)) names))
-		     `((,(Sm<< n "!")
-			(fmt (_ a b) (list (quote ,Xhashput) (quote ,n) a b)))
-		       (,(Sm<< n ">")
-			(fmt (_ a) (list (quote ,Xhashget) (quote ,n) a)))
-		       (,(Sm<< n "+!")
-			(fmt (_ a b) (list (quote ,Xhashput) (quote ,n) a
-					 (list 'cons b
-					       (list (quote ,Xhashget) (quote ,n) a))
-					 )))
-		       )))
-	   ,@body)))
+                       (foreach-map (n names)
+                         (if (list? n) n nil))))
+        (Xhashput (if o? 'ohashput 'hashput))
+        (Xhashget (if o? 'ohashget 'hashget))
+        (iner
+         `(with-macros
+           ,(foldl append nil
+                   (foreach-map (n (map (fun (x) (if (list? x) (car x) x)) names))
+                     `((,(Sm<< n "!")
+                        (fmt (_ a b) (list (quote ,Xhashput) (quote ,n) a b)))
+                       (,(Sm<< n ">")
+                        (fmt (_ a) (list (quote ,Xhashget) (quote ,n) a)))
+                       (,(Sm<< n "+!")
+                        (fmt (_ a b) (list (quote ,Xhashput) (quote ,n) a
+                                         (list 'cons b
+                                               (list (quote ,Xhashget) (quote ,n) a))
+                                         )))
+                       )))
+           ,@body)))
     (if outer `(let ,outer ,iner) iner)))
 
-  
+
 (recfunction iso (a b)
   (cond
    ((and (null? a)
          (null? b)) #t)
    ((and (symbol? a)
-	 (symbol? b)
-	 (eqv? a b)) #t)
+         (symbol? b)
+         (eqv? a b)) #t)
    ((and (list? a)
-	 (list? b)
-	 (iso (car a) (car b))
-	 (iso (cdr a) (cdr b))) #t)
+         (list? b)
+         (iso (car a) (car b))
+         (iso (cdr a) (cdr b))) #t)
    ((and (string? a)
-	 (string? b)
-	 (eq? a b)) #t)
+         (string? b)
+         (eq? a b)) #t)
    (else (eq? a b))))

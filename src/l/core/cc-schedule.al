@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -33,7 +33,7 @@
         (cc:mkgen value))
        (Setnewglobal
         (cc:mkgen value))
-       (Pushapp 
+       (Pushapp
         (cc:mkgen (append fn (foreach-mappend (a args) a))))
 ;= [[asm]] may destroy a target and may use some locals.
              (Asm
@@ -51,21 +51,21 @@
 ;= [[genkill]] used for some instrs here is a simultaneous gen and kill operation.
 ;= For example, any destructive assignment is [[genkill]] or [[kill]] operation.
        (Setlocapp
-        `((genkill 
-           ((V ,nm obj)) 
+        `((genkill
+           ((V ,nm obj))
            ,(append fn (foreach-mappend (a args) a)))))
        (Switch
         `(
           ,@(cc:mkgen val)
           ,@(foreach-map (l labels)
               `(gotocond () ,l))))
-       (Retapp 
-        (cc:mkgen 
+       (Retapp
+        (cc:mkgen
          (append fn (foreach-mappend (a args) a))))
        (Dropapp
-        (cc:mkgen  
+        (cc:mkgen
          (append fn (foreach-mappend (a args) a))))
-       (Return 
+       (Return
         (cc:mkgen value))
        (Gotoif
         `((gotocond ,cnd ,lbl)))
@@ -122,12 +122,12 @@
                   (else node))))
               (Patchclosure
                (wrap
-                (ast:mknode 
+                (ast:mknode
                  (id (newnm id))
                  (args (map-over args
                                  (fmt (i v)
                                       `(,i ,(newnm v))))))))
-              (Setlocapp 
+              (Setlocapp
                (wrap (ast:mknode (nm (newnm nm)))))
               (else (wrap node))))))
        (return `(,@(locget) ,@reslt))

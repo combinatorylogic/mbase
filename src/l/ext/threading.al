@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -23,7 +23,7 @@
                 thr:mkthread
                 thr:start
                 thr:abort
-                thr:mkmanual 
+                thr:mkmanual
                 thr:mkmutex
                 thr:mutex_wait
                 thr:mutex_release
@@ -39,7 +39,7 @@
                 thr:mkqueue
                 thr:queue-add
                 thr:queue-kill
-                thr:queue-start 
+                thr:queue-start
                 )
 
 (function _caller (f) (f))
@@ -84,7 +84,7 @@
  (function thr:mkthread (fn)
   "Makes a thread with a given controller function."
   (let ((runer (thr:mkrunner fn)))
-    (new t_thread (t_thrdelegate runer)))) 
+    (new t_thread (t_thrdelegate runer))))
 
  (function thr:start (t)
   "Starts a thread."
@@ -94,10 +94,10 @@
    "Aborts a thread's execution".
    ((r_tbind t_thread "Abort") t))
 
- (function thr:mkmanual () 
+ (function thr:mkmanual ()
    "Makes a manual switch object."
    ((r_constr t_manual t_Boolean) #f))
- 
+
  (function thr:mkmutex ()
    "Makes a mutex object."
    (new t_mutex))
@@ -106,7 +106,7 @@
    "Waits for a mutex."
    ((r_tbind t_mutex "WaitOne") mtx))
 
- (function thr:mutex_release (mtx) 
+ (function thr:mutex_release (mtx)
    "Releses a mutex object."
    ((r_tbind t_mutex "ReleaseMutex") mtx))
 
@@ -160,22 +160,22 @@
     )
     (let* ((man (thr:mkmanual))
            (mtx (thr:mkmutex))
-	   (egmtx (thr:mkmutex))
-	   (thctr (cons nil 0))
+           (egmtx (thr:mkmutex))
+           (thctr (cons nil 0))
            (stack (cons nil nil))
            (altadd (cons nil nil))
-	   (incthctr (fun ()
-		       (thr:mutex_wait egmtx)
-		       (set-cdr! thctr (+ 1 (cdr thctr)))
-		       (thr:mutex_release egmtx)
-		       ))
-	   (decthctr (fun ()
-		       (thr:mutex_wait egmtx)
-		       (set-cdr! thctr (- (cdr thctr) 1))
-		       (if (< (cdr thctr) 1)
-			   (if endgame (thr:manual_set endgame)))
-		       (thr:mutex_release egmtx)
-		       ))
+           (incthctr (fun ()
+                       (thr:mutex_wait egmtx)
+                       (set-cdr! thctr (+ 1 (cdr thctr)))
+                       (thr:mutex_release egmtx)
+                       ))
+           (decthctr (fun ()
+                       (thr:mutex_wait egmtx)
+                       (set-cdr! thctr (- (cdr thctr) 1))
+                       (if (< (cdr thctr) 1)
+                           (if endgame (thr:manual_set endgame)))
+                       (thr:mutex_release egmtx)
+                       ))
            (add (fun (x)
                    (thr:mutex_wait mtx)
                    (if (null? (cdr altadd)) (begin
@@ -191,21 +191,21 @@
                       (thr:mutex_release mtx)
                       v)))
            (workerbody (fun (env v)
-			 (format v (thr . msg)
+                         (format v (thr . msg)
                           (msg env) ;; message is a function
                           (add thr) ;; return the thread back to the stack
                           )))
            (newthrd (fun (env)
                       (format (thr:mkworker env workerbody) (t . s)
                         (thr:start (thr:mkthread t))
-			(incthctr)
+                        (incthctr)
                         (add s))))
            (kill (fun ()
                    (thr:mutex_wait mtx)
                    (set-cdr! altadd (fun (x)
                                        (x 'SUICIDE)
-				       (decthctr)
-				       ))
+                                       (decthctr)
+                                       ))
                    (foreach (x (cdr stack)) (x 'SUICIDE) (decthctr))
                    (thr:mutex_release mtx)))
            (send (fun (msg)
@@ -237,7 +237,7 @@
    ("Makes a consumer queue with a given consumer processor function."
     "If [nthr?] is [#t], makes a dedicated queue controller thread, otherwise uses the current one."
     )
-    (let* ((mtx (thr:mkmutex)) 
+    (let* ((mtx (thr:mkmutex))
            (man (thr:mkmanual))
            (qhead (cons nil nil))
            (qtail (cons nil nil))
@@ -254,7 +254,7 @@
                          (set-cdr! qtail nw)) ))
                    (thr:manual_set man)
                    (thr:mutex_release mtx)
-		   ))
+                   ))
            (get (fun ()
                    (thr:mutex_wait mtx)
                    (if (null? (cdr qhead))
@@ -275,10 +275,10 @@
                    (n.label infty)
                    (thr:manual_wait man)
                    (let ((v (get)))
-                     (if (eqv? v 'ABORT) 
+                     (if (eqv? v 'ABORT)
                         (begin
-			  (if (null? (cdr kil)) nil ((cdr kil)))
-			  (n.goto exit)) )
+                          (if (null? (cdr kil)) nil ((cdr kil)))
+                          (n.goto exit)) )
                      (consumer (car v)))
                    (n.goto infty)
                    (n.label exit) (n.null)

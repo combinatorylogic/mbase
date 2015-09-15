@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -20,7 +20,7 @@
 (define p.comment (<r> ("/*" ((! "*/") *) "*/") | ("//" ((! #\Newline) *))))
 
 (make-simple-lexer peg-lexer
-  (ident-or-keyword 
+  (ident-or-keyword
    (p.alpha ((p.alpha | "_" | p.digit) *))
    ident)
   (keywords rule token term ignoring define parser extends dynhook check) ; ...
@@ -56,12 +56,12 @@
              ))) TCOMMENT
    (
     ((_ "[") (_ (px.whitespace *))
-     (! px.whitespace) (_ (px.whitespace *))  (_ "-") 
+     (! px.whitespace) (_ (px.whitespace *))  (_ "-")
      (_ (px.whitespace *))
      (! px.whitespace)
      (_ (px.whitespace *))
      (_ "]"))
-    
+
     -> (fmt (c1 c2)
             (list (ascii c1) (ascii c2))))
    RANGE
@@ -78,7 +78,7 @@
              (clause parse-peg-clause)
              )
 
-  (exprs 
+  (exprs
    ((expr exprs) (cons $0 $1))
    ((expr) (list $0)))
 
@@ -86,7 +86,7 @@
    ((decl tdecls) (cons $0 $1))
    ((decl) (list $0)))
 
-  (maybepfx 
+  (maybepfx
    ((PFXTOKEN) nil)
    (() nil))
 
@@ -161,7 +161,7 @@
 
   (constrarg
    ((ident:field LARROW constr:a) `(set ,field ,a))
-   ((MONEY ident:id LB fconsargs:as RB) 
+   ((MONEY ident:id LB fconsargs:as RB)
     `(set ,(gensym) (fcall ,id ,@as)))
    ((BQUOTE ident:id) `(set ,(gensym) (const ,id)))
    ((MONEY ident:id LB RB) `(set ,(gensym) (fcall ,id)))

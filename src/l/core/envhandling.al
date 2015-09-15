@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -22,7 +22,7 @@
     (($$M:i . $rest)
      (to-string (cons (S<< i) rest)))))
 
-(macro env:makepath_: (pth)   
+(macro env:makepath_: (pth)
   (p:match pth
     ($$M:v (S<< v))
     (($$M:i . $rest)
@@ -47,7 +47,7 @@
           (foreach (,sd ,ss)
             (env:setpath_: ,env (_env:makepath_: (car ,sd)) (cadr ,sd))))))
     (($p $rest) `(env:setpath_: ,env (env:makepath_: ,p) ,rest))))
-    
+
 (macro env:check: (e . body)
   (format e (env path)
     (with-syms (s pth xx ee)
@@ -92,7 +92,7 @@
            (,s2 (if ,s1 (+ ,s1 1) 0)))
       (env:set: ,env (,name ,s2))
       ,s2)))
-      
-      
-    
+
+
+
 

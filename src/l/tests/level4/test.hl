@@ -2,8 +2,8 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-// This file is distributed under the terms of the Q Public License version 1.0.
+// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+//
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +24,7 @@ etest({s = "2*2+3*x"; parse s as pfront}, #'(expr (stopfix (stopfix (leftass (bi
 
 parser helloworld  ( ) {
   !!spaces;
-  
+
   @@spaces := ([space] / [cr]) +;
   @@space := " "/[tab];
   @@cr := 13;
@@ -48,7 +48,7 @@ macro my_peg_regexp(nm, e)
 {
   symbols(nn,nn1,nn2) {
    #`(top-begin
-       (packrat-ast ,nm ( ) 
+       (packrat-ast ,nm ( )
           (terminal () normal ,nn ,e (() ()))
           (terminal () normal ,nn1 (star (seq (notp (terminal ,nn)) (trivial (anychar)))) (()()))
           (terminal () token  ,nn2 (terminal ,nn) (() ()))
@@ -111,13 +111,13 @@ etest(#'(a (b c) (d ((b x) e))) /.. { b(v) -> v }, #'(a c (d (x e))));
 
 etest(map i in ['a';'b';'x';'d';'c'] do
         case i {
-	  'a'|'b' -> 1
-	| 'c'|'d'|'e' -> 2
-	| else -> 3
+          'a'|'b' -> 1
+        | 'c'|'d'|'e' -> 2
+        | else -> 3
         }, [1;1;3;2;2]);
 
-etest(map i in [[];1;[1;2];'a';"a"] do 
-       cond 
+etest(map i in [[];1;[1;2];'a';"a"] do
+       cond
        |  %null?(i) -> 1
        |  %number?(i) -> 2
        |  %symbol?(i) -> 3
@@ -140,9 +140,9 @@ parser recpars ( pfront ) {
    recpars := [rrexpr]:e => e;
    rrexpr := { [rrexpr]:a "+" [rrexpr]:b => plus ... }
            / { [rrexpr]:a "-" [rrexpr]:b => minus ... }
-	   / { [rrexpr]:a "!" => fact ... }
-	   / { [ident]:i => var(i) }
-	   ;
+           / { [rrexpr]:a "!" => fact ... }
+           / { [ident]:i => var(i) }
+           ;
 }
 
 etest(parse "a+b-c" as recpars, #'(minus (plus (var a) (var b)) (var c)));
@@ -157,7 +157,7 @@ mixed class Test.MixTest {
   mbase static object test(int n) {
      [fromto(1,n)]
   }
-  public static object dntest() 
+  public static object dntest()
   {
      return this.test(4);
   }
@@ -187,5 +187,31 @@ etest(foldl( #+ , 0, [ x |
         x <- do fib(a = 1, b = 1) { n = a + b; if(n>4000000) [] else n : fib(b, n)}
         where x mod 2 == 0 ]), 4613732)
 
- 
+// modules
 
+-------------
+
+module abcmod
+   export abcfun;
+
+  function abcfun(a, b) a+b
+
+endmodule.
+
+module abctest
+   import abcmod
+   export abctest
+
+  function abctest(a, b)
+     return abcfun(a, b)
+
+endmodule.
+
+using module abctest.
+ etest(abctest(2,2), 4);
+endusing.
+
+
+
+
+///

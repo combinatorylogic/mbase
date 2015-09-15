@@ -2,8 +2,8 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-// This file is distributed under the terms of the Q Public License version 1.0.
+// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+//
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -207,7 +207,7 @@ namespace Meta.Scripting
                 {
                   // start a new list;
                   Pair p = new Pair(null, null);
-                      
+
                   top.Push(p);
                   st.Push(p);
                   pos.Push(0); // will fill car first

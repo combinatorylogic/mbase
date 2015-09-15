@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -66,7 +66,7 @@
          (cch1 (env:get: env (quotecache valstr)))
          (cch (if cch1 cch1 cch2))
          )
-    (if cch 
+    (if cch
         (begin
           (env:inc: env ctr-qcache)
           `((Ldsfld ,cch)))
@@ -95,7 +95,7 @@
 
 ;-
 ;- Emit a quoted value generator code
-;- 
+;-
 
 (recfunction cc:emit-quote (lenv value)
   (cond
@@ -106,11 +106,11 @@
     ((char? value) `((Ldc_I4 ,(ascii value))
                      (Box ,t_Char)))
 
-    ((boolean? value) 
+    ((boolean? value)
      `(,(if (r_debool value)
             `(Ldsfld ,fld_True)
             `(Ldsfld ,fld_False))))
-    ((symbol? value) 
+    ((symbol? value)
      (cc:emit-symbol  lenv value))
     ((vector? value)
      (cc:emit-vconst lenv value))
@@ -153,7 +153,7 @@
      (if (cc:localenv:isclosure? lenv)
          `(,(_ldarg 0))
          (cc:atom->il env lenv `(Glob ,nm))))
-    ((Glob $nm0) 
+    ((Glob $nm0)
      (let* ((nm (cc:localenv:getname lenv nm0))
             (lc (cc:localenv:globalvalue lenv nm)))
        (p:match lc
@@ -165,7 +165,7 @@
              (if at1 `((Ldsfld (field ,at1)))
                 (alet ss (gensym)
                       (cc:localenv:addfield lenv ss 'object)
-                      (cc:localenv:addinit lenv 'zero 
+                      (cc:localenv:addinit lenv 'zero
                            `((Ldsfld ,f_Pc_symbols)
                              ,@(cc:emit-symbol lenv nm)
                              (Call ,m_getSItem)
@@ -185,7 +185,7 @@
           `((Ldtoken ,other)))
          (else (cc:comperror `(META ,nm ,lc)))
          )))
-    ((IntPtr (Glob $nm0)) 
+    ((IntPtr (Glob $nm0))
      (let* ((nm (cc:localenv:getname lenv nm0))
             (lc (cc:localenv:globalvalue lenv nm)))
         (p:match lc
@@ -204,13 +204,13 @@
     ((NBNum $n) `((Ldc_I4 ,n)))
     ((Chr $c) `((Ldc_I4 ,(ascii c))
                 (Box ,t_Char)))
-    ((Bool $b) 
+    ((Bool $b)
      `(,(if (r_debool b) `(Ldsfld ,fld_True)
               `(Ldsfld ,fld_False))))
 
     ((Nil) `((Ldnull)))
 
-    ((Quote $v) 
+    ((Quote $v)
      (cc:emit-quote lenv v))
     ((else)    (cc:comperror `(CC03:WRONGMODE)))
     ))
@@ -249,7 +249,7 @@
 (function cc:emit-setglobal (env lenv name)
   (let* ((fnm (cc:localenv:fieldname lenv name name)))
     `((Stsfld (field ,fnm)))))
-  
+
 ;- Flat body to IL transformation loop
 (force-class-flush)
 
@@ -264,14 +264,14 @@
        (Goto `((Br (label ,lbl))))
        (Setlocal `(,@(cc:atom->il env lenv value)
                    (Stloc (var ,id))))
-       (Setnewglobal 
+       (Setnewglobal
         (cc:emit-setglobal env lenv nm))
        (Push (cc:atom->il env lenv value))
        (Pushapp (cc:app->il nil env lenv fn args))
        (Setlocapp
         `(,@(cc:app->il nil env lenv fn args)
           (Stloc (var ,nm))))
-       (Retapp 
+       (Retapp
         `(,@(cc:app->il ret? env lenv fn args)
           ,@(if ret? `((Ret)) `((Pop)))))
        (Dropapp
@@ -290,7 +290,7 @@
        (GotoEqv `((Beq (label ,lbl))))
        (Gotoifnot
          `((Brfalse (label ,lbl))))
-       (Patchclosure 
+       (Patchclosure
         (alet clname (cc:env:innerclassname lenv liftid liftid)
           `(
             (Ldloc (var ,id))
@@ -307,11 +307,11 @@
         (if (cc:localenv:isclosure? lenv)
             `(,(_ldarg 0))
             nil))
-       
+
        (TryBegin `((try-block)))
        (CatchBegin `((catch-block ,(read-int-eval ex))))
        (TryEnd `((end-try-block)))
-       
+
        (InitGlobalVar `((Call ,mtd_register_field)))
        (InitGlobalFun `((Call ,mtd_register_method)))
        (InitGlobalMac `((Call ,mtd_register_macro)))
@@ -328,7 +328,7 @@
        (BinOp `((,op)))
        (IntBox `((Box ,t_Int32)))
        (IntUnbox `((Unbox ,t_Int32) (Ldind_I4)))
-       
+
        (Asm
         (with-hash (h1)
           (foreach (v use)
@@ -373,7 +373,7 @@
                           ,(map (fun (_) t_object) args))
                 (Ldarg_0)
                 (Call ,parconstr)
-                ,@(foreach-mappend 
+                ,@(foreach-mappend
                     (l (formap (i 1 (+ 1 nargs))
                         `((Ldarg_0)
                           ,(_ldarg i)
@@ -428,8 +428,8 @@
     (liftop _
      ((Init
        (env:set: env ((errorc 'last) ".NET init expression"))
-       (cc:localenv:addinit clsenv mode 
-                            (cc:emit-expr env clsenv e 
+       (cc:localenv:addinit clsenv mode
+                            (cc:emit-expr env clsenv e
                                           (eqv? mode 'retexpression)
                                           )))
       (Simple
@@ -444,7 +444,7 @@
          (cc:localenv:addinit clsenv 'expression
                               (cc:emit-expr env clsenv e nil))
          ))
-      (Closure 
+      (Closure
        (env:set: env ((errorc 'last) (S<< ".NET closure " usename)))
        (add (cc:emit-closure env clsenv name args fargs e)))
       (else nil)
@@ -479,7 +479,7 @@
              (cc:emit-global clsenv name usename)))
            (else nil))))
 ;= Pass 2.: emit the code
-    (collector (add get)    
+    (collector (add get)
       (cc:emit-flat-inject env clsenv code add)
 ;= Emit fields
       (foreach (flds (cc:localenv:getfields clsenv))
@@ -500,7 +500,7 @@
             (init2 (cc:localenv:getinit clsenv 'funref)))
         (when initi
            (env:set: clsenv (init0 #t))
-           (add 
+           (add
             `(method ("init0" (Public Static) (Standard) ,t_void ())
                      ,@(foreach-mappend (i initi) i)
                      (Ret))))
@@ -523,7 +523,7 @@
           (add `(method ("run" (Public Static) (Standard) ,t_object ())
                   (local v ,t_object)
                   ,@(if initi `((Call (method "init0"))) nil)
-                  ,@(if (or init1 init1e) 
+                  ,@(if (or init1 init1e)
                         `((Call (method "init_expression")) (Stloc (var v)))
                         `((Ldnull) (Stloc (var v))))
                   ,@(if (or init2 initm)
@@ -534,7 +534,7 @@
                   (Ldloc (var v))
                   (Ret))))
         )
-      
+
 ;= Form a class statement
       (cons clsenv
        `(class (,(S<< clsname) Public BeforeFieldInit Sealed)

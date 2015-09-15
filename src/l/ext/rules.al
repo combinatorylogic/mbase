@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -39,8 +39,8 @@
 (function dbAppend (db-to db-from)
   (let ((newdb (mkhash)))
    (hashiter (fun (key val) (hashput newdb key val)) db-to)
-   (hashiter 
-     (fun (key val) 
+   (hashiter
+     (fun (key val)
         (let ((d (hashget newdb key)))
           (hashput newdb key (append val d))))
      db-from)
@@ -76,7 +76,7 @@
         ((var (subst (cadr  node)))
          (str node))))))
 
-(function subst-append (a b) 
+(function subst-append (a b)
   (fun (t)
     (subst-apply a (b t))))
 
@@ -92,7 +92,7 @@
 (function ->- (id term)
    (fun (j)
      (if (id-eq? id j) term
-	 `(var ,j))))
+         `(var ,j))))
 
 (function ->-1 (id term)
   (p:match id
@@ -107,22 +107,22 @@
 (define l-substI (list substI))
 
 (recfunction unify (list-unify t1 t2)
-  (p:match (list t1 t2)       
-    ( ((var $x) (var $y)) 
+  (p:match (list t1 t2)
+    ( ((var $x) (var $y))
       (if (id-eq? x y) l-substI (list (->- x t2))))
     ( ((var $x) $t2)
-      (if (var-not-in x (varsIn t2)) 
-	  (list (->- x t2)) 
-	  nil)
+      (if (var-not-in x (varsIn t2))
+          (list (->- x t2))
+          nil)
       )
     ( ($t2 (var $x) )
       (if (var-not-in x (varsIn t2))
-	  (list (->- x t2))
-	  nil) 
+          (list (->- x t2))
+          nil)
       )
     ( ((str $a . $as) (str $b . $bs))
       (if (eqv? a b)
-          (list-unify as bs) 
+          (list-unify as bs)
           nil) )))
 
 (recfunction list-unify (ts1 ts2)
@@ -140,7 +140,7 @@
 
 (function new-unify (t1 t2) (unify list-unify t1 t2))
 
-(function isCut? (t) 
+(function isCut? (t)
   (p:match t
     ((str cut) #t)
     (else nil)))
@@ -148,10 +148,10 @@
 ; Stack solving engine:
 
 (function alts (db n g)
-   (<L> `(,tp ,u) | 
+   (<L> `(,tp ,u) |
          (tm . tp) <- (renClauses db n g)
          | u <- (new-unify g tm) & (not (null? u))
-     )) 
+     ))
 
 (define plg-builtin-ht (mkhash))
 (function plg-builtin? (t)
@@ -170,39 +170,39 @@
   (let* ((nnm (gensym)))
     `(begin
        (function ,nnm (args)
-	  (format args ,args
-	     ,@body))
+          (format args ,args
+             ,@body))
        (hashput plg-builtin-ht (quote ,nm) (list ,nnm)))))
-  
+
 (define plg-failure 'Prolog::Failure::Mark)
 
 (function prove (db goals) ; -> substs
-  (letrec  ((solve 
+  (letrec  ((solve
               (fun (n s gls ow)
                 (if gls
-		   (p:match (car gls)
-		     ((str cut)
-		      (solve n s (cdr gls) nil))
-		     ((str ($v) . $ars)
-		      (let ((res (v
-				  (map (cut subst-apply s <>) ars))))
-			(if (and res (eqv? res plg-failure))
-			    nil
-			(solve n 
-			       (if res (subst-append res s) s)
-			       (cdr gls) ow))))
-		     (else (choose n s (cdr gls) 
-				   (alts db n (subst-apply s (car gls)))
-				   ow)))
-		   (cons s (backtrack n ow))
-		   )))
-            (choose 
+                   (p:match (car gls)
+                     ((str cut)
+                      (solve n s (cdr gls) nil))
+                     ((str ($v) . $ars)
+                      (let ((res (v
+                                  (map (cut subst-apply s <>) ars))))
+                        (if (and res (eqv? res plg-failure))
+                            nil
+                        (solve n
+                               (if res (subst-append res s) s)
+                               (cdr gls) ow))))
+                     (else (choose n s (cdr gls)
+                                   (alts db n (subst-apply s (car gls)))
+                                   ow)))
+                   (cons s (backtrack n ow))
+                   )))
+            (choose
               (fun (n s gs alts ow)
                 (cond
                  ((null? alts) (backtrack n ow))
                  (else
                   (format alts ((tp u) . rs)
-                    (solve     (+ n 1) 
+                    (solve     (+ n 1)
                                (subst-append u s)
                                (append tp gs)
                                (cons `(,s ,gs ,rs) ow)))))))
@@ -271,7 +271,7 @@
    ( (term) `(str cons ,$0 (str nil) ) )
    )
   (term
-   ( ( pterm:t1 IDEN:i1 pterm:t2 ) `(str ,(plg-termcompile i1) ,t1 ,t2) ) 
+   ( ( pterm:t1 IDEN:i1 pterm:t2 ) `(str ,(plg-termcompile i1) ,t1 ,t2) )
    ( ( pterm:t1 EQL pterm:t2 ) `(str equals ,t1 ,t2))
    ( ( pterm ) $0)
    ( ( LB term RB) $1 )
@@ -308,13 +308,13 @@
                                                (car rest) (cadr rest)))
        (other)))
     (else (other)))))
- 
+
 (recfunction prolog-print (term)
   "Converts a prolog term into a pretty-printed string."
    (fccase term
      ((var) ((n . nm)) nm)
      ((str) (id . rest)
-      (cond 
+      (cond
        ((null? rest) (if (eq? id 'nil) "[]" id))
        ((eq? id 'cons)
         (buildstring "["
@@ -343,19 +343,19 @@
 (define DefaultPrologDB
   "Basic prolog definitions: and, or, equals, not, append, ..."
   (rules->db
-    (ctime `(quote 
+    (ctime `(quote
       ,(pprologrules
          (S<<
-	  "or(X,Y):-X."
-	  "or(X,Y):-Y."
-	  "equals(X,X)."
-	  "and(X,Y):-X,Y."
-	  "not(X):-X,!,false(shmalse)."
-	  "not(X)."
-	  "append([],L,L)."
-	  "append([H|T],L,[H|A]) :- append(T,L,A)."
+          "or(X,Y):-X."
+          "or(X,Y):-Y."
+          "equals(X,X)."
+          "and(X,Y):-X,Y."
+          "not(X):-X,!,false(shmalse)."
+          "not(X)."
+          "append([],L,L)."
+          "append([H|T],L,[H|A]) :- append(T,L,A)."
 
-	  "true.")))))
+          "true.")))))
   )
 
 (function simple-prolog (xdb goals)
@@ -366,7 +366,7 @@
                  DefaultPrologDB
                  (dbAppend DefaultPrologDB (rules->db (pprologrules xdb))))))
      (Prolog db (pprologgoals goals))))
-	   
+
 
 
 ;; list based prolog frontend:
@@ -426,7 +426,7 @@
   (p:match t
     ((str $nid)
      (S->N (list->string
-	    (cdr (string->list (any->string nid))))))
+            (cdr (string->list (any->string nid))))))
     (else (ccerror `(PLG-NUMVALUE ,t)))))
 
 (function plg-var? (t)
@@ -438,26 +438,26 @@
    (p:match (map plg-var? (list a b c))
      ((yes () ())
       (->-1 a `(str ,(Sm<< 'i (->s (+ (plg-numvalue b)
-				      (plg-numvalue c)))))))
+                                      (plg-numvalue c)))))))
      ((() yes ())
       (->-1 b `(str ,(Sm<< 'i (->s (- (plg-numvalue a)
-				      (plg-numvalue c)))))))
+                                      (plg-numvalue c)))))))
      ((() () yes)
       (->-1 c `(str ,(Sm<< 'i (->s (- (plg-numvalue a)
-				      (plg-numvalue b)))))))
+                                      (plg-numvalue b)))))))
      (else (ccerror `(PROLOG:+ ,a ,b ,c)))))
 
 (plg-function mult (a b c)
    (p:match (map plg-var? (list a b c))
      ((yes () ())
       (->-1 a `(str ,(Sm<< 'i (->s (* (plg-numvalue b)
-				      (plg-numvalue c)))))))
+                                      (plg-numvalue c)))))))
      ((() yes ())
       (->-1 b `(str ,(Sm<< 'i (->s (/ (plg-numvalue a)
-				      (plg-numvalue c)))))))
+                                      (plg-numvalue c)))))))
      ((() () yes)
       (->-1 c `(str ,(Sm<< 'i (->s (/ (plg-numvalue a)
-				      (plg-numvalue b)))))))
+                                      (plg-numvalue b)))))))
      (else (ccerror `(PROLOG:* ,a ,b ,c)))))
 
 
@@ -465,21 +465,21 @@
    (p:match (map plg-var? (list a b c))
      ((yes () ())
       (->-1 a `(str ,(Sm<< 'i (->s (- (plg-numvalue b)
-				      (plg-numvalue c)))))))
+                                      (plg-numvalue c)))))))
      ((() yes ())
       (->-1 b `(str ,(Sm<< 'i (->s (+ (plg-numvalue a)
-				      (plg-numvalue c)))))))
+                                      (plg-numvalue c)))))))
      ((() () yes)
       (->-1 c `(str ,(Sm<< 'i (->s (- (plg-numvalue b)
-				      (plg-numvalue a)))))))
+                                      (plg-numvalue a)))))))
      (else (ccerror `(PROLOG:+ ,a ,b ,c)))))
 
 (plg-function write (a)
    (p:match (plg-var? a)
      (()
       (begin
-	(println a)
-	(fun (j) `(var ,j))))
+        (println a)
+        (fun (j) `(var ,j))))
      (else (fun (j) `(var ,j)))))
 
 ;;; Unit tests
@@ -497,7 +497,7 @@
 
 (unit-test 3
  (prolog-pp-results
-  (simple-prolog 
+  (simple-prolog
    "vadd([],[],[]).
     vadd([A|T],[B|L],[SH|LL]) :- plus(SH,A,B), vadd(T,L,LL)."
    "vadd([2,3,4],[4,5,6],X)"))

@@ -64,13 +64,13 @@
                   (() `(tuple ,@ctx))
                   ))
                ))))
-         
+
          ;; Lower non-variant node definition
          (translate-simple-def
           (fun (id ptn)
             `(simple ,id ,(translate-pattern ptn))))
-         
-         ;; Lower variant node definiton 
+
+         ;; Lower variant node definiton
          (translate-var-def
           (fun (id vars)
             `(varnode ,id
@@ -79,7 +79,7 @@
                             (($tag . $ptn)
                              `(v ,tag ,(translate-pattern ptn)))
                             (else (ccerror `(AST-FRONT-VARIANT-FORMAT ,v))))))))
-         
+
          ;; Lower extension node definition
          (translate-extend-def
           (fun (id vars)
@@ -89,7 +89,7 @@
                             (($tag . $ptn)
                              `(add (v ,tag ,(translate-pattern ptn))))
                             (else (ccerror `(AST-FRONT-VARIANT-FORMAT ,v))))))))
-         
+
          ;; Lower the node definitions
          (translate-defs
           (fun (defn)
@@ -103,7 +103,7 @@
                (translate-simple-def (common-check-ident id) ptn))
               (else (ccerror `(AST-FRONT-NODE-FORMAT ,defn))))))
          )
-    
+
     ;; Lower the def:ast macro body
     (p:match src
       ((def:ast:new $id $incl
@@ -142,25 +142,28 @@
           (fun (code)
             (collector (addvar getvars)
             (collector (adddeep getdeeps)
-            (let ((el (mkref nil)))                     
+            (let ((el (mkref '(none))))
               (let loop ((cx code)
-                         (add addvar))
+                         (add addvar)
+                         (isdeep 'nope))
                 (common-check-list cx)
                 (foreach (c cx)
                   (p:match c
-                    ((else-deep . $cx)
-                     (loop cx adddeep))
-                    ((else . $x) (r! el x))
+                    ((else-deep $cx)
+                     (loop cx adddeep 'deep))
+                    ((else . $x)
+                     (if (eqv? isdeep 'deep)
+                         (r! el `(vdelse (begin ,@x)))
+                         (r! el `(velse (begin ,@x)))))
                     (($tag . $c)
                      (add `(v ,(common-check-ident tag) (begin ,@c))))
                     (else (ccerror `(AST-VISITOR-VARIANT-FORMAT ,c))))))
               `(vars
                 ,(getvars)
                 ,(getdeeps)
-                ,(if (deref el)
-                     `(velse (begin ,@(deref el)))
-                     `(none))))))))
-         
+                ,(deref el)
+                ))))))
+
          ;; Translate a single entry, taking its nature (variant vs. simple)
          ;; into account.
          (translate-entry-body
@@ -206,7 +209,7 @@
                (translate-entry-hl srcid ntag nil tp code))
               (else (ccerror `(VISITOR-ENTRY ,e))))))
          )
-  
+
   ;; Translate a visitor DSL macro body.
   (p:match src
     ((ast:visit:new $asttp $opts $top $e . $entries)
@@ -236,4 +239,3 @@
         (if to (car to) from))))))
 
 
-                   

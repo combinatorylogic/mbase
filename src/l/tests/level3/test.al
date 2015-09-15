@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -37,7 +37,7 @@
           (subsection
              (para "oqq")
              (para "qqo"))))))
- 
+
 
 (test
   ((sxml-path (chapter) (*) para) xml) ;; all the first paragraphs of each chapter's sub-elements
@@ -58,7 +58,7 @@
   ((para "oqq")))
 
 
-(test (strinterleave 
+(test (strinterleave
        (<L> v | (_ v) <- ((sxml-path (*) (para)) xml)) ",")
       "abc,cde,efg,ooo,oqq,qqo")
 
@@ -89,7 +89,7 @@
   (queue:add qq 5)
   (test (queue:length qq) 5)
   (test (formap (i 0 5) (queue:get qq))
-	(1 2 3 4 5)))
+        (1 2 3 4 5)))
 
 ;; floating point arithmetics tests
 
@@ -105,7 +105,7 @@
   (not.class NNClass1 (extends ValueType)
      (field int X (public))
      (field double Y (public))
-     (initfield test ((public) (static)) 
+     (initfield test ((public) (static))
                 1 0 0 0
                 2 0 0 0
                 3 0 0 0
@@ -119,22 +119,22 @@
    (->s
     ((fun ()
       (not.neth ()
-		 (lift-field (field int XXX (public) (static)))
+                 (lift-field (field int XXX (public) (static)))
                  (lift-field (field (array int) XXZ (public) (static)))
-		 (lift-method (method ((public) (static)) int dblit ((int x))
-				      (return (* 2 x))))
-		 (a = (new NNClass1))
-		 (a#X <- 10)
-		 (a#Y <- d10.0)
-		 (this#XXX <- (this@dblit (a#X)))
+                 (lift-method (method ((public) (static)) int dblit ((int x))
+                                      (return (* 2 x))))
+                 (a = (new NNClass1))
+                 (a#X <- 10)
+                 (a#Y <- d10.0)
+                 (this#XXX <- (this@dblit (a#X)))
                  (this#XXZ <- (mkarr int 6))
                  (System.Runtime.CompilerServices.RuntimeHelpers
-                  @ InitializeArray 
+                  @ InitializeArray
                     ((System.Array)(this#XXZ))
                     ((System.RuntimeFieldHandle)(fieldtoken (NNClass1#test))))
-		 (leave ((object)(+ ((double)
+                 (leave ((object)(+ ((double)
                                      (aref (this#XXZ) 3)
-                                     ) 
+                                     )
                                     (* ((double)(this#XXX)) (a#Y)))))))))
    "204")
 
@@ -142,43 +142,43 @@
       (field int X (public))
 
       (method ((public)) void dbl ()
-	  (lift-field (field double Y (public)))
-	  (self#X <- (* (self#X) 2))
-	  (self#Y <- (* (self#Y) d2.0))
-	  (return))
+          (lift-field (field double Y (public)))
+          (self#X <- (* (self#X) 2))
+          (self#Y <- (* (self#Y) d2.0))
+          (return))
       )
 
-  (not.class NNClass3 
+  (not.class NNClass3
       (method ((public) (static)) string test ()
-	 (a = (new NNClass2))
-	 (a#X <- 10)
-	 (a#Y <- ((double)(a#X)))
-	 (a@dbl)
-	 (return (concat "<" ((a#X)@ToString) ":"
-			 ((a#Y)@ToString "e1") ">"))))
+         (a = (new NNClass2))
+         (a#X <- 10)
+         (a#Y <- ((double)(a#X)))
+         (a@dbl)
+         (return (concat "<" ((a#X)@ToString) ":"
+                         ((a#Y)@ToString "e1") ">"))))
 
   (test ((r_tsbind C_NNClass3 "test")) "<20:2.0e+001>")
 
   (lltnet-macro concat2 lst
     `(concat ,@(foreach-map (l lst)
-		   (if (string? l) l `(,l @ ToString)))))
+                   (if (string? l) l `(,l @ ToString)))))
 
   (test ((fun ()
-	   (not.neth ()
-	     (leave (concat2 "Abc" "def" 1 2 3)))))
-	"Abcdef123")
+           (not.neth ()
+             (leave (concat2 "Abc" "def" 1 2 3)))))
+        "Abcdef123")
 
   (test ((fun (lst)
-	   (not.neth ((Pair lst))
-	       (foreach (l lst)
-		  (x = ((Pair)l))
-		  (x#car <- (concat ((string)(x#car)) "!"))
-		  (x#cdr <- (x#car))
-		  )
-	       (leave lst)
-	       ))
-	 '(("a") ("b") ("c")))
-	(("a!" . "a!") ("b!" . "b!") ("c!" . "c!")))
+           (not.neth ((Pair lst))
+               (foreach (l lst)
+                  (x = ((Pair)l))
+                  (x#car <- (concat ((string)(x#car)) "!"))
+                  (x#cdr <- (x#car))
+                  )
+               (leave lst)
+               ))
+         '(("a") ("b") ("c")))
+        (("a!" . "a!") ("b!" . "b!") ("c!" . "c!")))
 
   (test (not.neth () (a = (* 2 2)) (leave ((object)a))) 4)
 
@@ -202,7 +202,7 @@
 
      (lmethod ((public) (static)) Pair (s2l s2l) ((String p))
               (string->list p))
-             
+
      (lmethod ((public) (static)) Pair test ((string abc))
               (reverse (cdr (s2l abc))))
 
@@ -223,9 +223,9 @@
 (test (+ (aget testdata 1) (aget testdata 2)) 5)
 
 ;; Nesting
-;(ctimex (-bind-em (lltnet-current-module) 
-;		  `(class "Nested1" (extends "System.Object")
-;			  (class "Nested2
+;(ctimex (-bind-em (lltnet-current-module)
+;                  `(class "Nested1" (extends "System.Object")
+;                          (class "Nested2
 
 ;; threading tests
 
@@ -235,9 +235,9 @@
 (let* ((pl (thr:mkpool nil))
        (cntr (cons nil 0))
        (mtx (thr:mkmutex))
-       (cfun (fun (env) 
-	       (thr:mutex_wait mtx) (set-cdr! cntr (+ (cdr cntr) 1))
-	       (thr:mutex_release mtx)))
+       (cfun (fun (env)
+               (thr:mutex_wait mtx) (set-cdr! cntr (+ (cdr cntr) 1))
+               (thr:mutex_release mtx)))
        (qu (thr:mkqueue #t (fun (v) (thr:pool-send pl v)))))
   (for (i 0 55) (thr:pool-add pl))
   (for (i 0 1500) (thr:queue-add qu cfun))

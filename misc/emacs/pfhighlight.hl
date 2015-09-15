@@ -1,69 +1,69 @@
-#(recfunction ploop-11 (env str p fn fst ini)
-  (let* ((res (p env (deref str)))
-         (s (if (peg-success? (car res)) res nil)))
-    (if s
-        (begin
-          (fn (car res))
-          (if (peg-alldead? (cdr res)) nil
-              (begin
-                (r! str (cdr res))
-                (ploop-11 env str p fn fst ini))))
-        (let* ((f (PegEnv.failure env))
-               (fpos (if (null? f) (cons (cdr res) "<ERROR>")
-                        (format f (loc pos names) 
-                                   (cons pos (S<< names))))))
-          (if fst 
-             (begin
-               (peg_cleanse_stream (cdr res) fst)
-               (ploop-11 env (mkref ini) p fn nil nil)
-               )
-             (begin
-;;               (println (S<< `(FAILMESSAGE ,(sposloc (cdr res)) ,(sposloc (car fpos))
- ;;                             ) "|"))
-               (println (S<< `(FAILURE-POSITION  
-                            ,(peg:decode-pos (sposloc (car fpos)))
-                            ,(cdr fpos)
-                            ) "|"))))))))
+function psignal(msg)
+   println(%S<<(msg,"|"))
 
-#(function hlevl-consume-1 (env parser dstream rfun pos)
-  (let* ((flush (fun () nil))
-         (cadd (fun (x) nil))
-         (xfun (rfun cadd flush)))
-    (ploop-11 env dstream parser xfun pos (deref dstream))
-    ))
+function ploop11(env, str, p, fn, fst, ini)
+{
+  res = p(env, ^str);
+  s = if(%peg-success?(car(res))) res else [];
+  if (s) {
+     fn(car(res));
+     if(%peg-alldead?(cdr(res))) []
+     else {
+        str := cdr(res);
+        ploop11(env, str, p, fn, fst, ini)
+     }
+  } else {
+    f = %PegEnv.failure(env);
+    fpos = match f with
+                          [] -> cdr(res) :: "<ERROR>"
+           | [loc;pos;names] -> pos :: %S<<(names);
+    if(fst) {
+       peg_cleanse_stream(cdr(res),fst);
+       ploop11(env, mkref(ini), p, fn, [], [])
+    } else {
+       psignal('FAILMESSAGE'(sposloc(cdr(res)),sposloc(car(fpos))));
+       psignal('FAILURE-POSITION'(
+                %peg:decode-pos(sposloc(car(fpos))),
+                cdr(fpos)));
+    }
+  }
+}
 
-#(function test-parse (env fps pos)
-       (let* (
-	      (r
-	       (hlevl-consume-1 env peg_pfront
-				fps
-				(fun (cadd flush)
-				  (fun (x) (if x (cadd x))))
-                                pos)))
-	 r))
+function hlevl_consume_1(env, pf, dstream, rfun, pos)
+{
+  flush() = [];
+  cadd(x) = [];
+  xfun = rfun(cadd, flush);
+  ploop11(env, dstream, pf, xfun, pos, ^dstream);
+}
 
-#(define __nline (ascii #\Newline))
+function parsing_loop(env, fps, pos)
+ hlevl_consume_1(env, peg_pfront, fps,
+                 fun(cadd, flush) fun(x) if(x) cadd(x),
+                 pos)
 
-#(function __peg:makepos1 (fline fchar)
-   (not.neth ((int fline) (int fchar))
-     (leave ((object)(+ fchar (* fline 65536))))))
+define newline = #(ascii #\Newline);
 
-#(function __peg:mkstream1 (ntotal fline fchar)
-  (let* ((p0 (StreamEntry.new1 nil nil 0 -1 nil)))
-    (let loop ((n 0) (i (__peg:makepos1 fline fchar)) (c p0) (p p0))
-      (cond
-       ((= n ntotal)
-	(alet lst (StreamEntry.new1 nil nil i -1 nil)
-	      (StreamEntry.next! c lst)
-	      (StreamEntry.chknext p)))
-       (else ;; otherwise it's a continuation fun
-	(let* ((l =pf: .net(): Console.Read() )
-	       (n1 (StreamEntry.new1 nil nil i l nil)))
-	      (StreamEntry.next! c n1)
-	      (loop (+ n 1)
-		    (if (eq? __nline l) (__peg:newline i) (+ i 1))
-		    n1 p)))
-       ))))
+function peg_makepos1(fline, fchar)
+  return fchar + fline * 65536
+
+function peg_mkstream1(ntotal, fline, fchar)
+{
+   p0 = %StreamEntry.new1([],[],0,-1,[]);
+   do loop(n = 0, i = peg_makepos1(fline, fchar), c = p0, p = p0) {
+      if(n == ntotal) {
+         lst = %StreamEntry.new1([],[],i,-1,[]);
+         %StreamEntry.next!(c, lst);
+         %StreamEntry.chknext(p);
+      } else {
+        l = .net(): Console.Read();
+        n1 = %StreamEntry.new1([], [], i, l, nil);
+        %StreamEntry.next!(c, n1);
+        loop(n+1,if(l == newline) %__peg:newline(i) else i+1,
+             n1, p)
+      }
+   }
+}
 
 function peg_find_beg(s1, l1)
   do loop(x = s1, prv = []) {
@@ -93,10 +93,10 @@ function peg_patch_overlapping(f, l)
        i = %StreamEntry.idx(r);
        if (%<(i, lpos)) {
          add(m);
-	 if(%<(^rmostpos, i)) {
-	    rmostpos := i;
-	    rmost := r;
-	 }
+         if(%<(^rmostpos, i)) {
+            rmostpos := i;
+            rmost := r;
+         }
        }
       }
     };
@@ -111,7 +111,7 @@ function peg_cleanse_stream(from, to)
   do loop(s = from, t = to) {
     if(s) {
        %StreamEntry.memos!(s, []);
-       if(not(%eqv?(s,t))) 
+       if(not(%eqv?(s,t)))
           loop(%StreamEntry.next(s),t);
     }
   }
@@ -191,21 +191,19 @@ function %make-stream-inner (lf, ps, ipos)
   n3 = ptestint(lf);
   n4 = ptestint(lf);
   n5 = ptestint(lf);
-  s2 = %__peg:mkstream1(n1, n2, n3);
+  s2 = peg_mkstream1(n1, n2, n3);
   ipos := s2;
   eoba = .net(): Console.ReadLine(); // Skip the [:EOB:] marker
-//fprintlnf(lf, %S<<("EOBA=[",eoba,"]"));
   .net(): Console.ReadLine(); // Skip more
-  //println(%S<<(#`(NEW-STREAM ,n2 ,n4 ,n5),"|"));
   if(and(n2>0,ps)) {
     return peg_merge_streams(ps, s2, n2, n4, n5)
   } else s2
 }
 
-function %make-stream (lf, pshash, ipos) 
+function %make-stream (lf, pshash, ipos)
 {
   nm = .net(): Console.ReadLine();
-  if (%<(length(%string->list(nm)), 3)) ccerror("0")
+  if (length(%string->list(nm)) <  3) ccerror("0")
   else {
     s = %make-stream-inner (lf, ohashget(pshash, nm), ipos);
     ohashput(pshash, nm, s);
@@ -223,7 +221,7 @@ function fprintlnf(f, s)
 function mainloop_inner(logf)
 {
   do loop(pshash = mkhash()) {
-    fprintlnf(logf, "READING STREAM"); 
+    fprintlnf(logf, "READING STREAM");
     pss = mkref([]); ipos = mkref([]);
     try {
       pss := %make-stream(logf,pshash,ipos);
@@ -235,21 +233,18 @@ function mainloop_inner(logf)
     if (ss) {
       src = mkref(ss);
       env = #(PegEnv.new nil
-			(fun (tag first last signal)
-                          (alet msg (S<< `((,(peg:decode-pos (sposloc first)) 
-			                    ,(peg:decode-pos (sposloc last))) ,signal) "|")
+                        (fun (tag first last signal)
+                          (alet msg `((,(peg:decode-pos (sposloc first))
+                                       ,(peg:decode-pos (sposloc last))) ,signal)
                            (fprintlnf logf msg)
-	 	 	   (println msg)
-			  ))
-			nil
-			nil
-			);
-			fprintlnf(logf, %S<<(env));
-      %test-parse(env, src, ^ipos);
-//      fprintlnf(logf, %__peg:get-ndelta(ss, 500));
-//      fprintlnf(logf, "-----------");
-//      %__peg:streamprint1(logf, ss);
-//      fprintlnf(logf, "-----------");
+                             (psignal msg)
+                          ))
+                        nil
+                        nil
+                        nil
+                        );
+      fprintlnf(logf, %S<<(env));
+      %parsing_loop(env, src, ^ipos);
       loop( pshash )
     } else loop(pshash)
   }
@@ -269,36 +264,9 @@ function mainloop(logf)
   }
 }
 
-
-function pmemos11(b, mm) {
-  foldl(%string-append , "", 
-    map mm do {
-      cm = cdr(mm);
-      ma = %__peg:memo-entry.ans(cm);
-      if(or(%__peg:is-lr?(ma), 
-            %eqv?(%__peg-epic-fail__ , ma))) {
-        "" //%S<<("!",car(mm)," ")
-      } else {
-        %S<<(car(mm), ": [", %__peg:get-delta(b, %__peg:memo-entry.pos(cm)),
-                      "] ")
-      }
-    }
-  )
-}
-
-#(function __peg:streamprint1 (fl shit)
-  (let loop ((s shit))
-    (if (null? s) nil
-        (let* ((idx (StreamEntry.idx s))
-               (ch (StreamEntry.char s))
-               (mm (StreamEntry.memos s)))
-          (fprintlnf fl (S<< (peg:decode-pos idx) ": " (if (> ch 0) (n2s ch) "EOF")  ": " (pmemos11 s mm)
-            ))
-          (loop (StreamEntry.chknext s))))))
-
 function main()
 {
-//  logfile = %S<<("pfront-",.net(): DateTime.Now.Ticks.ToString() ,".log");
-//  %call-with-output-file(logfile, mainloop)
+  //logfile = %S<<("pfront-",.net(): DateTime.Now.Ticks.ToString() ,".log");
+  //%call-with-output-file(logfile, mainloop)
   mainloop([])
 }

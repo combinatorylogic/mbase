@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -42,7 +42,7 @@
 ;- explicitly.
 (function eval (e)
  ; Visits {\tt e} assuming it contains {\tt expr} node:
-  (calc01:visit expr e 
+  (calc01:visit expr e
    (expr DEEP ; Transforms {\tt expr} nodes using depth--first strategy
     ((const v) ; all {\tt expr} variants are listed here
      (plus (f+ a b))

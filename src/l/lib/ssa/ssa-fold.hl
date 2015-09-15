@@ -5,7 +5,7 @@
 This representation is suitable for doing generic SSA--based transformations,
 like constant folding, DCE, partial application, etc.
 
-All the target-specific operations are represented as intrinsic calls. 
+All the target-specific operations are represented as intrinsic calls.
 User must provide the intrinsic hooks and annotate explicitly the const calls.
 
 \pfcode{

@@ -2,14 +2,14 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-// This file is distributed under the terms of the Q Public License version 1.0.
+// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+//
 //
 //////////////////////////////////////////////////////////////////////////////
 
 /*
 
- This is a syntax for embedded PEG parsers to be used in PFront and other 
+ This is a syntax for embedded PEG parsers to be used in PFront and other
  derived languages. It is different from the language accepted by MBasePackrat,
  since the latter is defined using the old MBase parsers generator, and it is
  more lightweight, more leaned towards short embedded parsers.
@@ -27,7 +27,7 @@ parser minipeg extends pfcommon (
    token tsinglechar := '"' . '"';
 
    token tkhexnumber := '0x' ([a-f]/[A-F]/[0-9])+;
-  
+
    term hexnumber := tkhexnumber:n => {ctoken=const} $hexval(n);
 
 
@@ -36,26 +36,26 @@ parser minipeg extends pfcommon (
    token mLEFT := ':=' => {ctoken = leftset};
 
    term singlechar := tsinglechar:c => $stripval(c);
-   term charrange := '[' singlone:a '-' singlone:b ']' => 
+   term charrange := '[' singlone:a '-' singlone:b ']' =>
           range($charcode($val(a)),$charcode($val(b)));
 
    term mpsymbol0 := tIdent:i => {ctoken = ident} $sval(i);
    term mpstring := tString0:t => {ctoken = ident} $stripval(t);
    term mpsymbol := mpsymbol0 / {mpstring:s => $symbol(s)};
 
-   term minipeg := 
+   term minipeg :=
          {tQUOTE miniexpr:e mTO miniastx:a tQUOTE '+'
           '{' cslist<mininode,';'>:nodes ';'? '}' => peg(e,a,nodes)}
       /  {tQUOTE miniexpr:e mTO miniastx:a tQUOTE => peg(e,a,$nil())}
       ;
 
-   term mpeg := 
+   term mpeg :=
          {tQUOTE miniexpr:e tQUOTE '+'
           '{' cslist<mininode,';'>:nodes ';'? '}'
           => mpeg(e,nodes)}
       /  {tQUOTE miniexpr:e tQUOTE => mpeg(e,$nil())}
       ;
-         
+
 
    term miniexpr "PEG expression" :=
        { minielt:e '/' cslist<minielt,'/'>:els => palt(e,@els) }
@@ -65,7 +65,7 @@ parser minipeg extends pfcommon (
     /  minielt
     ;
 
-   term minielt "PEG element" := 
+   term minielt "PEG element" :=
        { miniatom:a '?' => {state=pattern} maybe(a) }
     /  { miniatom:a '+' => {state=pattern} plus(a) }
     /  { miniatom:a '*' => {state=pattern} star(a) }
@@ -76,7 +76,7 @@ parser minipeg extends pfcommon (
 
     term miniatom "PEG atom" :=
         { miniatomx:at ':' tIdent:nm => {state=pattern} bind($sval(nm),at) }
-     /  { miniatomx:e '$!' '[' tIdent:nm ':' cslist<miniast,",">:args ']' 
+     /  { miniatomx:e '$!' '[' tIdent:nm ':' cslist<miniast,",">:args ']'
               => {state = pattern} ordie(e, $sval(nm), @args) }
      /  { miniatomx:e '$!' '[' tIdent:nm ']' => {state = pattern} ordie(e, $sval(nm)) }
      / miniatomx
@@ -181,7 +181,7 @@ parser minipeg extends pfcommon (
     /  { '@@' ident:nm report:r mLEFT miniexpr:e mTO slist<miniannotation>:a
            => terminal($nil(),`[[normal]],nm,e,$list(a,$nil()),@r) }
     /  { '@@' ident:nm report:r mLEFT miniexpr:e => terminal($nil(),`[[normal]],nm,e,$list($nil(),$nil()),@r) }
-    /  { '@' ident:nm report:r mLEFT miniexpr:e  mTO slist<miniannotation>:a  
+    /  { '@' ident:nm report:r mLEFT miniexpr:e  mTO slist<miniannotation>:a
            => terminal($nil(),`[[token]],nm,e,$list(a,$nil()),@r) }
     /  { '@' ident:nm report:r mLEFT miniexpr:e => terminal($nil(),`[[token]],nm,e,$list($nil(),$nil()),@r) }
     /  { '!!' ident:nm => [[with-ignore]](nm) }

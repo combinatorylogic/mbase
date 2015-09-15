@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -13,9 +13,9 @@
 ;-
 
 ;-
-;- Here follows an AST definition which is used in all the stages prior to 
+;- Here follows an AST definition which is used in all the stages prior to
 ;- Plain code generation. The same AST is used for both source code (produced in
-;- the previous step out of macro expanded expressions) and 
+;- the previous step out of macro expanded expressions) and
 ;- a lambda lifted code (see below).
 ;-
 
@@ -91,7 +91,7 @@
 ;= Imperative looping hints:
       (While <ident:escapename> <expr:cnd> <expr:body>)
       (Escape <ident:escapename>) ; Won't work from a nested lambda!
-      
+
 ;= And a grouping, of course, since it is an imperative language:
       (Begin . <*expr:es>)
 
@@ -106,7 +106,7 @@
 
 ;= Introduced as an intermediate compilation construction:
       (PatchClosure <ident:nm> <ident:liftname> . <*captcharg:args>)
-      
+
       ))
 
 ;= Utility nodes

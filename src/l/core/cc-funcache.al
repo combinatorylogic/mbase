@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -15,7 +15,7 @@
 ;- The basic idea is to look up short functions and closures by their textual
 ;- representation as a hash key. In order to do this, all the
 ;- names must be normalised, including labels. [[cc:fc:mapnames]] will
-;- do the job. 
+;- do the job.
 ;-
 ;- BackendAsm constructions normally will have entities which can't be
 ;- represented in a string form. In order to get rid of them, we can use
@@ -96,7 +96,7 @@
            (else node)))
         )))))
 
-;- 
+;-
 ;- We already have a node counting feature from an optimiser layer, so it
 ;- can be reused in order to estimate, if there's a reason to cache a functions.
 ;- The final decision is made using the length of a resulting hash string, which
@@ -153,15 +153,15 @@
   (collector (radd rget)
   (collector (cadd cget)
      (foreach (f fexprs)
-	 (format f (src _ txt)
-	   (alet tst (hs> txt)
-	     (if tst
-		 (alet idd (cc:identity src)
-		       (when dbg (println (S<< "Cache collapsing: " idd " to " tst)))
-		       (cadd (list idd tst)))
-		 (alet idd (cc:identity src)
-		   (radd f)
-		   (hs! txt idd))))))
+         (format f (src _ txt)
+           (alet tst (hs> txt)
+             (if tst
+                 (alet idd (cc:identity src)
+                       (when dbg (println (S<< "Cache collapsing: " idd " to " tst)))
+                       (cadd (list idd tst)))
+                 (alet idd (cc:identity src)
+                   (radd f)
+                   (hs! txt idd))))))
      (list (rget) (cget))))))
 
 ;= Build a list of cache hits
@@ -195,9 +195,9 @@
                      ((Glob (ast:mknode (id (replace id))))
                       (Funref (ast:mknode (id (replace id))))
                       (else node)))
-	       (liftop DEEP
-		       ((Funref (ast:mknode (iname (replace iname))))
-			(else node)))
+               (liftop DEEP
+                       ((Funref (ast:mknode (iname (replace iname))))
+                        (else node)))
                (captcharg DEEP (ast:mknode (ref (replace ref))))))
             )))))
 
@@ -215,21 +215,21 @@
 ;= Perform cache pass as many times as necessary
 (function cc:cacheloop ( parenv cacheenv code0 )
   (let loop ((code code0) (tocache (cc:cachefilter code0))
-	     (dbg (shashget (getfuncenv) 'debug-compiler-cache)))
+             (dbg (shashget (getfuncenv) 'debug-compiler-cache)))
       (if (null? tocache)
           code
           (let*  ((nw (cc:cachecollapse tocache dbg))
-		  (remains (car nw))
-		  (hits0 (cadr nw))
-		  (hits1 (cc:cachehits cacheenv remains))
-		  (hits0prim (with-hash (hs)
-				 (foreach (h hits1)
-				   (hs! (car h) (cadr h)))
-				 (foreach-map (h hits0)
-				   (format h (f t)
-				      (alet x (hs> t)
-					(list f (if x x t)))))))
-		  (hits (append hits0prim hits1)))
+                  (remains (car nw))
+                  (hits0 (cadr nw))
+                  (hits1 (cc:cachehits cacheenv remains))
+                  (hits0prim (with-hash (hs)
+                                 (foreach (h hits1)
+                                   (hs! (car h) (cadr h)))
+                                 (foreach-map (h hits0)
+                                   (format h (f t)
+                                      (alet x (hs> t)
+                                        (list f (if x x t)))))))
+                  (hits (append hits0prim hits1)))
                 (if (null? hits)
                     (cc:tocache cacheenv remains code dbg)
                     (alet subst (cc:cachepass parenv hits code dbg)

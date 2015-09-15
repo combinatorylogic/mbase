@@ -6,6 +6,9 @@ include "domtree.hl"
 include "ssa-trans.hl"
 include "ssa-analysis.hl"
 include "ssa-backend.hl"
+include "genlive.hl"
+
+include "genpprint.hl"
 
 #(force-class-flush)
 #(n.save)

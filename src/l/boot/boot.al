@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -180,7 +180,7 @@
     (let* ((fn (cadr arg))
            (argg (caddr arg))
            (body (cdddr arg)))
-      
+
       (list 'def
             (list 'quote fn)
             (bootlib:rec-helper fn argg body)
@@ -408,7 +408,7 @@
           (let ((cx (car x)))
             (if (shashget ht cx)
                 (loop v (cdr x))
-                (begin 
+                (begin
                   (shashput ht cx cx)
                   (loop (cons cx v)
                         (cdr x)))))))))
@@ -464,7 +464,7 @@
 (recfunction bootlib:expand0 (compile mcenv l)
   (cond
    ((null? l) l)
-   ((symbol? l) 
+   ((symbol? l)
     (if (corelib:symbol-starts-with '## l)
         (let ((v (hashget-seq mcenv l))) (if v ((hashget-seq mcenv l)) 'nil))
         l
@@ -500,13 +500,13 @@
                   (begin
                     (println "Exception")
                     (println
-                     ((shashget (getfuncenv) 'to-string) 
+                     ((shashget (getfuncenv) 'to-string)
                       ((shashget (getfuncenv) 'mbaseerror) x)))
                     (println " while expanding:")
                     (println
                      ((shashget (getfuncenv) 'to-string) l))
                     `(Error)
-                    
+
                     ))
                 )
                t_Exception
@@ -518,7 +518,7 @@
                    (println
                     ((shashget (getfuncenv) 'to-string) x))
                    `(Error)
-                   
+
                    )
                  )
                )
@@ -533,7 +533,7 @@
     (quote ,(string->symbol (string-append "##" (symbol->string nm))))
     (let ((vl ,vl)) (lambda () vl))))
 
-(macro #fdefine (nm vl) 
+(macro #fdefine (nm vl)
   `(defmacro
      (quote ,(string->symbol (string-append "##" (symbol->string nm))))
      (lambda () ,vl)))
@@ -555,7 +555,7 @@
                           (loop (cdr l))))
                     nm))
               nm)))))
-   
+
 ;; Free<->bound variables substitution - the heart of the L1->L0 compiler.
 (recfunction bootlib:postcompile (env l)
   (cond
@@ -640,14 +640,14 @@
        (else
         (inner.map (lambda (x) (bootlib:postcompile env x)) l)))))
    (else l)))
-              
+
 (define *current-macro-env-holder* (cons nil nil))
 (function set-macro-env (env)
   (corelib:set-car! *current-macro-env-holder* env))
-  
+
 (function getcurmacroenv ()
   (car *current-macro-env-holder*))
-  
+
 (set-macro-env (getmacroenv)) ;; default is the global one
 
 
@@ -680,14 +680,14 @@
    ((null? a) "()")
    ((string? a) (string-append
                  "\""
-                 (string-append (corelib:string-escape a) 
+                 (string-append (corelib:string-escape a)
                                 "\"")))
    ((symbol? a) (symbol->string (screen-symbol a)))
    ((number? a) (number->string a))
-   ((char? a) 
-    (string-append 
+   ((char? a)
+    (string-append
      "#\\"
-     (cond 
+     (cond
       ((eq? a #\Newline) "Newline")
       ((eq? a #\Tab) "Tab")
       ((eq? a #\Space) "Space")
@@ -700,10 +700,10 @@
    ((boolean? a) (if (r_debool a) "#t" "#f"))
    (else (string-append "?:" (any->string a)))))
 
-;;  
+;;
 (recfunction innerlist (outerlist q l)
   (string-append (outerlist q (car l))
-     (if (null? (cdr l)) 
+     (if (null? (cdr l))
          ""
          (if (pair? (cdr l))
        (string-append " " (innerlist outerlist q (cdr l)))
@@ -712,7 +712,7 @@
 ;; Separate defines to keep the stupid text editors happy with (-) balance.
 (define lbr "(") (define rbr ")")
 
-;; 
+;;
 (recfunction outerlist (q l)
   (cond
    ((null? l) "()")
@@ -727,7 +727,7 @@
           (string-append "," (outerlist 1 (cadr l))))
          ((and (= q 2) (eqv? 'unquote-splicing (car l)))
           (string-append ",@" (outerlist 1 (cadr l))))
-         (else 
+         (else
           (string-append lbr (string-append (innerlist outerlist q l) rbr))
           ))
         (string-append lbr (string-append (innerlist outerlist q l) rbr))))
@@ -738,10 +738,10 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Now the L1->L0 compiler is implemented in L1, so we can add two interface 
+;; Now the L1->L0 compiler is implemented in L1, so we can add two interface
 ;; functions: read-compile-eval to be called from the runtime each time it reads a complete list
 ;; and read-compile-eval-dump to be called when bootstraping the compiler.
- 
+
 (function read-compile-eval0 (lst)
   (let ((expr (compile nil lst))) ;; compile it
     (let ((res (eval expr)))
@@ -763,7 +763,7 @@
      (let loop ((str "")
                 (ll (cdr l)))
          (if (null? ll) str
-            (loop (string-append str (string-append 
+            (loop (string-append str (string-append
                                       (let ((nxt (to-string-top (car ll))))
                                         (if nxt nxt "")
                                         )"\n")) (cdr ll)))))

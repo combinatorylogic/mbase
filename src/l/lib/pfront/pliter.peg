@@ -2,8 +2,8 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-// This file is distributed under the terms of the Q Public License version 1.0.
+// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+//
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -34,10 +34,10 @@ parser pliter extends pfront (
                 /  {pltbeg2 slist<atopexpr>:e pltend => plqexpr(e)}
                 /  {pltbeg3 slist<plminipeg>:e pltend => plqexpr(e)}
                 /  {pltbeg1x slist<atopexpr>:e pltend => { uberstate = empty } plqhexpr(e)}
-		/  {pltdll string:s pltend => { uberstate = empty } $pfcheckdll(s) }
-		/  {pltbeg4:pars #invokeparser<pars>:e pltend => plqexpr(e)}
-		;
- 
+                /  {pltdll string:s pltend => { uberstate = empty } $pfcheckdll(s) }
+                /  {pltbeg4:pars #invokeparser<pars>:e pltend => plqexpr(e)}
+                ;
+
  nottex := !('\pfcode'/'\pfqode'/'\ppcode'/'\phcode'/'\parse') .;
 
  token tex := nottex +;

@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -23,7 +23,7 @@
    `(aset ,a ,i ,b))
 
 (function write (o)
-  "Calls [System.Console.Write] for a given object." 
+  "Calls [System.Console.Write] for a given object."
   ((r_tsbind "System.Console" "Write" object) o))
 
 (include "netlib_fields.al")
@@ -36,7 +36,7 @@
    (let ((cr (read-int-eval '(r_current_using))))
     `(top-begin
        ,@(map
-             (lambda (a) 
+             (lambda (a)
                `(define ,(string->symbol (string-append "t_" (symbol->string a)))
                   (usdotnet ,cr ,(symbol->string a))))
            args)
@@ -52,13 +52,13 @@
 (function enum-or (a b)
   "Calculates [a] OR [b], where [a] and [b] are enums."
   (to_enum_object (r_GetType b) (bitor a b)))
- 
+
 (function a->l (ar)
   "Converts an array into a list."
    (let ((l (alength ar)))
      (let loop ((i 0))
         (if (< i l) (cons (aget ar i) (loop (+ i 1)))))))
-        
+
 (function amap (f a)
   "Maps a given [Object] array into an array of the same size via a given function."
   (let* ((l (alength a))
@@ -118,7 +118,7 @@
                   (set-cdr! p np)
                   (loop np (cdr ll)))))))
        p0))))
-                  
+
 
 (define a-lbound (r_tbind "System.Array" "GetLowerBound" int))
 (define a-ubound (r_tbind "System.Array" "GetUpperBound" int))
@@ -130,17 +130,17 @@
     (let loop ((i lb))
        (if (> i ub) nil
            (cons (a-get ar i) (loop (+ i 1)))
-           ))))  
-           
-           
-(define r_getmethod1 
+           ))))
+
+
+(define r_getmethod1
    (let ((gtmtd (r_tbind t_type "GetMethod" string)))
       (fun (tp nm)
          (gtmtd tp nm))))
-           
+
 (define EnumHash (mkhash))
-        
-        
+
+
 (define e_name (r_tsbind "System.Enum" "GetName" t_type t_object))
 (define _enum_vals (r_tsbind "System.Enum" "GetValues" t_type))
 (define _enum_nams (r_tsbind "System.Enum" "GetNames" t_type))
@@ -154,7 +154,7 @@
                (hsh (mkhash)))
               (iter (lambda (ab)
                       (hashput hsh (car ab) (cdr ab)))
-                      
+
                     (czip ns bs))
               (hashput EnumHash tp hsh)
               (hashget hsh nm))
@@ -211,10 +211,10 @@
 (define _once_ht_ (mkhash))
 (macro once (name . rest)
   (if (hashget _once_ht_ name) `(begin)
-      (begin 
+      (begin
         (hashput _once_ht_ name name)
         `(top-begin (hashput _once_ht_ ,name ,name) ,@rest))))
-        
+
 (function sleep (msec)
   "Waits for [msec] milliseconds."
   ((r_tsbind "System.Threading.Thread" "Sleep" t_int) msec))
@@ -232,7 +232,7 @@
 ;(define string->list
 ;  (let ((s2a (r_tbind t_string "ToCharArray")))
 ;     (@ ar->l s2a)))
-     
+
 (define symbol->list (@ string->list symbol->string))
 
 ;(function list->string (l)
@@ -240,7 +240,7 @@
 ;          (ar (anew t_char ll)))
 ;     (iteri (fun (i c) (aset ar i c)) l)
 ;     (new t_string (t_char[] ar))))
-       
+
 (define list->symbol (@ string->symbol list->string))
 
 (int-only
@@ -252,7 +252,7 @@
  (function apply (fn ars)
    "Applies [fn] to the list of arguments [ars]."
     (let* ((ara (mkovector ars)))
-      (ctime 
+      (ctime
        `(n.asm (fn ara)
          (expr ara)
          (Castclass ,t_object_array)
@@ -282,10 +282,10 @@
 
 ;;;; Enums
 
-(function enumOr (tp lst) 
+(function enumOr (tp lst)
   "Apply the [bitwise or] to all the listed enum values of the type [tp]."
-   (foldl enum-or 0 (map-over lst 
-                      (fun (s) 
+   (foldl enum-or 0 (map-over lst
+                      (fun (s)
                           (getEnum tp (any->string s))))))
 
 

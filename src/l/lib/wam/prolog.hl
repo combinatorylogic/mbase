@@ -2,24 +2,24 @@
 
 \section{A generic Prolog compiler}
 
-The current Prolog implementation in MBase is not very efficient, it is a non-destructive, 
-pure functional interpreter. This compiler is supposed to provide a more efficient and 
+The current Prolog implementation in MBase is not very efficient, it is a non-destructive,
+pure functional interpreter. This compiler is supposed to provide a more efficient and
 flexible implementation with easy--to--write drop--in backends.
 
-Compiler idea is simple: Prolog source is translated into an intermediate language which 
-explicitly introduces new variables, explicitly marks choice points and explicitly unifies 
+Compiler idea is simple: Prolog source is translated into an intermediate language which
+explicitly introduces new variables, explicitly marks choice points and explicitly unifies
 values. There are two call varieties: \verb|call_with| which calls a Prolog function and passes a
-remaining continuation to it and a simpler \verb|tailcall| which does not pass any continuation. 
-Only variables and constants are allowed as call arguments, any structured call arguments must be 
+remaining continuation to it and a simpler \verb|tailcall| which does not pass any continuation.
+Only variables and constants are allowed as call arguments, any structured call arguments must be
 lifted as new variable definitions.
 
-The trickiest part is the \verb|choice| construction which allocates a choice point and makes a list of 
-continuations (choice variants). 
+The trickiest part is the \verb|choice| construction which allocates a choice point and makes a list of
+continuations (choice variants).
 
 
-Any backend should implement a translation from this intermediate language into something which 
+Any backend should implement a translation from this intermediate language into something which
 can be compiled or interpreted.
-A default backend translates this code into raw MBase featuring explicit continuations, whith a 
+A default backend translates this code into raw MBase featuring explicit continuations, whith a
 handful of simple runtime function library.
 
 It's a backend's responsibility to provide implementations of \verb|cut/0| and \verb|call/1|.
@@ -35,6 +35,7 @@ ast prolog {
        // Extensions
        | number(number:v)
        | string(string:v)
+       | weakset(.*term:ts)
        // Externally defined variable
        // Must be elimnated by a pre-compilation pass
        | evar(ident:id)
@@ -49,27 +50,27 @@ ast prolog {
 
 \subsection{Compiler helper functions}
 
-Environment is pretty simple in this compiler. It contains only the locally 
-scoped definitons, in form of a list of pairs: {\tt name:type}, where 
-{\tt type} can either be {\tt 'var'} or {\tt 'arg'}. We do not keep a track 
-of any global declarations, hoping that the backend or some post--processing 
+Environment is pretty simple in this compiler. It contains only the locally
+scoped definitons, in form of a list of pairs: {\tt name:type}, where
+{\tt type} can either be {\tt 'var'} or {\tt 'arg'}. We do not keep a track
+of any global declarations, hoping that the backend or some post--processing
 passes will take care of it (e.g., it should be possible to do some inlining and
 compile--time specialisation).
 
 \pfcode{
 % "Look up a variable in the environment"
 function prolog_check_env(env,id)
-  do loop(l = env) 
-     match l with 
-       (xid:v):tl -> if(xid===id) v else loop(tl) 
+  do loop(l = env)
+     match l with
+       (xid:v):tl -> if(xid===id) v else loop(tl)
      | else -> []}
 
-We have to extract the free variables in order to initialise them explicitly 
-before any unification attempts. In addition to the explicit free variables 
+We have to extract the free variables in order to initialise them explicitly
+before any unification attempts. In addition to the explicit free variables
 there will be a list of new implicit variables introduced for the high order "call" arguments.
 
 \pfcode{
-% "Get a list of free variables in a term within a 
+% "Get a list of free variables in a term within a
    given environment"
 function prolog_freevars(env, t)
  collector(add,get) {
@@ -81,7 +82,7 @@ function prolog_freevars(env, t)
       } | else -> []}};
    return unifiq(get()) }}
 
-A key idea of this compiler is that all the calls are made with 
+A key idea of this compiler is that all the calls are made with
 trivial arguments only (constants and variables). It means that a structure
 argument have to be lifted and explicitly unified with a newly allocated variable. A separate
 optimisation pass (in a backend) can mark such trivial unifications explicitly.
@@ -98,7 +99,7 @@ function prolog_compile_arg(env, t)
         | string -> 'const'(v)
         | var -> {
              chk = prolog_check_env(env, id);
-             match chk with 
+             match chk with
                 'arg' -> 'arg'(id)
               | 'var' -> 'var'(id)
               | [] -> { add(id); 'var'(id) }
@@ -147,9 +148,9 @@ function prolog_unify_chain(ins, inner)
      | else -> inner}
 
 
-The list of rules in a function "body" is compiled as a sequence of nested 
+The list of rules in a function "body" is compiled as a sequence of nested
 function calls. The last term is a tail call (i.e., there is no continuation).
-If any explicit or implicit free variables occured inside a term, they're 
+If any explicit or implicit free variables occured inside a term, they're
 lifted into an explicit {\tt 'intros'} node and unified before committing
 a call.
 
@@ -195,22 +196,22 @@ function prolog_term_head(t) {<[x;id;@rest]> = t; id }}
 
 \subsection{Compiler top level}
 
-Queries are pretty much a backend business, so here we'll provide only 
+Queries are pretty much a backend business, so here we'll provide only
 the most basic support. Namely, transforming a query into a special function
-called 'query', with all the free variables lifted into arguments, 
-preserving their names. 
+called 'query', with all the free variables lifted into arguments,
+preserving their names.
 
 Backend must detect this name and behave appropriately.
 A possible behaviour is following: detect 'query' function in a parsed stream,
-slice everything above it and perform the compilation (may be giving a new 
+slice everything above it and perform the compilation (may be giving a new
 unique name to the query function), extract a list of argument names, allocate
 the variable slots, store them with their corresponding names into a variables
-environment and then call the query function. Dismiss results with 
-a backend's failure function to get more alternative answers. 
+environment and then call the query function. Dismiss results with
+a backend's failure function to get more alternative answers.
 Use the variables environment for pretty--printing the results.
 
 \pfcode{
-% "Sanitise queries into special predicates, 
+% "Sanitise queries into special predicates,
    expect only ONE query"
 function prolog_sanitise_queries(cs, qname, qargsref)
   visit:prolog(clauses:cs) {
@@ -337,7 +338,7 @@ parser prolog (prologlex) {
   !!Spaces;
   [lexical:] := [lexical] => {ctoken = lexic};
   [keyword:] := [keyword] ![IdentRest] => {ctoken=keyword};
-  
+
   prolog := slist<[plgclause]>:cs [Spaces]* => cs;
 
 
@@ -356,7 +357,7 @@ parser prolog (prologlex) {
             /  [plgclause_end]
             ;
   plgterm "Prolog binary term"
-          := { [plgfact]:l "=" [plgterm]:r => 
+          := { [plgfact]:l "=" [plgterm]:r =>
                      term(`equals,l,r) }
           /  [plgfact]
           ;
@@ -365,12 +366,12 @@ parser prolog (prologlex) {
   plgfact "Prolog term"
           :=
              [plgfact_start]
-          /  { [constident]:id "(" cslist<[plgterm],",">:args ")" => 
+          /  { [constident]:id "(" cslist<[plgterm],",">:args ")" =>
                      term(id,@args) }
           /  { [constident]:id => term(id) }
           /  { [varident]:id => var(id) }
           /  { "$" [varident]:id => evar(id) }
-          /  { "[" [plgterm]:hd "|" [plgterm]:tl "]" => 
+          /  { "[" [plgterm]:hd "|" [plgterm]:tl "]" =>
                      term(`cons,hd,tl) }
           /  { "[" [plglist]:ls "]" => ls }
           /  { "[" "]" => term(`nil) }
@@ -381,7 +382,7 @@ parser prolog (prologlex) {
           ;
 ///\pfcodeblockend{}Inner list representation:\\ \pfcodeblockbegin{}
   plglist "Prolog list node"
-          := { [plgterm]:hd "," [plglist]:tl => 
+          := { [plgterm]:hd "," [plglist]:tl =>
                     term(`cons, hd, tl) }
           /  { [plgterm]:hd => term(`cons, hd, term(`nil)) }
           ;
@@ -392,10 +393,10 @@ Terms produced by this parser will lack arity information, so we'll need this si
 \pfcode{
 function prolog_parse_fix_arity(t)
   visit:prolog(term:t) { deep term {
-        term -> mk:node(id=%Sm<<(id,"/", length(ts))) 
+        term -> mk:node(id=%Sm<<(id,"/", length(ts)))
       | else -> node }}
 function prolog_parse_fix_arity_clause(c)
-  visit:prolog(clause:c) { 
+  visit:prolog(clause:c) {
      once term : forall prolog_parse_fix_arity(node) }
 }
 
@@ -416,27 +417,28 @@ function prolog_strip_id(id)
 % "Pretty-print a prolog term into a string"
 function prolog_term_to_string(t)
   visit:prolog(term:t) {
-     deep term { 
+     deep term {
          term -> (
            match id with
              'cons/2' -> %S<<("[",car(ts),"|",cadr(ts),"]")
            | 'nil/0' -> "[]"
            | 'cut/0' -> "!"
-           | else -> 
-                if (ts) 
+           | else ->
+                if (ts)
                    %S<<(prolog_strip_id(id),"(",
                          strinterleave(ts,", "),
                        ")")
                 else prolog_strip_id(id))
        | number -> %S<<(v)
        | string -> v
+       | weakset -> %S<<("weakset(",strinterleave(ts,", "),")")
        | var -> %S<<(id)}}}
 
 \pfcode{
 % "Pretty-print a prolog clause or a query into a string"
 function prolog_clause_to_string(cl)
   visit:prolog(clause:cl) {
-      deep clause { clause -> 
+      deep clause { clause ->
                       if(tl) %S<<(hd, " :- ",
                          strinterleave(tl, ", "), ".")
                       else %S<<(hd, ".")

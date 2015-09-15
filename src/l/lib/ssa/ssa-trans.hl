@@ -10,7 +10,7 @@ named basic blocks, unconditional jumps, {\tt use} nodes, {\tt load} and {\tt st
 function quickunifiq(v)
 collector(add, get) {
    ht = mkhash();
-   iter v do 
+   iter v do
       if(ohashget(ht,v)) [] else {
          ohashput(ht,v,v); add(v)
       };
@@ -25,7 +25,7 @@ function fastunifiq(v)
 
 \pfcode{
 function ssa_transform_findallstores(code, sth, aas)
-collector(add,get) { 
+collector(add,get) {
    visit:genssa(code: code) {
       deep bblock { b -> iter [_;o] in ops do o(name) };
       deep iop {
@@ -65,13 +65,13 @@ function ssa_domtree_pairup(dtree)
 }
 
 \pfcode{
-function ssa_transform_domfront(cfg, dtree, srcs, cache) 
+function ssa_transform_domfront(cfg, dtree, srcs, cache)
 collector(add, get) {
   <[domtree;pairdomtree]> = dtree;
    iter s in srcs do {
      chk = ohashget(cache, s);
      if(chk) {iter c in chk do add(c)}
-     else collector(add1, get1) {   
+     else collector(add1, get1) {
        doms = ohashget(domtree, s);
        iter d in doms do {
          ns = ohashget(cfg, d);
@@ -109,7 +109,7 @@ function ssa_transform_3(mapink, cfg, code, a)
     match l with
        hd : tl -> {
           chk = ohashget(hd, k);
-	  if(chk) return chk else loop(tl)
+          if(chk) return chk else loop(tl)
        }
     |  else -> []
   };
@@ -127,18 +127,18 @@ function ssa_transform_3(mapink, cfg, code, a)
           cd = ohashget(cht, c); cdef = Inc(ldef);
           ohashput(path,c,c); mod = mkref([]);nextsh = mkref([]);
           nc = visit:genssa(bblock: cd) {
-	    deep bblock { b -> {nextsh:=nexts;node} };
+            deep bblock { b -> {nextsh:=nexts;node} };
             deep oppair : [name;op(name)];
             once iop {
                store -> fun(n) if(In(dst,a)) {
-		  mod := true;
+                  mod := true;
                   Update(cdef,dst,src);
                   return 'remap'(src)
                } else node
              | load -> fun(n) if(In(v, a)) {
                 pcdef = Find(cdef, v);
                 if(pcdef) {
-		  mod := true;
+                  mod := true;
                   pv = remap(pcdef);
                   ohashput(mapink, n, pv);
                   return 'remap'(pv)
@@ -150,9 +150,9 @@ function ssa_transform_3(mapink, cfg, code, a)
                   })
                }
              | phi -> fun(n) if(and(prev,In(orig,a))) {
-		  mod := true;
+                  mod := true;
                   ocdef0 = Find(cdef,orig);
-		  ocdef = if (ocdef0) ocdef0 else '*Undefined*';
+                  ocdef = if (ocdef0) ocdef0 else '*Undefined*';
                   Update(cdef, orig, n);
                   mk:node(prevs = prev: prevs, vals = ocdef: vals)
                } else node
@@ -238,8 +238,8 @@ function ssa_optimise(code)
       deep oppair : {a(name);op(name)};
       deep iop {
          phi -> fun(up) { uses = getuses(node);
-	           addphi(up);
-	           iter u in uses do addref(up, u); }
+                   addphi(up);
+                   iter u in uses do addref(up, u); }
        | else -> fun(up) { uses = getuses(node);
                    iter u in uses do addref(up, u); }
       }
@@ -251,12 +251,12 @@ function ssa_optimise(code)
      if(not(ohashget(phis,n))) {
        do taint(i = n) {
          if(ohashget(vis,i)) []
-	 else {
-	    ohashput(taints, i, i);
-	    ohashput(vis, i, i);
-	    us = ohashget(gr, i);
-	    iter u in us do taint(u)
-	 }
+         else {
+            ohashput(taints, i, i);
+            ohashput(vis, i, i);
+            us = ohashget(gr, i);
+            iter u in us do taint(u)
+         }
        }
      }
    };
@@ -298,5 +298,5 @@ function ssa_transform(code, allocas)
 
 
 
-%%%    
+%%%
 %%%

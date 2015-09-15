@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -31,7 +31,7 @@
        (ccerror `(WRAPPING an incorrect method ,nm)))
      `(method (,(mtdnames wnm) ,flags (Standard) ,ret ,args)
          ,@(if (> d 0) `((Ldarg_0) (Castclass ,t_object)) nil)
-         ,@(pre-emit 
+         ,@(pre-emit
              (mapi
                (fun (i a)
                 `(,(_ldarg (+ d i))
@@ -54,61 +54,61 @@
 
 ;; use it with ctime macro to substitute the type values
 (recfunction f.:classwrap.inner (dest nm fags body)
- (let* ((extends (select-car 'extends body)) 
+ (let* ((extends (select-car 'extends body))
         (implements (select-car 'implements body))
         (methods (select-car 'method body))
-	(tmodule (select-car 'target-module body))
+        (tmodule (select-car 'target-module body))
         (constrs (select-car 'xconstr body))
         (mainp (select-car 'main body))
         (fields (select-car 'field body))
         (ifields (select-car 'initfield body))
         (xmethods (select-car 'xmethod body))
-	(pinvokes (select-car 'pinvoke body))
-	(inners (foreach-map (c (select-car 'class body))
-		  (format c (_ nm1 fags1 . body1)
-		     (car (f.:classwrap.inner nil nm1 fags1 body1)))))
+        (pinvokes (select-car 'pinvoke body))
+        (inners (foreach-map (c (select-car 'class body))
+                  (format c (_ nm1 fags1 . body1)
+                     (car (f.:classwrap.inner nil nm1 fags1 body1)))))
 
         (cls
-         `(class (,(any->string nm) ,@fags) ,@extends ,@implements 
-	    ,@inners
+         `(class (,(any->string nm) ,@fags) ,@extends ,@implements
+            ,@inners
             ,@ifields
-            ,@fields 
-	    ,@(foreach-map (p pinvokes)
-		`(pinvoke-method ,@(cdr p)))
+            ,@fields
+            ,@(foreach-map (p pinvokes)
+                `(pinvoke-method ,@(cdr p)))
             ,@(foreach-map (m xmethods)
-		(format (cdr m) ((nm . r1) . r2)
-	            `(method (,(mtdnames nm) ,@r1) ,@r2)))
+                (format (cdr m) ((nm . r1) . r2)
+                    `(method (,(mtdnames nm) ,@r1) ,@r2)))
             ,@(foreach-map (m methods)
                 (format (cdr m) ((wnm ret . args) fags nm)
                  (wrap-a-method nm wnm fags ret args)))
-	    ,@(foreach-map (c constrs)
-		(format (cdr c) (nickname acc xx args . body)
-		   `(constructor (,nickname ,acc ,xx ,args) ,@body
-				 )))
+            ,@(foreach-map (c constrs)
+                (format (cdr c) (nickname acc xx args . body)
+                   `(constructor (,nickname ,acc ,xx ,args) ,@body
+                                 )))
           )))
    (list cls mainp tmodule)
    ))
 
 (function f.:classwrap (dest nm fags body)
   (format (f.:classwrap.inner dest nm fags body)
-	  (cls mainp tmodule)
-  (let* ((modl 
-	  (if dest dest
-	      (if tmodule (format tmodule ((_ vnm)) 
-				  (read-int-eval `(car (list ,vnm))))
-		  (net.current-module))))
-	 
-	 (ccls (clr:emit.class modl cls)))
+          (cls mainp tmodule)
+  (let* ((modl
+          (if dest dest
+              (if tmodule (format tmodule ((_ vnm))
+                                  (read-int-eval `(car (list ,vnm))))
+                  (net.current-module))))
+
+         (ccls (clr:emit.class modl cls)))
     (if mainp
-	(_set_exe_entry_point 
-	 (_aasm modl)
-	 (r_mtdf ccls (cadr (car mainp)) (list t_string_array))
-	 (if (null? (cddr (car mainp)))
-	     "ConsoleApplication"
-	     (caddr (car mainp)))
-	 ))
+        (_set_exe_entry_point
+         (_aasm modl)
+         (r_mtdf ccls (cadr (car mainp)) (list t_string_array))
+         (if (null? (cddr (car mainp)))
+             "ConsoleApplication"
+             (caddr (car mainp)))
+         ))
     (cons modl ccls))))
-   
+
 (macro :classwrap (nm fags . body)
  ("Creates a class with a given name [nm] and attributes [fags].[br]"
   "[body] format is:"
@@ -124,18 +124,18 @@
   "]]"
   )
  (let* ((mccls (f.:classwrap nil nm fags body))
-	(ccls (cdr mccls))
-	(modl (car mccls))
-	(as ((r_tbind "System.Reflection.Emit.ModuleBuilder" "get_Assembly") 
-	     modl))
-	(ax (hashget *asms* ((r_tbind "System.Reflection.AssemblyName" "get_Name") 
-			     ((r_tbind t_assembly "GetName")
-			      as)))))
+        (ccls (cdr mccls))
+        (modl (car mccls))
+        (as ((r_tbind "System.Reflection.Emit.ModuleBuilder" "get_Assembly")
+             modl))
+        (ax (hashget *asms* ((r_tbind "System.Reflection.AssemblyName" "get_Name")
+                             ((r_tbind t_assembly "GetName")
+                              as)))))
    (if (null? ax)
        (add-assembly-inner as))
 
    `(ctimex
      (define ,(string->symbol (buildstring "C_" nm)) (quote ,ccls)))))
 
-        
-  
+
+

@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -16,12 +16,12 @@
 ;   (NODENAME PATTERN)...)
 ;
 ; where PATTERN is:
-;  (| (TAG PTN)...) 
+;  (| (TAG PTN)...)
 ;    or
 ;  PTN
 ;
 ; and PTN is an S-expression with substitutions in form of:
-;  <NODENAME:VARIABLE> 
+;  <NODENAME:VARIABLE>
 ;  <*NODENAME:VARIABLE>
 ;  VARIABLE
 ;
@@ -65,7 +65,7 @@
                      (with-syms (ca cd)
                       `(let* ((,ca (car ,c))
                               (,cd (cdr ,c)))
-                         (,(if buld? '__ast:check_cons 'begin) 
+                         (,(if buld? '__ast:check_cons 'begin)
                           ,(loop (car m) ca)
                           ,(loop (cdr m) cd)
                           ,@(if buld? `(,ca ,cd ,c) nil)
@@ -80,17 +80,17 @@
    (let loop ((f formt))
       (fccase f
         ((CONST) _ #t)
-        ((NODE) (nm)  
+        ((NODE) (nm)
          (if (hashget nodehash nm)
-             `(E (-process-the-node 
-                  (cons nodebody stack) 
+             `(E (-process-the-node
+                  (cons nodebody stack)
                   (quote ,nm))) #t))
         ((NODES) (nm)
          (if (hashget nodehash nm)
              `(E (fun (vl)
                    (map (-process-the-node
                          (cons nodebody stack)
-                         (quote ,nm)) 
+                         (quote ,nm))
                         vl)))
              #t))
         ((CONS) (hd tl)
@@ -100,7 +100,7 @@
                       ((null? r) #t)
                       ((and (list? r)
                             (eq? (car r) 'E)) nil)
-                      ((list? r) 
+                      ((list? r)
                        (and (iloop (car r)) (iloop (cdr r))))
                       (else #t)))
                #t res0)))
@@ -108,7 +108,7 @@
         )))
 
 (function _ast_add_deps (ht nodnm mask)
-  (let ((all 
+  (let ((all
           (let loop ((m mask))
             (fccase m
               ((CONST) _ nil)
@@ -116,10 +116,10 @@
               ((CONS) (hd tl)
                (append (loop hd) (loop tl))))))
         (vv (hashget ht nodnm)))
-    (hashput ht nodnm 
+    (hashput ht nodnm
              (unifiq (append (if vv vv nil) all)))
 ))
-     
+
 ;; Build dependency and reverse dependency graphs for a given AST definition
 (function _ast_build_depgraph (defntn)
   (let ((ht (mkhash))
@@ -128,14 +128,14 @@
     (iter-over defntn
       (fmt (nodnm ndef)
          (fccase ndef
-           ((VAR) opts 
-            (iter-over opts 
+           ((VAR) opts
+            (iter-over opts
                (fmt (tag val) (_ast_add_deps ht nodnm val))))
            ((VAL) (val)
             (_ast_add_deps ht nodnm val)))))
-    (hashiter 
-     (fun (a b) 
-       (foreach (x b) 
+    (hashiter
+     (fun (a b)
+       (foreach (x b)
            (hashput rht0 x
               (unifiq (cons (string->symbol a)
                             (hashget rht0 x))))))
@@ -148,17 +148,17 @@
           (loop (car tovis) vis (cdr tovis)))
          (let ((rev (hashget rht0 t)))
            (hashput rht a (unifiq (cons t (hashget rht a)) ))
-           (if (null? rev) 
+           (if (null? rev)
                (if (null? tovis) nil
-                   (loop (car tovis) 
+                   (loop (car tovis)
                          (cons t vis)
                          (cdr tovis)))
-               (loop (car rev) 
+               (loop (car rev)
                      (cons t vis)
                      (append rev tovis)))))))
     (cons rht0 rht)))
-        
- 
+
+
 
 ;; Get a list of nodes affected by a given list of modified nodes.
 (function _ast_build_corelist (depgraph mnodes)
@@ -182,7 +182,7 @@
        (fccase node
          ,@(map-over opts
              (fmt (tag vl)
-              `((,tag) nodebody 
+              `((,tag) nodebody
                 ,(if buld?
                      `(cons (quote ,tag) ,(_ast_comp_visitornode #t vl ch))
                      (_ast_comp_visitornode nil vl ch)
@@ -207,28 +207,28 @@
          (core  (_ast_build_corelist depgraph mnods))
          (ch (_list->hash core))
          (transcore (filter (fun (x) (not (hashget hh x))) core)))
-     (cons ch 
+     (cons ch
       (foreach-map (t transcore)
-          (let ((defx (hashget defs t))) 
+          (let ((defx (hashget defs t)))
             `(,t ,(_ast_comp_visitorptn buld? defx ch)))))))
 
 (function _ast_make_accessmacros0 (name fdefz defz)
   (collector (vars gvars)
     (let collect ((d defz) (f fdefz))
       (p:match d
-        ($$M 
+        ($$M
          (p:match f
            ((NODE $n . $_)
             (vars (list d n)))
            (else nil)))
-        (($a . $b) 
+        (($a . $b)
          (p:match f
            ((CONS $fa $fb)
             (collect a fa) (collect b fb))
            (else (ccerror `(AST:format ,d ,f)))))
         (else nil)))
     (foreach-map (v (gvars))
-      `(,(Sm<< (car v) ".>") (fun (ll) 
+      `(,(Sm<< (car v) ".>") (fun (ll)
              (list 'ast:access:element ,name
                    (quote ,(cadr v)) (quote ,(car v)) (cdr ll)))))))
 
@@ -266,9 +266,9 @@
                (d2 (map car opts))
                (dif (if (not (or (memq 'else d1) (memq 'else-deep d1)))
                      (foldl (fun (acc v) (filter (fun (av) (not (eqv? av v))) acc)) d2 d1))))
-         (if dif 
+         (if dif
              (ccwarning `(COVERAGE: ,entry ,dif)))
-         
+
          `(fun (node)
            (fccase node
             ,@(map-over code
@@ -284,7 +284,7 @@
                               node))))
                     (else
                      (let ((fent (cadr (car (filter (fun (x) (eq? (car x) cent)) opts)))))
-                       `((,cent) ,fent 
+                       `((,cent) ,fent
                          (with-macros
                           ((this-node-var (fun (_) '(quote ,cent)))
                            ,@(_ast_make_accessmacros cent defs entry)
@@ -315,11 +315,11 @@
                   (bb (_ast_comp_visitorptn buld?
                                             (hashget defs (cadr entry)) ch)))
              `(,entry
-               (fun (nodebody) 
+               (fun (nodebody)
                  ,(if buld?
                     `(,aa (,bb nodebody))
                     `(begin (,bb nodebody) (,aa nodebody)))))))
-          ((AFIRST A DEEP) 
+          ((AFIRST A DEEP)
            (let* ((aa (_ast_term_code defs entry code buld? ch))
                   (bb (_ast_comp_visitorptn buld?
                                             (hashget defs entry) ch)))
@@ -337,32 +337,32 @@
 (function _ast_make_visitor2 (buld? defs toph patns)
    (let* ((depgraph (hashget defs "  (DEPGRAPH)"))
           (code (_ast_make_visitor1 buld? depgraph defs patns))
-          (efun 
-           `(case ndn 
-              ,@(map-over code 
+          (efun
+           `(case ndn
+              ,@(map-over code
                   (fmt (nnm0 cde)
                    (let ((nnm (if (list? nnm0) (car nnm0) nnm0))
                          (annm (if (list? nnm0) (cadr nnm0) nnm0)))
-                    `((,nnm) 
+                    `((,nnm)
                       (with-macros
                        ((outer-ast-node (fun (_)
                                           (this-ast-node)))
                         (this-ast-node (fun (_)
-                                         (quote 
+                                         (quote
                                           (quote ,annm))))
-                        (__ast:check_cons 
+                        (__ast:check_cons
                          (fun (args)
-                           (cons (quote 
+                           (cons (quote
                                   ,(if (shashget (getfuncenv)
                                                  'compiler-ast-cons)
                                        '__ast:check_cons_fake
                                        '__ast:check_cons_inner))
                                  (cdr args))))
-                        ,@(_ast_make_accessmacros 
+                        ,@(_ast_make_accessmacros
                            nil
                            defs
                            annm)
-                        
+
                         )
                        ,cde)))))
               (else (_ast_unnode_error ndn (list (this-ast-name)))))))
@@ -381,8 +381,8 @@
   `(with-macros
     ((outer-ast-name (fun (_) (this-ast-name)))
      (this-ast-name  (fun (_) (quote (quote ,name)))))
-    ,(_ast_make_visitor2 #t 
-       (shashget (getfuncenv) 
+    ,(_ast_make_visitor2 #t
+       (bootlib:hashget-mod (getfuncenv)
                 (Sm<< "AST:" name ":DEF")) toph patns)))
 
 (macro this-ast-name ()
@@ -398,24 +398,24 @@
   `(with-macros
     ((outer-ast-name (fun (_) (this-ast-name)))
      (this-ast-name  (fun (_) (quote (quote ,name)))))
-    ,(_ast_make_visitor2 nil (shashget (getfuncenv) (Sm<< "AST:" name ":DEF")) toph patns)))
+    ,(_ast_make_visitor2 nil (bootlib:hashget-mod (getfuncenv) (Sm<< "AST:" name ":DEF")) toph patns)))
 
 ;;; Compiles the AST definition into the defs hashtable
 
 (define p.ast.ident (<r> (p.alpha | p.digit | (% ".-_/[]"))))
 
-(define _ast_parse_sym 
-   (let ((r 
+(define _ast_parse_sym
+   (let ((r
           (<r> ( ("<"  (?? (("*" | "?") -> (fun (x) `(*))))
                   ( ( (p.ast.ident +*) :-> list->symbol )
-                    ( ( ( (_ ":") ( p.ast.ident +*) ) :-> 
+                    ( ( ( (_ ":") ( p.ast.ident +*) ) :->
                         list->symbol )
-                      | (p.any -> 
+                      | (p.any ->
                                (fun (x) '(_)))
                       ))
                   ">") ->
-                  (M@ (fun (x) (if (eqv? '* (car x)) 
-                                   (cons 'NODES (cdr x)) 
+                  (M@ (fun (x) (if (eqv? '* (car x))
+                                   (cons 'NODES (cdr x))
                                    (cons 'NODE x))) cdr cuttail))
                | ( ( p.ast.ident +*) ->
                    (M@ (fun (x) (list 'CONST x)) list->symbol))
@@ -428,10 +428,10 @@
   (let loop ((d defntn))
     (cond
       ((null? d) '(CONST))
-      ((symbol? d) 
+      ((symbol? d)
        (let ((p (_ast_parse_sym d)))
          (fccase p
-           ((CONST) (name) '(CONST))       
+           ((CONST) (name) '(CONST))
            ((NODE)  (ref name) `(NODE ,ref ,name))
            ((NODES)  (ref name) `(NODES ,ref ,name))
            )))
@@ -451,16 +451,16 @@
 
 
 (function _ast_comp_defs (defns)
-  (let* ((def0 
+  (let* ((def0
            (map-over defns
             (fmt (nm dv)
               (if (_ast_var? dv)
                   (list nm
-                     `(VAR 
+                     `(VAR
                        ,@(map-over (cdr dv)
                            (fmt (enm . efmt)
                              `(,enm ,(_ast_process_onedef_struc efmt)))))
-                      `(VAR 
+                      `(VAR
                         ,@(map-over (cdr dv)
                             (fmt (enm . efmt)
                              `(,enm ,(_ast_process_onedef_fmt efmt))))))
@@ -469,20 +469,20 @@
                     `(VAL ,(_ast_process_onedef_fmt dv)))))))
           (def1 (map-over
                  def0 (fmt (nm str _) (list nm str))))
-          (def2 (map-over 
-                 def0 
+          (def2 (map-over
+                 def0
                  (fmt (nm _ fm) (list (buildstring "  " nm ":format") fm)))))
      (list def1 def2)))
 
-(define _ast_xnparse 
+(define _ast_xnparse
    (let ((p (<r> ((_ "::" ) ((p. *) -> (@ wrap list->symbol)))
                 | (_ (p. *)))))
      (fun (s) (p-result (p (string->list (symbol->string s)))))))
 
 (function _ast_uniappend (l1 l2)
-  (let ((ht (mkhash)))     
+  (let ((ht (mkhash)))
     (iter-over l1 (fmt (a b) (hashput ht a b)))
-    (iter-over l2 (fmt (a b) 
+    (iter-over l2 (fmt (a b)
                    (let ((xa (_ast_xnparse a)))
                     (if (and xa (list? xa))
                       (let* ( (a1 (car xa))
@@ -504,7 +504,7 @@
 
 (function makeitervisit (iv name topnode arg code)
   `(<> ,arg (,iv ,name ,topnode ,@code)))
-                     
+
 (macro def:ast (name incls . defns)
   ("Defines a named AST, inheriting properties from 'incls' and adding new 'defns'."
    "The definition is interpreted and exists in compilation time only."
@@ -514,17 +514,17 @@
                     (cond
                       ((symbol? i) (list i))
                       ((list? i)   i))))
-         (defns1 (_ast_uniappend 
-                  (foldl (fun (acc dn) 
-                           (_ast_uniappend acc 
+         (defns1 (_ast_uniappend
+                  (foldl (fun (acc dn)
+                           (_ast_uniappend acc
                              (_ast_renames (cdr dn)
-                               (hashget (shashget (getfuncenv) 
+                               (hashget (bootlib:hashget-mod (getfuncenv)
                                                   (Sm<< "AST:" (car dn) ":DEF"))
                                        "  (DEFSRC)"))))
                          nil incls1)
                   defns)))
-   (format (_ast_comp_defs defns1) (d1 d2)                
-    (read-int-eval 
+   (format (_ast_comp_defs defns1) (d1 d2)
+    (read-int-eval
      `(macro ,(Sm<< name ":visit") (topnode arg . rest)
             (makeitervisit 'ast:visit (quote ,name) topnode arg rest)))
     (read-int-eval
@@ -535,8 +535,8 @@
                 (let ((ht (mkhash))
                      (d1 (quote ,d1))
                      (d2 (quote ,d2)))
-                  (foreach (d d1) (hashput ht (car d) (cadr d))) 
-                  (foreach (d d2) (hashput ht (car d) (cadr d))) 
+                  (foreach (d d1) (hashput ht (car d) (cadr d)))
+                  (foreach (d d2) (hashput ht (car d) (cadr d)))
                   (hashput ht "  (DEPGRAPH)" (_ast_build_depgraph d1))
                   (hashput ht "  (DEFSRC)" (quote ,defns1))
                   (hashput ht "  (DEFNAME)" (symbol->string (quote ,name)))
@@ -610,17 +610,28 @@
          (nodename (cadr nodenameq))
          (varname (p:match varnameq ((this-node-var) nil)
                            ((quote $x) x)))
-         (astdef (shashget (getfuncenv) 
+         (astdef (bootlib:hashget-mod (getfuncenv)
                           (Sm<< "AST:" astname ":DEF")))
          (src (hashget astdef "  (DEFSRC)"))
          (values (cadr qvalues))
          (nodedef (cadr (find (fmt (a . _) (eqv? nodename a)) src))))
     (build-constructor nodedef varname values)))
-  
+
+(macro alt-mknode () '())
+
 (macro ast:mknode values
   (
    "Make a node of a current format. To be used within a visitor or revisitor only."
    )
+  `(inner-expand-first
+    ast:mknode:select (alt-mknode) (quote ,values)))
+
+(macro ast:mknode:select (alt qvalues)
+  (if alt
+      `(ast2:mknode ,@(cadr qvalues))
+      `(ast:mknode:old ,@(cadr qvalues))))
+
+(macro ast:mknode:old values
   `(inner-expand-first
     ast:mknode:inner (this-ast-name) (this-ast-node)
     (this-node-var)
@@ -628,7 +639,7 @@
 
 ;;; TODO: path
 (macro ast:access:element (ast node varname xrest)
-  (let* ((defn (shashget (getfuncenv) (Sm<< "AST:" ast ":DEF")))
+  (let* ((defn (bootlib:hashget-mod (getfuncenv) (Sm<< "AST:" ast ":DEF")))
          (ndedef (hashget defn (S<< "  " node ":format"))))
     (p:match ndedef
       ((VAR . $xxx)
@@ -647,7 +658,7 @@
   )
 
 (function docstring-single (nm frmt)
-  (S<< "\n{\\bf " (doc.texnic (any->string nm)) "} $\\to${} "  
+  (S<< "\n{\\bf " (doc.texnic (any->string nm)) "} $\\to${} "
        (docstring-frmt frmt)
        "{}~\\\\"))
 
@@ -661,7 +672,7 @@
        "~\\\\"))
 
 (function ast-docify (name opts src)
-  (foldl string-append 
+  (foldl string-append
     (S<< "AST " name " of " (to-string opts) "\\\\")
     (foreach-map (s src)
       (p:match s

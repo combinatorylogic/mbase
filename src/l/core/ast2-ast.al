@@ -56,10 +56,13 @@
                  (simple <any:e>)
                  (vars <*visitorvar:vs>
                        <*visitorvar:ds>
-                       <visitorelse:e>)))
+                       <visitorelse:e>
+                       )))
   (visitorvar (| (v <tagident:id> <any:e>)))
   (visitorelse (| (none)
-                  (velse <any:e>)))
+                  (velse <any:e>)
+                  (vdelse <any:e>) ;; deep else
+                  ))
   )
 
 ;; Next stage of processing: fusing the AST and the visitor together
@@ -69,13 +72,13 @@
                          <astident:from>
                          <?astident:to>
                          <*visoption:opts>
-                         
+
                          <any:src>
                          <nodeident:srctp>
-                         
+
                          <?topdef:srcdef>
                          <?topdef:dstdef>
-                         
+
                          . <*visitorentry:vs>)))
   (visitorptn (| (forall <*variant:vsrc> <*variant:vdst> <any:e>)
                  (simple <pattern:ps> <pattern:pd> <any:e>)
@@ -84,7 +87,8 @@
                          <*variant:vdst>
                          <*visitorvar:vs>
                          <*visitorvar:ds>
-                         <visitorelse:e>)
+                         <visitorelse:e>
+                         )
                  ))
   )
 
@@ -109,6 +113,7 @@
       (update_thisnode <visitorcode:c> <visitorcode:e>)
       (delayed_update <any:id> <any:tag> <visitorcode:e>)
       (nil)
+      (vdelse <any:e>)
       ))
   )
 
@@ -116,12 +121,12 @@
 (def:ast visitorlang2 ( visitorlang1x )
   (visitorexpr (| (visitor <*tagident:srctags>
                            <*tagident:dsttags>
-                           
+
                            <any:src>
                            <nodeident:srctp>
                            <ident:srcast>
                            <ident:dstast>
-                           
+
                            <*visoption:opts>
 
                            <visitorcode:body>)))
@@ -143,7 +148,7 @@
                   (make_move_record         <ident:nodeid>
                                             <number:pos>
                                             <visitorcode:src>)
-                  
+
                   (make_continuation_record <ident:nodeid>
                                             <number:pos>
                                             <visitorcode:src>)
@@ -152,19 +157,24 @@
                   (ast_make_tuple <pattern:p>) ;; allocate a tuple
                   (ast_make_tagged_tuple <tagident:tg> <pattern:p>) ;; allocate a tuple
                   (label <labelident:id> <visitorcode:e>)
-                  
-                  
+
+
                   (thisnode)
                   (thisnodesrc)
                   (thismetadata)
+
+                  (nil)
+                  (vdelse <visitorcode:e>)
+
                   (make_list_collector)
-                  
+
                   (get_tagged_tuple <visitorcode:e> <number:id>)
                   (get_tuple <visitorcode:e> <number:id>)
                   (bind <*bindpair:ps> <visitorcode:e>)
-                
+
                   (code <any:c>) ;; arbitrary code
-                  (setup_macros <any:c> <visitorcode:e>)
+                  (setup_macros <any:c> . <*visitorcode:e>)
+                  (debugmessage <any:c>)
 
                   (implicit_ctor . <any:v>)
                   (implicit_ctor_tag . <any:v>)
@@ -189,7 +199,7 @@
     (set   <varident:id> <expr:v>)
     (let   <*letpair:ds> <expr:b>) ; a simple let*
     (bind  <*letpair:ds> <expr:b>) ; tenative binding, removed if unused
-    
+
     (label <labelident:id> <expr:e>)
     (switch <expr:c> <*expr:es> <expr:df>)
     (make_label <switchdst:dst>)
@@ -205,7 +215,7 @@
 
     (move                     <number:pos>
                               <expr:src>)
-    
+
     (make_continuation_record <switchdst:dst>
                               <number:pos>
                               <expr:src>)
@@ -240,7 +250,8 @@
 
     (make_popper <label:runner> <label:retlabel> <ident:stackid>)
 
-    (setup_macros <*macropair:ps> <expr:e>)
+    (setup_macros <*macropair:ps> . <*expr:e>)
+    (debugmessage <any:c>)
 
     ;; maybe
     (implicit_ctor <pattern:p>)
@@ -248,5 +259,5 @@
 
     ;; return value
     (dummy) (dummyslot) (getdummy <expr:d>)
-    
+
     )))

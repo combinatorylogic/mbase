@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -16,11 +16,11 @@
 
 (def:ast reg3a ( )
   (*TOP* <exprs>)
-  
+
   (exprs <*expr:es>)
 
   (expr
-   (| 
+   (|
     (mov <rvalue:tgt> <rvalue:src>)
     (gen .  <*rvalue:srcs>)
     (kill . <*rvalue:tgts>)
@@ -75,11 +75,11 @@
            (else nil))))))
    (list (genget) (killget) nil nil))))
 
-(function r3:intermediate1 ( exprs )  
+(function r3:intermediate1 ( exprs )
   (with-sequence ( tg )
     (<> exprs
       (ast:visit reg3a exprs
-        (expr _ 
+        (expr _
           ((label (rreg3a_i.new l () () () () node))
            (else  (format (r3:mkgenkill node) (gen kill . _)
                           (rreg3a_i.new (tg) gen kill nil nil node)))))))))
@@ -178,7 +178,7 @@
               (r3:get-ins ehsh sc))
              (newin
               (r3:set-merge (list (rreg3a_i.gen t)
-                                  (r3:set-substr newout 
+                                  (r3:set-substr newout
                                                  (rreg3a_i.kill t))))))
         (if (not
              (and (= (length newout) (length (rreg3a_i.out t)))
@@ -212,7 +212,7 @@
             (var _
               (begin (add node) (ta tp)))
            )))
-    (list 
+    (list
      (r3:unifiq (get))
      (let* ((h (mkhash)))
        (iter (cut hashput h <> #t)

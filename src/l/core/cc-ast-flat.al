@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -20,8 +20,8 @@
     (Simple <ident:name> <ident:usename> <*ident:fargs> <block:e>)
     (Global <ident:name> <ident:usename> <block:e>)
     (Funref <ident:gloname> <ident:iname>)
-    (Closure <ident:name> <ident:usename> <*ident:args> 
-	     <*ident:fargs> <block:e>)
+    (Closure <ident:name> <ident:usename> <*ident:args>
+             <*ident:fargs> <block:e>)
     ))
   (block <*code:cd>)
 ;= Expressions are atomic now, including a virtual reference to the stack.
@@ -64,7 +64,7 @@
     (Switch <expr:val> . <*ident:labels>)
 
     (Pushapp <expr:fn> . <*expr:args>) ; Regular call
-    (Setlocapp <ident:nm> <expr:fn> . <*expr:args>) 
+    (Setlocapp <ident:nm> <expr:fn> . <*expr:args>)
     (Retapp <expr:fn> . <*expr:args>)  ; A tail call
     (Dropapp <expr:fn> . <*expr:args>)
     (Asm <atarget:tgt> <*useident:use> . <any:body>)
@@ -98,5 +98,5 @@
     ))
   (patcharg (<number:n> <ident:id>))
   (useident (<ident:old> <expr:new>))
-   
+
   )

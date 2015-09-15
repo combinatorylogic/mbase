@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -37,10 +37,10 @@
     (calc02:visit expr e
 ;= We are using a different visiting strategy here: with [[DEEP]] it will process
 ;= inner nodes first, and with ``[[_]]'' it will not go into recursion for listed variants.
-;= If [[else-deep]] is specified, [[DEEP]] behaviour will be turned on for the rest of 
+;= If [[else-deep]] is specified, [[DEEP]] behaviour will be turned on for the rest of
 ;= patterns.
       (expr _
-	((const v)
+        ((const v)
          (var  (lookup-env-car env nm))
          (let
             (loop `((,nm ,(loop env val)) ,@env)
@@ -90,7 +90,7 @@
     ((+) 'plus) ((-) 'minus) ((*) 'mult) ((/) 'div)))
 ;}}
 
-;- The parser is just a little bit different from the previous one, providing two more 
+;- The parser is just a little bit different from the previous one, providing two more
 ;- patterns for an atomic expression entry [[fact]].
 (bnf-parser ((expr calcparser))
   (expr

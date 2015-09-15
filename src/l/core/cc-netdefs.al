@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -14,11 +14,11 @@
 (net.types RuntimeMethodHandle RuntimeFieldHandle Precompiler Runtime)
 
 (define mtd_register_method (r_mtd t_runtime "_register_method" t_Symbol t_RuntimeMethodHandle int))
-(define mtd_register_field (r_mtd t_runtime "_register_field" 
-					   t_Symbol t_RuntimeFieldHandle t_object))
+(define mtd_register_field (r_mtd t_runtime "_register_field"
+                                           t_Symbol t_RuntimeFieldHandle t_object))
 
-(define mtd_register_macro (r_mtd t_runtime "_register_macro" 
-					   t_string t_object))
+(define mtd_register_macro (r_mtd t_runtime "_register_macro"
+                                           t_string t_object))
 
 (define fld_True (r_getField t_runtime "_true"))
 (define fld_False (r_getField t_runtime "_false"))

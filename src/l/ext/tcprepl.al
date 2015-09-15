@@ -2,16 +2,16 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (using ("System.Net.Sockets" "System.IO" "System")
 (module tcprepl
         (using threads)
         (export spawn-mbase-repl tcprepl)
-        
-       
+
+
  (not.function tcplistener ((int port))
      (return (new System.Net.Sockets.TcpListener port)))
 
@@ -43,16 +43,16 @@
    (let loop ()
      (print ">>")
      (let* ((rdr (fun () (let ((res (treadline fi)))
-			   (if (string=? res "#quit")
-			       nil
-			       res))))
-	    (a0x (mbase-parse-repl rdr (fun () (tprint fo "%> ")))))
+                           (if (string=? res "#quit")
+                               nil
+                               res))))
+            (a0x (mbase-parse-repl rdr (fun () (tprint fo "%> ")))))
        (if a0x
-	   (let ((v (read-compile-eval a0x)))
-	     (tprintln fo (S<< "<< " 
+           (let ((v (read-compile-eval a0x)))
+             (tprintln fo (S<< "<< "
                                (to-string v)))
-	     (loop)
-	     ))))
+             (loop)
+             ))))
    t_MBaseException
    (fun (ex)
      (writeline (mbaseerror ex))

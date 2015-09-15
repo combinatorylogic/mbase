@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -17,8 +17,8 @@
   (ntexprs <*ntexpr:es>)
 
   (ntexpr
-   (| 
-      (terminal <?ctortype:dtype> <id:ttype> <id:name> <expr:value> 
+   (|
+      (terminal <?ctortype:dtype> <id:ttype> <id:name> <expr:value>
                 <dualcode:constr> . <*report:r>)
       (binaries <?ctortype:dtype> <id:ttype> <id:name> <expr:lr>
                 <*binvar:vs> . <*report:r>)
@@ -29,15 +29,17 @@
       (targetast <ident:name>)
       ;; syntax sugar to be expanded into binaries
       (src-binaries <?ctortype:dtype> <id:ttype> <id:name>
-		    <*srcbinvar:vs> . <*report:r>)
-      
+                    <*srcbinvar:vs> . <*report:r>)
+
       ))
 
   (dualcode (<annot:a> <code:c>))
+  (annot (.<*apair:as>))
+  (apair (<ident:tg> <ident:v>))
   (binvar (<number:prec> <assoctp:assoc> <expr:op> <dualcode:constr> . <*report:r>))
   (srcbinvar (| (simple <expr:e>)
-		(binary <number:prec> <assocptl:assoc> <expr:e>
-			<dualcode:constr>)))
+                (binary <number:prec> <assocptl:assoc> <expr:e>
+                        <dualcode:constr>)))
   (code
    (|
       (var <id:name>)
@@ -49,7 +51,7 @@
       (dconstr <id:nname> <id:cname> . <*carg:ars>)
       (list . <*carg:ars>)
       (dauto . <*id:tagname>)
-      
+
       (action <lisp:code>) ;; USE WITH CAUTION
       (auto . <*id:tagname>) ;; to be replaced with an automatically inferred code
       (nop)
@@ -58,7 +60,7 @@
    (| (set <id:var> <code:val>)
       (append <id:var> <code:val>)
       ))
-  
+
   (expr
    (| (seq . <*expr:es>)   ; E1 E2 ...
       (palt . <*expr:es>)  ; E1 / E2 ...

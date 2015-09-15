@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -30,7 +30,7 @@
   (return ((object)((tp@get_FieldHandle)@get_Value))))
 
 (function mc-nonstatic (acc)
-  (not 
+  (not
    (filter (fun (x)
              (p:match x
                ((static) #t)
@@ -60,7 +60,7 @@
                                    ,@(map cadr args)) ,@body)
                    (method ,acc ,type ,name ,args
                            (return ((,type)
-                                    (mbase-fn ,nnm 
+                                    (mbase-fn ,nnm
                                               ,@(if ns
                                                     `(((object) self))
                                                     nil)
@@ -76,7 +76,7 @@
     ))
 
 
-    
+
 (function lookupresource (xxnm nm)
   (alet xtp (dotnet xxnm)
    (try
@@ -96,15 +96,15 @@
   (let* ((xxnm (S<< xnm))
          (str0 (lookupresource xxnm nm))
          (ms(cadr str0))
-         (_ 
-          (when (eqv? 'ERROR (car str0)) 
+         (_
+          (when (eqv? 'ERROR (car str0))
                 (ccerror `(CAN NOT LOCATE RESOURCE ,nm))))
-         (strm 
+         (strm
           (not.neth ((System.IO.Stream ms))
            (leave
              (new System.IO.StreamReader ms))))
          (fi (mkreader strm))
-         (res 
+         (res
           (collector (add get)
              (let loop ()
                (alet r (xio-read fi)
@@ -120,8 +120,8 @@
   (let* ((fi0 (io-open-read fn))
          (fi  (mkreader fi0))
          (res (let loop () (let ((r (xio-read fi)))
-				(if (null? r) nil
-				    (cons r (loop))))))
+                                (if (null? r) nil
+                                    (cons r (loop))))))
          )
     (xio-close fi)
     res))
@@ -138,7 +138,7 @@
     ;;;TODO!
     `(,d 0 0 0)))
 
-(macro not.staticdata (name type . data) 
+(macro not.staticdata (name type . data)
   ("Initialise a static data array. Only byte and int types are allowed.")
   (let* ((tdata (case type
                   ((byte) data)
@@ -153,7 +153,7 @@
          (not.neth ()
           (varr = (mkarr ,type ,tlength))
           (System.Runtime.CompilerServices.RuntimeHelpers
-                  @ InitializeArray 
+                  @ InitializeArray
                     ((System.Array)varr)
                     ((System.RuntimeFieldHandle)
                      (fieldtoken

@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -17,45 +17,45 @@
      (Ldarg_1)
      (Ldfld ,f_Closure_frame)
      ,@(if ##prefix-tail
-	 '((Tailcall)) nil)
-	    ;; this is why we had to rewrite the stupid method
+         '((Tailcall)) nil)
+            ;; this is why we had to rewrite the stupid method
      (Callvirt  ,m_Code_Run)
      (Ret)))
 
 ;; A generic call wrapper which applies the appropriate calling convention for a
 ;; given function or closure reference.
 
-(define __kallz_genereegz 
+(define __kallz_genereegz
   (formap (narz 0 SMAXARGS)
      `(method (,(buildstring "call_generic__" narz) (Public Static) (Standard) ,t_object
                (,t_object ,@(formap (i 0 narz) t_object)))
         ,@(pre-emit
             `(
-	          ,(_ldarg 0)
-		  (Isinst ,(nth narz AltFuns))
-		  (Brtrue (label PTR))
- 		  ,(_ldarg 0)
- 		  (Isinst ,(nth narz AltClosures))
- 		  (Brtrue (label NCLOS))
+                  ,(_ldarg 0)
+                  (Isinst ,(nth narz AltFuns))
+                  (Brtrue (label PTR))
+                   ,(_ldarg 0)
+                   (Isinst ,(nth narz AltClosures))
+                   (Brtrue (label NCLOS))
                   (Br (label NONNATIV))
 
                   (label NCLOS)
                   ,(_ldarg 0)
                   (Castclass ,(nth narz AltClosures))
                   ,@(formap (i 0 narz) (_ldarg (+ 1 i)))
- 	          ,@(if ##prefix-tail '((Tailcall)) nil)
-		  (Callvirt ,(nth narz AltClFuns))
- 	          (Ret)
+                   ,@(if ##prefix-tail '((Tailcall)) nil)
+                  (Callvirt ,(nth narz AltClFuns))
+                   (Ret)
 
-		  (label PTR)
-		  ,(_ldarg 0)
-		  (Castclass ,(nth narz AltFuns))
-		  ,@(formap (i 0 narz) (_ldarg (+ 1 i)))
- 	          ,@(if ##prefix-tail '((Tailcall)) nil)
-		  (Callvirt ,(r_mtdf (nth narz AltFuns) "Invoke"
-				     (formap (i 0 narz) t_object)))
-		  (Ret)
-		  
+                  (label PTR)
+                  ,(_ldarg 0)
+                  (Castclass ,(nth narz AltFuns))
+                  ,@(formap (i 0 narz) (_ldarg (+ 1 i)))
+                   ,@(if ##prefix-tail '((Tailcall)) nil)
+                  (Callvirt ,(r_mtdf (nth narz AltFuns) "Invoke"
+                                     (formap (i 0 narz) t_object)))
+                  (Ret)
+
 
                   (label NONNATIV)
                   ,(_ldc_i4 narz)
@@ -67,42 +67,42 @@
                       (Stelem_Ref)
                   ))
                   ,(_ldarg 0)
- 	          ,@(if ##prefix-tail '((Tailcall)) nil)
+                   ,@(if ##prefix-tail '((Tailcall)) nil)
                   (Call (method "call_generic"))
                   (Ret)
              )))))
 
-(define __kallz_r_genereegz 
+(define __kallz_r_genereegz
   (formap (narz 0 SMAXARGS)
      `(method (,(buildstring "call_r_generic__" narz) (Public Static) (Standard) ,t_object
                (,@(formap (i 0 narz) t_object) ,t_object))
         ,@(pre-emit
             `(
-	          ,(_ldarg narz)
-		  (Isinst ,(nth narz AltFuns))
-		  (Brtrue (label PTR))
- 		  ,(_ldarg narz)
- 		  (Isinst ,(nth narz AltClosures))
- 		  (Brtrue (label NCLOS))
+                  ,(_ldarg narz)
+                  (Isinst ,(nth narz AltFuns))
+                  (Brtrue (label PTR))
+                   ,(_ldarg narz)
+                   (Isinst ,(nth narz AltClosures))
+                   (Brtrue (label NCLOS))
                   (Br (label NONNATIV))
 
                   (label NCLOS)
                   ,(_ldarg narz)
                   (Castclass ,(nth narz AltClosures))
                   ,@(formap (i 0 narz) (_ldarg i))
- 	          ,@(if ##prefix-tail '((Tailcall)) nil)
-		  (Callvirt ,(nth narz AltClFuns))
- 	          (Ret)
+                   ,@(if ##prefix-tail '((Tailcall)) nil)
+                  (Callvirt ,(nth narz AltClFuns))
+                   (Ret)
 
-		  (label PTR)
-		  ,(_ldarg narz)
-		  (Castclass ,(nth narz AltFuns))
-		  ,@(formap (i 0 narz) (_ldarg i))
- 	          ,@(if ##prefix-tail '((Tailcall)) nil)
-		  (Callvirt ,(r_mtdf (nth narz AltFuns) "Invoke"
-				     (formap (i 0 narz) t_object)))
-		  (Ret)
-		  
+                  (label PTR)
+                  ,(_ldarg narz)
+                  (Castclass ,(nth narz AltFuns))
+                  ,@(formap (i 0 narz) (_ldarg i))
+                   ,@(if ##prefix-tail '((Tailcall)) nil)
+                  (Callvirt ,(r_mtdf (nth narz AltFuns) "Invoke"
+                                     (formap (i 0 narz) t_object)))
+                  (Ret)
+
 
                   (label NONNATIV)
                   ,(_ldc_i4 narz)
@@ -114,110 +114,110 @@
                       (Stelem_Ref)
                   ))
                   ,(_ldarg narz)
- 	          ,@(if ##prefix-tail '((Tailcall)) nil)
+                   ,@(if ##prefix-tail '((Tailcall)) nil)
                   (Call (method "call_generic"))
                   (Ret)
                   )))))
 
 (define __call_generic
   ;; Check the type of object and call using a proper calling conventions.
- 	`(method ("call_generic" (Public Static) (Standard) ,t_object (,t_object_array ,t_object))
- 	    (local fptr ,t_IntPtr)
- 	    (local ffrm ,t_object_array)
-     ,@(pre-emit `(	
- 		  (Ldarg_1)
- 		  (Isinst ,t_AltClosure)
- 		  (Brtrue (label NCLOS))
- 		  (Ldarg_1)
- 		  (Isinst ,t_SimpleCode)
- 		  (Brtrue (label SIMPLECODE))
- 		  (Ldarg_1)
- 		  (Isinst ,t_Delegate)
- 		  (Brtrue (label PTR))
- 		  (Ldarg_1)
- 		  (Isinst ,t_Code)
- 		  (Brtrue (label CODE))
- 		  (Ldarg_1)
- 		  (Isinst ,t_Closure)
- 		  (Brtrue (label CLOS))
- 		  (Br (label ERRR))
- 		  
- 		  ;; call the given SimpleCode delegate
- 		  (label SIMPLECODE)
- 		  
- 		  
- 	    (Ldarg_1)
- 		  (Castclass ,t_SimpleCode)
- 	    (Ldarg_0) ;; array of args
-	    ,@(if ##prefix-tail '((Tailcall)) nil)
- 	    (Callvirt ,m_SimpleCode_Invoke)
- 	    (Ret)
- 	    
- 	    ;; call the given Code ref
- 	    (label CODE)
-      (Ldarg_1) 	    
- 	    (Castclass ,t_Code)
- 	    (Ldarg_0)
-	    (Ldnull)
-	    ,@(if ##prefix-tail '((Tailcall)) nil)
- 	    (Callvirt ,m_Code_Run)
- 	    (Ret)
- 	    
- 	    ;; call the given Native closure
- 	    (label NCLOS)
- 	    (Ldarg_0)
- 	    (Ldlen)   ;; get the number of args
- 	    (Switch ,(formap (i 0 MAXARGS)
- 	                 (string->symbol (string-append "CALLN" (number->string i)))))
- 	    (Br (label ERRR))
- 	                 
- 	    ;; Call the given native function ref:
- 	    (label PTR)
- 	    (Ldarg_0)
- 	    (Ldlen)
- 	    (Switch ,(formap (i 0 MAXARGS)
- 	                 (string->symbol (string-append "CALLP" (number->string i)))))
- 	    (Br (label ERRR))
- 	    
- 	    ;; Call the given CLOSURE ref: 
- 	    (label CLOS)
- 	    (Ldarg_0)
- 	    (Ldarg_1)
- 	    (Castclass ,t_Closure)
-	    ,@(if ##prefix-tail '((Tailcall)) nil)
- 	    (Call (method "call_closure"))
- 	    (Ret)
- 	    
- 	    ,@(formap (i 0 MAXARGS)
- 	         `((label ,(string->symbol (string-append "CALLN" (number->string i))))
-		   (Ldarg_1)
-		   (Castclass ,(nth i AltClosures))
- 	           ,@(formap (j 0 i) 
- 	                `((Ldarg_0)
- 	                  ,(_ldc_i4 j)
- 	                  (Ldelem_Ref)))
-		   ,@(if ##prefix-tail '((Tailcall)) nil)
-		   (Callvirt ,(nth i AltClFuns))
- 	           (Ret)))
- 	           
+         `(method ("call_generic" (Public Static) (Standard) ,t_object (,t_object_array ,t_object))
+             (local fptr ,t_IntPtr)
+             (local ffrm ,t_object_array)
+     ,@(pre-emit `(
+                   (Ldarg_1)
+                   (Isinst ,t_AltClosure)
+                   (Brtrue (label NCLOS))
+                   (Ldarg_1)
+                   (Isinst ,t_SimpleCode)
+                   (Brtrue (label SIMPLECODE))
+                   (Ldarg_1)
+                   (Isinst ,t_Delegate)
+                   (Brtrue (label PTR))
+                   (Ldarg_1)
+                   (Isinst ,t_Code)
+                   (Brtrue (label CODE))
+                   (Ldarg_1)
+                   (Isinst ,t_Closure)
+                   (Brtrue (label CLOS))
+                   (Br (label ERRR))
+
+                   ;; call the given SimpleCode delegate
+                   (label SIMPLECODE)
+
+
+             (Ldarg_1)
+                   (Castclass ,t_SimpleCode)
+             (Ldarg_0) ;; array of args
+            ,@(if ##prefix-tail '((Tailcall)) nil)
+             (Callvirt ,m_SimpleCode_Invoke)
+             (Ret)
+
+             ;; call the given Code ref
+             (label CODE)
+      (Ldarg_1)
+             (Castclass ,t_Code)
+             (Ldarg_0)
+            (Ldnull)
+            ,@(if ##prefix-tail '((Tailcall)) nil)
+             (Callvirt ,m_Code_Run)
+             (Ret)
+
+             ;; call the given Native closure
+             (label NCLOS)
+             (Ldarg_0)
+             (Ldlen)   ;; get the number of args
+             (Switch ,(formap (i 0 MAXARGS)
+                          (string->symbol (string-append "CALLN" (number->string i)))))
+             (Br (label ERRR))
+
+             ;; Call the given native function ref:
+             (label PTR)
+             (Ldarg_0)
+             (Ldlen)
+             (Switch ,(formap (i 0 MAXARGS)
+                          (string->symbol (string-append "CALLP" (number->string i)))))
+             (Br (label ERRR))
+
+             ;; Call the given CLOSURE ref:
+             (label CLOS)
+             (Ldarg_0)
+             (Ldarg_1)
+             (Castclass ,t_Closure)
+            ,@(if ##prefix-tail '((Tailcall)) nil)
+             (Call (method "call_closure"))
+             (Ret)
+
+             ,@(formap (i 0 MAXARGS)
+                  `((label ,(string->symbol (string-append "CALLN" (number->string i))))
+                   (Ldarg_1)
+                   (Castclass ,(nth i AltClosures))
+                    ,@(formap (j 0 i)
+                         `((Ldarg_0)
+                           ,(_ldc_i4 j)
+                           (Ldelem_Ref)))
+                   ,@(if ##prefix-tail '((Tailcall)) nil)
+                   (Callvirt ,(nth i AltClFuns))
+                    (Ret)))
+
       ,@(formap (i 0 MAXARGS)
- 	         `((label ,(string->symbol (string-append "CALLP" (number->string i))))
-		   (Ldarg_1)
-		   (Castclass ,(nth i AltFuns))
- 	           ,@(formap (j 0 i) 
- 	                `((Ldarg_0)
- 	                  ,(_ldc_i4 j)
- 	                  (Ldelem_Ref)))
-		   ,@(if ##prefix-tail '((Tailcall)) nil)
-		   (Callvirt ,(r_mtdf (nth i AltFuns) "Invoke"
-				     (formap (x 0 i) t_object)))
- 	           (Ret)))
- 	    (label ERRR)
-	    (Ldstr "GENERIC CALL ERROR")
- 	    (Ret)
- 	  ))))
- 	  
-                 
+                  `((label ,(string->symbol (string-append "CALLP" (number->string i))))
+                   (Ldarg_1)
+                   (Castclass ,(nth i AltFuns))
+                    ,@(formap (j 0 i)
+                         `((Ldarg_0)
+                           ,(_ldc_i4 j)
+                           (Ldelem_Ref)))
+                   ,@(if ##prefix-tail '((Tailcall)) nil)
+                   (Callvirt ,(r_mtdf (nth i AltFuns) "Invoke"
+                                     (formap (x 0 i) t_object)))
+                    (Ret)))
+             (label ERRR)
+            (Ldstr "GENERIC CALL ERROR")
+             (Ret)
+           ))))
+
+
 ;; Now compile and save the assembly code:
 (define _ctor_MiscCall (r_getconstructor t_MiscCall t_object t_IntPtr))
 (define _f_Runtime_clr (r_getField t_Runtime "clr"))
@@ -235,5 +235,5 @@
        (Ret)
     )
     )))
-  
+
 

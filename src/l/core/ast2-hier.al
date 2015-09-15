@@ -53,8 +53,7 @@
                                      (wrap n))))))
                   (rw (hashmap (fun (k v) k) rwh))
                   (rwsrc
-                   (if rw
-                       (astlang:visit topdef isrc
+                   (astlang:visit topdef isrc
                          (topdef DEEP
                                  ((defast (foreach-mappend (n ns) n))))
                          (astnode DEEP
@@ -62,11 +61,11 @@
                                    (varnode (check id node))
                                    (extend
                                     (ccerror `(AST-MERGE-EXTEND ,node)))))
-                         
+
                          (nodedefident DEEP
                            (let* ((chk (ohashget rwh node)))
                              (if chk chk node))))
-                       isrc)))
+                   ))
              (astlang:iter topdef isrc
                (topdef _
                  ((defast (tagsadd taglist)))))

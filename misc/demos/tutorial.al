@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -11,7 +11,7 @@
 
 ;; Ignore this please:
 (define chN (cons nil 0))
-(macro /@ rest 
+(macro /@ rest
   (set-cdr! chN (+ (cdr chN) 1))
   `(println (S<< ,(S<< "\nChapter " (->s (cdr chN)) ":\n\t") ,(strinterleave (map to-string rest) " ") "\n")))
 (macro // rest `(println ,@rest))
@@ -54,7 +54,7 @@
        (c (* b 2))
        (d (* c 2)))
    (///  "d=") (// d))
-   
+
 ; To define a global variable, use (define ...):
 
 (define Hundred 100)
@@ -114,7 +114,7 @@
 (recfunction list-length (lst)
    (if (null? lst) 0
        (+ 1 (list-length (cdr lst)))))
-       
+
 ; Here the predicate function 'null?' returns true when argument is a null pointer.
 ; Null is normally represented as '()'.
 ; 'if' construction has 2 or 3 arguments: (if <condition> <iftrue> [<iffalse>])
@@ -143,11 +143,11 @@
 
 (function list-length (lst0)
   (let list-length-inner ((acc 0)
-			  (lst lst0))
+                          (lst lst0))
     (if (null? lst)
-	acc
-	;; otherwise
-	(list-length-inner (+ acc 1) (cdr lst)))))
+        acc
+        ;; otherwise
+        (list-length-inner (+ acc 1) (cdr lst)))))
 
 (/// "length of long list is: ") (// (list-length (formap (i 1 1000) i)))
 
@@ -159,13 +159,13 @@
 
 (/// "5 stars: ") (for (i 0 5) (print "*")) (println "")
 
-(/// "list of some even numbers: ") 
+(/// "list of some even numbers: ")
 (writeline (map (fun (x) (* x 2))
                 (formap (i 0 11) i)))
-                
+
 (/// "Sum of numbers from 5 to 10: ")
 (writeline (foldl + 0 (formap (i 5 11) i)))
-               
+
 (/// "Product of numbers from 5 to 10: ")
 (writeline (foldl * 1 (formap (i 5 11) i)))
 
@@ -175,12 +175,12 @@
 ; For example, the list-length function can be rewritten as follows:
 (function list-length (lst)
    (foldl (fun (acc el) (+ acc 1)) 0 lst))
-   
+
 (/// "List length again: ") (// (list-length (formap (i 0 1000) "AAA")))
 
 (/@ More lists.)
 
-; We have learned how to compose and decompose lists using basic functions and c**r 
+; We have learned how to compose and decompose lists using basic functions and c**r
 ; derivatives. Now let's consider some higher level constructions:
 
 (/// "a+b for the list (x y (a) . b): ")
@@ -216,16 +216,16 @@
                 (if (eq? (car e) '<>)
                     (cons (car a) (loop (cdr e) (cdr a)))
                     (cons (car e) (loop (cdr e) a))))))))
-                    
+
 ; To see how your macro works you can use 'expand' function:
 (/// "(cut * 2 <>)=") (writeline (expand '(cut * 2 <>)))
 
 ; An example of the macro 'cut' application:
 
-(/// "Odd numbers ") 
+(/// "Odd numbers ")
 (writeline
   (map (cut * 2 <>) (formap (i 0 10) i)))
-  
+
 ; Another example, this time a simple one:
 
 (macro example (description expression)
@@ -249,26 +249,26 @@
           (msg (string-append "Error in " name))
           (rname (gensym)))
      (println (buildstring "Defining function with contract: " name))
-     `(function ,name ,argz 
+     `(function ,name ,argz
         (begin
-           (if ,argver 
+           (if ,argver
              (let ((,rname (begin ,@body)))
                (if (,contract ,rname)
                    ,rname
                    (begin (println ,msg) nil)))
              (begin (println ,msg) nil))))))
-             
+
 ; Now note that "Defining function..." message appears only during compilation.
 ; If you run the compiled code later, you will not see the message.
 
 (cfunction test ((i (> i 0))) (cut > <> 0)
     (* 8 (- i 10)))
-    
+
 (example () (test 4))
 (example () (test 25))
 (example () (test 0))
 
-; That is how the language can be extended. In fact, almost all the constructions of 
+; That is how the language can be extended. In fact, almost all the constructions of
 ; the language are implemented as macros. The core language itself is very simple
 ; and limited.
 
@@ -286,7 +286,7 @@
                    | (_ p.space )  ;; ignore whitespaces
                    | ("."   T> DOT I)
                    | ((p.alpha +*)             ;; idents
-			                T> SYM list->symbol))
+                                        T> SYM list->symbol))
                   ))
 
 ; For parsing pass we will use an embedded LL(1) parsers generator:
@@ -304,7 +304,7 @@
        ((nde:a DOT nde:b)   (cons a b)            )
        ((nde:a ndx:b)       (cons a b)            )
        ((nde:x)             (list x)              ))
-    ) 
+    )
 
 (example () (lex-and-parse lexr parse-sexpr "(a b (c . d)  `(,@o . e))"))
 ; Lexers and parsers may return errors:
@@ -328,7 +328,7 @@
 ;; 'sort' function is naturally polymorphic:
 (example () (sort < '(9 7 3 4 5 7 3 1 4 9 2 3)))
 
-(example () (sort string<? 
+(example () (sort string<?
                   '(
                     "Some" "words" "to" "sort" "in" "an" "alphabetical" "order"
                    )))
@@ -340,8 +340,8 @@
   (p:match lst
     (() nil)
     (($piv . $rst)
-     `( ,@(qsort2 (<L> l | l <- rst & (<= l piv))) 
-        ,piv 
+     `( ,@(qsort2 (<L> l | l <- rst & (<= l piv)))
+        ,piv
         ,@(qsort2 (<L> r | r <- rst & (>  r piv)))))
     (else lst)))
 
@@ -384,11 +384,11 @@
 (define query "append([1,2,3],X,[1,2,3,3,2,1]).")
 
 (/// "(append '(1 2 3) X) = '(1 2 3 3 2 1); X = ")
-(format 
+(format
  (simple-prolog nil query)
  (((_ x)))
  (// (prolog-print x)))
-      
+
 
 (/@ Abstract Syntax Trees: another kind of declarative programming.)
 
@@ -414,7 +414,7 @@
 (example () (avisitor '(APP + (CONST 2) (APP * (APP / (VAR x) (VAR y)) (CONST 8)))))
 
 
-(/@ Humor: playing Peano with decimals.) 
+(/@ Humor: playing Peano with decimals.)
 
 ; Definitions for Peano numbers and operations on them
 
@@ -427,13 +427,13 @@
 
 (define Plus append)
 
-(function Mult (a b) 
+(function Mult (a b)
    (foldl (fun (acc _) (Plus b acc)) nil a))
 
 (function Minus (x y) (foldl DFun x y))
 (function MinusOne (x) (cdr x))
 
-(function Div (x y) 
+(function Div (x y)
   (let loop ((t x)
              (n Zero))
      (let ((z (let loop1 ((v t)
@@ -442,7 +442,7 @@
                    (if (null? z) (cons v nil)
                        (loop1 (cdr v) (cdr z))
                        )))))
-       (if (null? (cdr z)) 
+       (if (null? (cdr z))
            (if (null? (car z)) (cons (Succ n) nil)
                                (loop (car z) (Succ n)))
            (cons n t)))))
@@ -461,8 +461,8 @@
 
 ; Parse a decimal string into a Peano number
 (function ParseNumber (str)
-  (cdr (foldl (fun (acc dig) 
-               (cons (Mult (car acc) Ten) 
+  (cdr (foldl (fun (acc dig)
+               (cons (Mult (car acc) Ten)
                      (Plus (cdr acc) (Mult (car acc) dig))))
               (cons One Zero)
               (map (@ FromDigit char->string) (reverse (string->list str))))))
@@ -478,9 +478,9 @@
                        nt
                        (cons (ToDigit dig) r)))))))
 
-; Demo usage: 
+; Demo usage:
 (recfunction Fact (x)
-   (if (null? x) One 
+   (if (null? x) One
                  (Mult x (Fact (MinusOne x)))))
 
 (print "9! = ")
@@ -521,20 +521,20 @@
 (writeline (notnettest "String: " 10))
 
 (using (System Meta.Scripting)
- 
+
  (not.class SimpleStructure  (extend ValueType)
     (field int x (public))
     (field int y (public))
     )
 
- (not.class SimpleClass 
+ (not.class SimpleClass
     (method ((public) (static)) object test ((int i))
        (s1 = (new SimpleStructure))
        (s1#x <- i)
        (s1#y <- (* 2 (s1#x)))
        (print (concat "s1: " ((s1#x)@ToString) "," ((s1#y)@ToString)))
        (print ((Math@Sin (* d3.14 d2.1))
-	       @ToString "e3"))
+               @ToString "e3"))
        (return ((object)s1))
       ))
 
@@ -563,22 +563,22 @@
    ((+) +) ((*) *) ((/) /) ((-) -) ))
 
 (function polish (lst)
-   (car (foldl (fun (stk op) 
-		    (if (symbol? op)
-			(format stk (a b . rst) 
-				(cons ((despatch op) b a) rst))
-			(cons op stk)))
-	       nil
-	       lst)))
+   (car (foldl (fun (stk op)
+                    (if (symbol? op)
+                        (format stk (a b . rst)
+                                (cons ((despatch op) b a) rst))
+                        (cons op stk)))
+               nil
+               lst)))
 
 (example "RPN calculator:" (polish '(2 2 + 2 * 10 -)))
 
 (/@ More imperative coding.)
 
-(function primes (N) ;; not a very efficient implementation 
+(function primes (N) ;; not a very efficient implementation
   (let* ((v (mkvector (fromto 0 N)))
          (I (/ N 2)))
-    (for (i 2 I) 
+    (for (i 2 I)
         (for (k (+ i i) N i) (aset v k 0)))
     (filter (cut > <> 0) (a->l v))) )
 
@@ -598,4 +598,3 @@
 
 (example "Functional prime numbers:" (funprimes 100))
 
-  

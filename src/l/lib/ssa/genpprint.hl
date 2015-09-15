@@ -1,0 +1,101 @@
+% literate:
+
+\section{Generic pretty-printing language}
+
+\pfcode{
+module generic_pprint
+       export pprint.
+}
+
+This is a simple nearly-unstructured language for pretty-printing arbitrary
+source code. An AST visitor generates an unstructured tree of printing commands
+and hints, using simple rewrite rules, and then the printing backend takes
+care of the actual formatting. Tree may contain symbols - which are treated
+as commands, potentially with some arguments following the symbols, and strings,
+which are assembled into output lines as atomic entities (i.e., cannot be
+splitted into smaller substrings).
+
+The following commands are supported:
+
+\begin{itemize}
+\item \verb|FORCECR|: line break is mandatory
+\item \verb|WEAK|: a good candidate position for breaking the line
+\item \verb|PUSHSTOP|: set the indentation to the current position
+\item \verb|PUSHTAB|: add a tab width to the current indentation
+\item \verb|POP|: pop the indentations stack
+\item \verb|NB|: do not break here, please, please, look for a WEAK instead
+\item \verb|TABBACK|: if used in a beginning of a new line, cut the indentation by one tab width for this line only (this is useful for the goto labels, for example)
+\end{itemize}
+
+Internally, an output line is assembled from a mixture of string-level commands and
+string chunks. Commands passed onto an output line are following:
+
+\begin{itemize}
+\item \verb|NB|: never break here
+\item \verb|WEAK<pos>|: potential break, with the next line indentation set to \verb|pos|.
+\item \verb|TABBACK|: if the first command in the line, reduce the indentation
+\end{itemize}
+
+\pfcode{
+function pprint(lst, pfun)
+  do loop(l = lst,
+          str = [0],
+          pos = 0,
+          stk = [],
+          cnt = []) {
+    cont(str1, pos1, stk1) =
+      if (cnt) loop(car(cnt), str1, pos1, stk1, cdr(cnt)) else [];
+    tab_width = 2;
+    print_spaces(n) = {
+      iter i in [0..n] do pfun(" ");
+    };
+    getpos() = if (stk) car(stk) else 0;
+    flush_string() = {
+      if (cdr(str)) {
+      do fsloop(s = cdr(str), ind = car(str)) {
+        if (s) {
+          match car(s) with
+            'TABBACK' -> fsloop(cdr(s), ind - tab_width)
+          | 'WEAK' -> fsloop(cddr(s), ind)
+          | 'NB' -> fsloop(cdr(s), ind)
+          | x -> {
+               if (ind) print_spaces(ind);
+               pfun(x); fsloop(cdr(s), 0)}
+        } else pfun("\n")}}};
+    splitthisstring(nw) = {
+      //TODO: if string ends with NB, carry on.
+      //TODO: find the last WEAK marker, flush the string before the marker,
+      //  carry on with the remaining string + nw
+      flush_string();
+      cont([getpos();nw], getpos(), stk)
+    };
+    match l with
+      hd:tl -> loop(hd, str, pos, stk, tl:cnt)
+    | [] -> cont(str, pos, stk)
+    | else -> if(%symbol?(l)) {// this is a command
+       case l {
+         | 'FORCECR' -> {flush_string(); cont([getpos()], getpos(), stk)}
+         | 'PUSHSTOP' -> cont(str, pos, pos:stk)
+         | 'PUSHTAB' -> cont(str, pos, (getpos()+tab_width):stk)
+         | 'POP' -> cont(str, pos, cdr(stk))
+         | 'WEAK' -> cont(str::['WEAK';getpos()], pos, stk)
+         | 'NB' -> cont(str::['NB'], pos, stk)
+         | 'TABBACK' -> cont(str::['TABBACK'], pos, stk)
+         // ignore the unknown commands
+         | else -> cont(str, pos, stk)
+       }} else { //it's a proper string
+         len = notnet(string l) {leave l.get_Length();};
+         ipos = car(str);
+         if ((pos + len - ipos) > 78) splitthisstring(l)
+         else cont(str::[l], pos + len, stk)
+       }
+    }
+  }
+}
+
+
+\pfcode{
+endmodule.
+}
+
+%%%%

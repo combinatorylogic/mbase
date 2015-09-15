@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -66,16 +66,16 @@
            ((regexp-tokens) lst
             (let* ((p (mkpairs lst))
                    (r `(pm<|> ,@(map-over p
-				  (fmt (l r)
-				    `(<r> (,l
-					   T> ,r I)))))))
+                                  (fmt (l r)
+                                    `(<r> (,l
+                                           T> ,r I)))))))
                (set-cdr! regexps (append (cdr regexps) (list r)))))
            ((simple-tokens) lst
             (let* ((p (mkpairs lst))
                    (r `(pm<|> ,@(map-over p
-				  (fmt (l r)
-				    `(<r> ((,l -> genlist->string) 
-					   T> ,r I)))))))
+                                  (fmt (l r)
+                                    `(<r> ((,l -> genlist->string)
+                                           T> ,r I)))))))
                (set-cdr! regexps (append (cdr regexps) (list r)))))
            ((ignore) lst
             (set-cdr! ignore (cons `(pWhitespace (pm<|> ,@lst))
@@ -87,25 +87,25 @@
                                      `(<r> (,l T> (,r) I))))))
               (set-cdr! ignore (append r (cdr ignore)))))
            ))
-   `(define ,name 
+   `(define ,name
      (pm<|>
         ,@(if (null? (cdr ignore)) nil `((pm<|> ,@(cdr ignore))))
         ,@(cdr regexps)
-        (<r> (,(cdr ident) X-> 
+        (<r> (,(cdr ident) X->
                (fun (l r)
                  (let* ((s0 (genlist->symbol l))
-			(s (genvalue s0))
-			(sp (genposition s0)))
+                        (s (genvalue s0))
+                        (sp (genposition s0)))
                    ,(let ((rrr
                            `((p[xTp] (quote ,(cdr ident-name)) I) s r sp)))
                        (if (null? (cdr keywords)) rrr
-                          `(case s 
+                          `(case s
                               (,(cdr keywords) ((p[xTp] s I) s r sp))
-                              (else 
+                              (else
                                ,(if (null? (car keyexs)) rrr
                                     `(cond
                                       ,@(foreach-map (e (car keyexs))
-                                          `((,(car e) s) 
+                                          `((,(car e) s)
                                             ((p[xTp] (quote ,(cadr e)) I) s r sp)))
                                       (else ,rrr)
                                       )
@@ -116,7 +116,7 @@
   ("Returns a lexing result or error in a printable format.")
   (try
    (map (fmt (a b) (list a b))
-	(p-result ((<r> lexer *) src)))
+        (p-result ((<r> lexer *) src)))
    t_MBaseException
    (fun (e)
      `(DEBUG-LEXER-ERROR: ,(mbaseerror e)))))

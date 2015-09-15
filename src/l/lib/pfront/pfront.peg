@@ -2,8 +2,8 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-// This file is distributed under the terms of the Q Public License version 1.0.
+// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+//
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -53,12 +53,12 @@ parser pfront extends minipeg (
     /   ident
     ;
 
-  term expr "Expression" := 
+  term expr "Expression" :=
              { zzexpr:a binop0:o expr:b => leftass(binop(o,a,b)) }
           /  { zzexpr:a => stopfix(a) }
           ;
 
-  term zzexpr := 
+  term zzexpr :=
              { bexpr:a tAPPEND zzexpr:b => append(a,b) }
           /  { bexpr:a ':' zzexpr:b => cons(a,b) }
           /  { bexpr:a binop3:o zzexpr:b => leftass(binop(o,a,b)) }
@@ -71,14 +71,15 @@ parser pfront extends minipeg (
             / { eterm:a => stopfix(a) }
             ;
   term eterm := { basicexpr:a binop2:o eterm:b => leftass(binop(o,a,b)) }
+            / { basicexpr:a |'mod'| eterm:b => leftass(binop(`mod,a,b)) }
             / expr_bin2
             /  { basicexpr:a => stopfix(a) }
             ;
 
-  term casepair "<case pair>" := cslist<qsymbol,'|'>:ss tTO exprwrap:e 
+  term casepair "<case pair>" := cslist<qsymbol,'|'>:ss tTO exprwrap:e
        => $cons(ss,$cons(e,$nil()));
 
-  term condpair "<cond pair>" := (!|'else'| exprwrap:pred) tTO exprwrap:e 
+  term condpair "<cond pair>" := (!|'else'| exprwrap:pred) tTO exprwrap:e
        => $cons(pred,$cons(e,$nil()));
 
   term itercount "count <id>" := |'count'| qident:id => id;
@@ -89,8 +90,10 @@ parser pfront extends minipeg (
 
   term docstring := '%' string:s => s;
 
+  term localmacrodef := qident:id "=" exprwrap:e => def(id,e);
+
   term basicexpr :=
-    expr_start 
+    expr_start
   / { '{' %indent(push,tab) ecslist<exprwrap,';'>:body ';'? %indent(pop,tab) '}' => {mode=expr}
              begin(@$makeloc(),@body) }
   / { '<' %indent(push,firsttab) mpattern:fm %indent(pop,firsttab) '>' '=' exprwrap:e =>
@@ -99,6 +102,11 @@ parser pfront extends minipeg (
            {mode=expr} $makelocbegin(call(e,@args)) }
   / { '(' exprwrap:e ')' '('  ')' => {mode=expr} $makelocbegin(call(e)) }
   / { '(' exprwrap:e ')' => unleft(e) }
+  / { |'with'| |'macros'| "(" cslist<localmacrodef,";">:defs ";"? ")" exprwrap:e
+       => withmacros(defs, e) }
+  / { |'with'| |'metadata'| "(" exprwrap:m ")" exprwrap:e =>
+         withmetadata(m,e) }
+  / { |'with'| |'target'| "(" qident:astnm ")" exprwrap:e => withast(astnm, e) }
   / { |'collector'| '(' %indent(push,firsttab) qident:addname ',' qident:getname %indent(pop,firsttab) ')' exprwrap:body =>
       {mode=expr} collector(addname,getname, begin(@$makeloc(), body)) }
   / { |'try'| exprwrap:e |'catch'| '(' dottype:tp qident:nm ')' %indent(push,tab) exprwrap:proc %indent(pop,tab) =>
@@ -108,11 +116,15 @@ parser pfront extends minipeg (
        tTO exprwrap:els)? '}' %indent(pop,firsttab) => case(e,opts,els) }
   / { |'cond'|  %indent(push,firsttab) '|'? cslist<condpair,'|'>:opts ('|' |'else'|
        tTO exprwrap:els)? %indent(pop,firsttab) => cond(opts,els) }
-  / { |'visit'| ':' ident:ast vsopts:ops '(' ident:top ':' exprwrap:e ')' '{' %indent(push,tab) visitbody:b %indent(pop,tab) '}' 
+  / { |'visit'| ':' ident:ast vsopts:ops '(' ident:top ':' exprwrap:e ')' '{' %indent(push,tab) visitbody:b %indent(pop,tab) '}'
       => visit(ops,ast,top,e,@b) }
-  / { |'iter'| ':' ident:ast vsopts:ops '(' ident:top ':' exprwrap:e ')' '{' %indent(push,tab) visitbody:b %indent(pop,tab) '}' 
+  / { |'iter'| ':' ident:ast vsopts:ops '(' ident:top ':' exprwrap:e ')' '{' %indent(push,tab) visitbody:b %indent(pop,tab) '}'
       => viter(ops,ast,top,e,@b) }
-  / { |'mk'| ':' |'node'| '(' %indent(push,firsttab) cslist<argpair,','>:args %indent(pop,firsttab) ')' => mknode(@args) }
+  / { |'mk'| ':' |'node'| '(' %indent(push,firsttab) ecslist<mdargpair,','>:args %indent(pop,firsttab) ')' => mknode(@args) }
+  / { |'mk'| ':' ident:nd ':' ident:vtag
+         '(' %indent(push,firsttab) ecslist<mdargpair,','>:args %indent(pop,firsttab) ')' => mkvnode(nd, vtag, @args) }
+  / { |'mk'| ':' ident:vtag
+         '(' %indent(push,firsttab) ecslist<mdargpair,','>:args %indent(pop,firsttab) ')' => mkxnode(vtag, @args) }
   / { |'if'| exprwrap:e |'then'|? %indent(push,tab) exprwrap:tr ';'? %indent(pop,tab) |'else'| %indent(push,tab) exprwrap:fl %indent(pop,tab)
       => if3(e,tr,fl) }
   / { |'if'| exprwrap:e |'then'|? %indent(push,tab) exprwrap:tr %indent(pop,tab)
@@ -148,10 +160,10 @@ parser pfront extends minipeg (
   / { '`' expr:e '`' => {qstate = quote} qquote(e) }
   / { qident:nm '.>' qident:nm1 => accelement(nm, nm1) }
   / { qident:fn '(' ')' => {mode=expr} begin(@$makeloc(),call(var(fn))) }
-  / { qident:fn '(' cslist<expr,','>:args ')' => 
+  / { qident:fn '(' %indent(push, tab) cslist<expr,','>:args %indent(pop,tab) ')' =>
                 {mode=expr} begin(@$makeloc(),call(var(fn),@args)) }
   / { qident:nm '=' expr:e => {mode=expr} $makelocbegin(def(nm,e)) }
-  / { pfchar:ch => char(ch) } 
+  / { pfchar:ch => char(ch) }
   / { qsymbol:s '(' ecslist<ecexpr,','>:args ')' => easyconstr(s,@args) }
   / { qsymbol:s => vquote(s) }
   / { ident:e => var(e) }
@@ -166,7 +178,7 @@ parser pfront extends minipeg (
   term vsopts := { '/' ecslist<vsopt,','>:ops '/' => some(@ops) }
             /  { empty => none() }
             ;
-            
+
   term vsopt :=    { 'rec' => recform() }
            /  { 'dst' ident:id => dst(id) }
            /  { 'listform' => listformsrc() }
@@ -175,9 +187,12 @@ parser pfront extends minipeg (
 
   term ecexpr "expr | @expr" := { '@' expr:e => append(e) }
                              /  { expr:e => normal(e) }
-			     ;
+                             ;
 
   term argpair "'nm' = 'value'" := qident:nm '=' expr:e => $list(nm,e);
+  term mdargpair "'nm' = 'value'" := mdargnm:nm '=' expr:e => $list(nm,e);
+  term mdargnm := { '@' => `[[*metadata*]] }
+               /  qident;
 
   term matchbody := '|'? cslist<matchbodyel,'|'>:bs => bs;
   term matchbodyel "<match pair>" := mpattern:p tTO exprwrap:e =>
@@ -195,7 +210,7 @@ parser pfront extends minipeg (
   term impattern "Match pattern" :=
      { '[' ']' => { ctoken = emptyset } nil() }
    / { '[' cslist<lmpattern,';'>:lst ']' => list(@lst) }
-   / { '(' mpattern:p ')' => p }     
+   / { '(' mpattern:p ')' => p }
    / { '=' ident:i => eq(i) }
    / { '::ptn' '\' ident:i '\' => {qstate = unquote} unquote(i) }
    / { qsymbol:i '(' ecslist<lmpattern,','>:args ')' => alist(i,@args) }
@@ -215,11 +230,16 @@ parser pfront extends minipeg (
    ;
 
   term visitbody := cslist<visitbodyel,';'>:es ';'? => es;
-  term visitbodyel "<visit node>" := 
-     { visitype:tp ident:id
-        '{' '|'? cslist<visitpattern,'|'>:ps 
+  term visitbodyel "<visit node>" :=
+     { visitype:tp ident:id '(' cslist<ident,','>:args ')'
+        '{' '|'? cslist<visitpattern,'|'>:ps
             (visielse:ee)?
-        '}' => 
+        '}' =>
+       manyfun(tp,id,args,ps,ee) }
+   / { visitype:tp ident:id
+        '{' '|'? cslist<visitpattern,'|'>:ps
+            (visielse:ee)?
+        '}' =>
        many(tp,id,ps,ee) }
    / { visitype:tp ident:id ':' tFORALL exprwrap:e => forall(tp,id,e) }
    / { visitype:tp ident:id ':' exprwrap:e => single(tp,id,e) }
@@ -229,11 +249,11 @@ parser pfront extends minipeg (
   term visitpattern "<visit pattern>" := vpident:p tTO exprwrap:e => $list(p,e);
   term vpident := ident / qsymbol;
 
-  term visielse "<visit else>" := 
+  term visielse "<visit else>" :=
       { '|'? |'else'| tTO? exprwrap:e => velse(e) }
-   /  { '|'? |'deep'| tTO? '{' '|'? cslist<visitpattern,'|'>:ps 
+   /  { '|'? |'deep'| tTO? '{' '|'? cslist<visitpattern,'|'>:ps
             (visielse:ee)?
-       '}' => elsedeep(ps,ee) }; 
+       '}' => elsedeep(ps,ee) };
 
   term visitype := { visitypenode:nd '>>' ident:dst => withdst(nd,dst) }
                 /  visitypenode
@@ -241,20 +261,30 @@ parser pfront extends minipeg (
   term visitypenode "<visitor type>" := { tvisitype:t => id($sval(t)) }
                 /  { ident:i |'as'| |'once'| => asonce(i) }
                 /  { ident:i |'as'| => as(i) }
-		;
+                ;
 
   token tvisitype := 'deep'/'once' => {ctoken = keyword};
 
   term addborrow := { '(' cslist<ident,','>:is ')' => is } / {!'(' => $nil() /* ) */ };
 
+  term moduleexport := { |'export'| qident:i => export(i) }
+                    /  { |'import'| qident:i => import(i) }
+                    ;
+
   term topexpr "Top level expression" :=
      top_start
    / { '{' %indent(push,tab) eslist<topexpr>:es %indent(pop,tab) '}' =>  {mode=top} begin(@es) }
+   / { |'using'| %indent(push, tab) |'module'| %indent(push, tab) cslist<qident,','>:nms ('.'/';')? %indent(pop, tab)
+           => usemodule(nms) }
+   / { |'endusing'| ('.'/';')? %indent(pop, tab) => endusing() }
    / { |'using'| '(' cslist<dnetns,','>:us ')' ';'? slist<topexpr>:es
         => using(us,@es) }
    / { tflush => topflush() }
-   / { |'module'| ident:nm |'exe'| ';'? => exemodule(nm) }
-   / { |'module'| ident:nm ';'? => module(nm) }
+   / { |'binary'| |'module'| ident:nm |'exe'| ';'? => exemodule(nm) }
+   / { |'binary'| |'module'| ident:nm ';'? => module(nm) }
+   / { |'module'| %indent(push, tab) ident:nm %indent(push, tab) eslist<moduleexport>:exs
+                                              %indent(pop,tab) ('.'/';')? => defmodule(nm, exs) }
+   / { |'endmodule'| ('.'/';')? %indent(pop, tab) => endmodule() }
    / { |'parser'| miniparser:p => p }
    / { |'syntax'| |'in'| ident:nm ',' ident:pos addborrow:ab ':' mpeg:c expr:body
         => topsyntax($list(nm,pos),ab, c, body) }
@@ -291,7 +321,7 @@ parser pfront extends minipeg (
    / { qident:i => i(i) }
    ;
 
-  term astparent "<ast parent>" := ident:nm '(' ecslist<astparpair,','>:tmap ')' 
+  term astparent "<ast parent>" := ident:nm '(' ecslist<astparpair,','>:tmap ')'
      => $cons(nm,tmap);
 
   term astparpair "<ast par pair>" := ident:a tTO ident:b => $list(a,b);
@@ -301,7 +331,7 @@ parser pfront extends minipeg (
                / { ident:nm '+' '=' '|'? cslist<aststruct,'|'>:alts => addalt(nm,@alts) }
                / { ident:nm |'is'| aststrucx:s => struct(nm,s) };
 
-  term aststruct "<ast struct>" := 
+  term aststruct "<ast struct>" :=
       { ident:nm '(' ecslist<astsarg,','>:args ')' => withargs(nm,args) }
     / { ident:nm => single(nm) };
 
@@ -312,7 +342,7 @@ parser pfront extends minipeg (
   term astsarg "<ast struct element>" := { '*' ident:tp ':' ident:nm => bindmany(tp,nm) }
                /  { '?' ident:tp ':' ident:nm => bindopt(tp, nm) }
                /  { ident:tp ':' ident:nm => bindone(tp,nm) }
-	       /  { '.' astsarg:as => dot(as) }
-	       /  { '(' ecslist<astsarg,','>:args ')' => list(@args) }
-	       ;
+               /  { '.' astsarg:as => dot(as) }
+               /  { '(' ecslist<astsarg,','>:args ')' => list(@args) }
+               ;
 )

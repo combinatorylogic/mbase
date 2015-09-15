@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -16,13 +16,25 @@
 ;- not quite suitable for compilation, and here we'll transform it into a
 ;- proper, strict AST form. Some error checking is performed here, giving
 ;- level CC01 exceptions.
-;- 
+;-
 
 ;= A helper function: check if argument is a symbol.
 (function cc:check-sym (s)
   (if (not (symbol? s))
       (cc:comperror `(CC01:SYM ,s)))
   s)
+
+(function cc:nl? (v)
+  (if (null? v) #t
+      (if (list? v) #t
+          nil)))
+
+(function cc:chkappend (l r)
+  (if (and (cc:nl? l) (cc:nl? r))
+      (append l r)
+      (if (cc:nl? l)
+          (cc:comperror `(CC01:LIST-OR-NULL ,r))
+          (cc:comperror `(CC01:LIST-OR-NULL ,l)))))
 
 ;= A helper function: check if a lambda arguments list contains only symbols.
 (function cc:check-args (lst)
@@ -77,7 +89,7 @@
 
       ((inner.localvar $x) `(Var ,x))
 
-;= Function application syntax:      
+;= Function application syntax:
       (($expr . $rest)
        `(App ,(loop expr) ,@(map loop rest)))
 ;= Literals:
@@ -96,27 +108,27 @@
         ))
     ))
 
-;- 
+;-
 ;- Next part of the same process
 ;-
 
 (function cc:core->ast-part2 (env loop_outer s)
   (let ((loop (lambda (s) (loop_outer env s)))
         (mklloop (lambda (args)
-                   (let ((newenv (append args env)))
+                   (let ((newenv (cc:chkappend args env)))
                      (lambda (s)
                        (loop_outer newenv s))))))
   (p:match s
     ;= With, begin:
       ((inner.let $args . $body)
        (let ((lloop (mklloop (map car args))))
-       `(SLet ,(map-over args 
+       `(SLet ,(map-over args
                   (fmt (nm vl)
                     `(,(cc:check-sym nm) ,(lloop vl))))
              (Begin ,@(map lloop body)))))
       ((inner.letrec $args . $body)
        (let ((lloop (mklloop (map car args))))
-       `(SLetRec ,(map-over args 
+       `(SLetRec ,(map-over args
                             (fmt (nm vl)
                                  `(,(cc:check-sym nm) ,(lloop vl))))
              (Begin ,@(map lloop body)))))
@@ -152,7 +164,7 @@
   (let loop_outer ((env nil) (s src))
   (let ((loop (lambda (s) (loop_outer env s)))
         (mklloop (lambda (args)
-                   (let ((newenv (append args env)))
+                   (let ((newenv (cc:chkappend args env)))
                      (lambda (s)
                        (loop_outer newenv s))))))
     (p:match s
@@ -173,7 +185,7 @@
       ((quote ()) '(Nil))
       ((quote $any) `(Quote ,any))
 ;= Setloc, try
-      ((inner.set $nm $vl) 
+      ((inner.set $nm $vl)
        `(Set ,(cc:check-sym nm) ,(loop vl)))
       ((inner.try $body $ex $act)
        `(TryBlock ,(loop body) ,ex ,(loop act)))
@@ -228,7 +240,7 @@
   ;;;   replace them with something serialisable.
   (cc:mbcoreast:visit expr src
      (expr DEEP
-        ((BackendAsm 
+        ((BackendAsm
           (ast:mknode (body (cc:core-sanitise-tokens-inner body))))
          (else node)))))
 

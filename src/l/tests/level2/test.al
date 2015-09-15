@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -13,11 +13,11 @@
 
 (bnf-parser
   ((elt tstparse))
-  (elt 
+  (elt
     ( (LB tst RB) $1 )
     ( (LB RB)     nil)
-    ( (TKN)       $0)) 
-  (tst 
+    ( (TKN)       $0))
+  (tst
     ( (elt tst)  (cons $0 $1) )
     ( (elt)      (list $0) ) ))
 
@@ -35,46 +35,46 @@
   (ident nm)
   )
 
-(test ((ast:visit tstast expr 
-             (expr DEEP 
+(test ((ast:visit tstast expr
+             (expr DEEP
                  ((VAR (symbol->string (name.> nm)))
                   (CONST (val.> val))
                   (else node)))) '(OP + (OP * (VAR x) (CONST 2))
-				        (COMMENT (VAR bbb) (VAR y))))
+                                        (COMMENT (VAR bbb) (VAR y))))
       (OP + (OP * "x" 2) (COMMENT (VAR bbb) "y")))
-      
+
 ;; Advanced pattern matching
 
-(let* ((data '( (a b c) (a 1 c) ("qq" (x . y)) (a 20 c) (foo foo bar) 
+(let* ((data '( (a b c) (a 1 c) ("qq" (x . y)) (a 20 c) (foo foo bar)
                 (foo bar foo) (foo hokus-pokus-boom)
-		(bee 1 2 3 4 5 x a b c)
-		))
+                (bee 1 2 3 4 5 x a b c)
+                ))
        (res (foreach-map (d data)
               (p:match d
-		( ( $x ($$F:y (fun (v) (and (number? v) (> v 5)))) $z)
-		  `(CASE1 ,y))
-		( ( $$S:x ($y . y))
-		  `(CASE2 ,x ,y))
-		( ( $x $$N:y $z)
-		  `(CASE3 ,x ,y ,z))
-		( ( $a =a $b) `(CASE5 ,a ,b))
-		( ( a b $x)
-		  `(CASE4 ,x))
-		( (bee $$XXX:a x $$XXX:b)
-		  `(CASE7 ,a ,b))
-		( (foo ($$FF:a (fun (x) 
-				 (map string->symbol 
-				      (strsplit (<r> "-") (symbol->string x))))
-			       hokus pokus  $abc))
-		  `(CASE6 ,abc ,a))
-		(else `(CASE-E))
-		))))
-  (test res 
-	( (CASE4 c) (CASE3 a 1 c) (CASE2 "qq" x) (CASE1 20) (CASE5 foo bar) 
-	  (CASE-E) (CASE6 boom hokus-pokus-boom) 
-	  (CASE7 (1 2 3 4 5) (a b c))
-	  )
-	))
+                ( ( $x ($$F:y (fun (v) (and (number? v) (> v 5)))) $z)
+                  `(CASE1 ,y))
+                ( ( $$S:x ($y . y))
+                  `(CASE2 ,x ,y))
+                ( ( $x $$N:y $z)
+                  `(CASE3 ,x ,y ,z))
+                ( ( $a =a $b) `(CASE5 ,a ,b))
+                ( ( a b $x)
+                  `(CASE4 ,x))
+                ( (bee $$XXX:a x $$XXX:b)
+                  `(CASE7 ,a ,b))
+                ( (foo ($$FF:a (fun (x)
+                                 (map string->symbol
+                                      (strsplit (<r> "-") (symbol->string x))))
+                               hokus pokus  $abc))
+                  `(CASE6 ,abc ,a))
+                (else `(CASE-E))
+                ))))
+  (test res
+        ( (CASE4 c) (CASE3 a 1 c) (CASE2 "qq" x) (CASE1 20) (CASE5 foo bar)
+          (CASE-E) (CASE6 boom hokus-pokus-boom)
+          (CASE7 (1 2 3 4 5) (a b c))
+          )
+        ))
 
 ;; List comprehensions tests
 
@@ -104,13 +104,13 @@
 ;;
 (function ast2test ()
   ((ast:visit tstast expr
-       (expr DEEP 
-	  (forall (cons (list (this-ast-name) (this-ast-node)) node))))
+       (expr DEEP
+          (forall (cons (list (this-ast-name) (this-ast-node)) node))))
    '(OP + (OP * (VAR x) (CONST 2)) (CONST 1))))
-(test (ast2test) 
-  ((tstast expr) OP + 
-   ((tstast expr) OP * 
-    ((tstast expr) VAR x) ((tstast expr) CONST 2)) 
+(test (ast2test)
+  ((tstast expr) OP +
+   ((tstast expr) OP *
+    ((tstast expr) VAR x) ((tstast expr) CONST 2))
    ((tstast expr) CONST 1)))
 
 (def:ast asttest2 ()
@@ -119,10 +119,10 @@
   (pair (a b)))
 
 (function ast3test (v)
-  (ast:access:element "asttest2" nodex v 
+  (ast:access:element "asttest2" nodex v
      ((list
-	(+ (abc.> a) (cde.> a))
-	(+ (abc.> b) (cde.> b))))))
+        (+ (abc.> a) (cde.> a))
+        (+ (abc.> b) (cde.> b))))))
 
 (test (ast3test '((1 2) (3 4)))
       (4 6))
@@ -146,7 +146,7 @@
     (syntax-case x ()
       ((l2tabc ((a b) ...) body ...)
        (syntax
-	(quote (a ... b ... (body ...))))))))
+        (quote (a ... b ... (body ...))))))))
 
 (test (l2tabc ((1 2) (3 4) (9 9)) 5 6) (1 3 9 2 4 9 (5 6)))
 
@@ -164,7 +164,7 @@
      (let ((~x a))
        (b ~x)))))
 
-(test (let ((~x 3)) (mytestsyntax 2 (mytestsyntax 0 
-					(fun (i) 
-					  (fun (a) (+ ~x a))))))
+(test (let ((~x 3)) (mytestsyntax 2 (mytestsyntax 0
+                                        (fun (i)
+                                          (fun (a) (+ ~x a))))))
       5)

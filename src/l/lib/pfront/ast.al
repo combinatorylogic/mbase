@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -39,12 +39,18 @@
       (exemodule <ident:nm>)
       (module <ident:nm>)
 
+      (defmodule <ident:nm> <*modexport:exs>)
+      (usemodule <*indent:nms>)
+      (endmodule)
+      (endusing)
+
+
       (expr <expr:e>)
       ))
 
   (astpar (<ident:parent> . <*renamepair:args>))
 
-  (astbody 
+  (astbody
    (| (alt <ident:nm> . <*astalt:alts>)
       (struct <ident:nm> <aststruct:s>)
       (addalt <ident:nm> . <*astalt:alts>)
@@ -83,13 +89,14 @@
        (append <mpattern:p>)))
 
   (vtype (| (id <ident:tp>)
-	    (as <ident:nm>)
-	    (asonce <ident:nm>)
+            (as <ident:nm>)
+            (asonce <ident:nm>)
             (withdst <vtype:t> <ident:dst>)
-	    ))
+            ))
 
-  (visitptn 
+  (visitptn
    (| (many <vtype:t> <ident:node> <*visitp:ps> <*visitelse:el>)
+      (manyfun <vtype:t> <ident:node> <*ident:args> <*visitp:ps> <*visitelse:el>)
       (forall <vtype:t> <ident:node> <expr:e>)
       (single <vtype:t> <ident:node> <expr:e>)))
 
@@ -136,7 +143,12 @@
       (visit <*visitopt:os> <ident:ast> <ident:top> <expr:e> . <*visitptn:ps>)
       (viter <*visitopt:os> <ident:ast> <ident:top> <expr:e> . <*visitptn:ps>)
       (collector <ident:addname> <ident:getname> <expr:body>)
+      (withast <ident:nm> <expr:e>)
+      (withmacros <*lmacrodef:ds> <expr:e>)
+      (withmetadata <expr:m> <expr:e>)
       (mknode . <*llpair:args>)
+      (mkvnode <ident:nd> <ident:tag> . <*llpair:args>)
+      (mkxnode <ident:tag> . <*llpair:args>)
 
       (if3 <expr:e> <expr:tr> <expr:fl>)
       (if2 <expr:e> <expr:tr>)
@@ -148,8 +160,8 @@
       (mappend <identptn:n> <expr:e> <expr:b> <*ident:cn>)
       (map <identptn:n> <expr:e> <expr:b> <*ident:cn>)
       (iter <identptn:n> <expr:e> <expr:b> <*ident:cn>)
-      
-      
+
+
 
       (vquote <qexpr:e>)
       (qquote <qexpr:e>)
@@ -171,6 +183,6 @@
       ))
 
   (llpair (<ident:nm> <expr:v>))
+  (lmacrodef (| (def <ident:nm> <expr:v>)))
 
   )
-      

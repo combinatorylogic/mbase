@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -24,7 +24,7 @@
        -> list->string))
 ;- [[<r>]] is a special mini--language macro. It unrolls into a code, which uses recursive descent
 ;- parsing combinators. ``[[+*]]'' postfix operator generates ``one--or--many'' combinator, ``[[??]]'' is for
-;- ``maybe'' combinator, ``[[->]]'' infix defines a transformation combinator for a parsing result, 
+;- ``maybe'' combinator, ``[[->]]'' infix defines a transformation combinator for a parsing result,
 ;- in our case -- collecting recognised characters into a string.
 ;-
 ;- A higher level macro [[make-simple-lexer]] is provided for defining lexers.
@@ -80,7 +80,7 @@
 
 ;- And now we can use this interpreter by calling a special function [[lex-and-parse]], which
 ;- applies a lexer to a string or a stream and applies a given parser to a resulting tokens stream.
-(writeline 
+(writeline
  (lex-and-parse
   calclexer
   calcparser

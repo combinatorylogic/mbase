@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -40,11 +40,11 @@
    (let* ((t (r_GetType vl))
           (b (r_bind t (string-append "set_" fld) (r_GetType val))))
      (b vl val)))
-   
+
 (function s-> (typ fld)
    "Get a static field value."
    (r_FI-GetValue (r_getField (r_typer typ) fld) nil))
-   
+
 (function /-> (vl fld)
    "Gets a value of the field [fld] of the object [vl]."
    (r_FI-GetValue (r_getField (r_GetType vl) fld) vl))
@@ -69,11 +69,11 @@
 
 (function r_getconstructorf (tp args)
     (let* ((t (r_typerx tp))
-	   (res (_gt_constr t (if (null? args) (anew t_type 0) (mkvector (map (fun (x) (r_typerx x)) args))))))
+           (res (_gt_constr t (if (null? args) (anew t_type 0) (mkvector (map (fun (x) (r_typerx x)) args))))))
       res))
 
 (function instanceof (v t)
   (let ((tv (r_GetType v)))
    ((r_tbind "System.Type" "IsAssignableFrom" "System.Type") tv t)))
-         
+
 

@@ -2,8 +2,8 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-// This file is distributed under the terms of the Q Public License version 1.0.
+// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+//
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -49,7 +49,7 @@ parser mbaseml extends mbasemlcore (
    /  { |'match'| expr:v |'with'| matchpattern:p => match(v,@p) }
    /  { |'if'| expr:v |'then'| expr:tr |'else'| expr:fl
         => if3(v,tr,fl) }
-   /  { |'if'| expr:v |'then'| expr:tr 
+   /  { |'if'| expr:v |'then'| expr:tr
         => if2(v,tr) }
    /  { '[' ']' => constr(`Nil) }
    /  { '[' cslist<expr,';'>:es ']' => makelist(@es) }
@@ -109,7 +109,7 @@ parser mbaseml extends mbasemlcore (
 
   term mbaseml := slist<mbaseml_e>:l => l;
 
-  term letdef := 
+  term letdef :=
       { nvar:nm '=' expr:v => $list(nm, v) }
    /  { nvar:nm slist<SIdent>:args '=' expr:v => $list(nm, uncurriedfun(args, v)) };
 
@@ -125,7 +125,7 @@ parser mbaseml extends mbasemlcore (
     / { |'type'| typedefs:df => mltype(@df) }
     / { |'foreign'| SIdent:nm '(' typef:tp ')' '->' IdentOrString:ffi
         => mlffi(nm,tp,ffi) }
-    / { |'export'| SIdent:nm '(' Int:na ')' '->' String:nn 
+    / { |'export'| SIdent:nm '(' Int:na ')' '->' String:nn
         => mlexport(nm,$nval(na),nn) }
     / { |'val'| SIdent:nm ':' typef:tp => mlannotate(nm,tp) }
     / { |'lisp'| String:s => mbinclude($stripval(s)) }
@@ -134,16 +134,16 @@ parser mbaseml extends mbasemlcore (
 
   /* Type declarations */
   term typedefs := cslist<typedef,|'and'|>;
-  term typedef := 
+  term typedef :=
        { typet:nm '=' variatype:t => variant($mltypename(nm),@t) }
      / { typet:nm '=' typetuple:t => tuplealias($mltypename(nm), t) }
      ;
   term variatype := cslist<variantt,'|'>;
-  term variantt := {CapIdent:nm |'of'| typetuple:t => $cons($sval(nm), t) } 
+  term variantt := {CapIdent:nm |'of'| typetuple:t => $cons($sval(nm), t) }
                  / {CapIdent:nm => $wrap($sval(nm)) }
-                 ; 
+                 ;
   term typetuple := cslist<typef, '*'>;
-  term typef := 
+  term typef :=
         { typet:t '->' typef:fn => F(t,fn) }
      /  typet
      ;

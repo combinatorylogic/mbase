@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -26,7 +26,7 @@
                     (,t_Int64 . I8)
                     (,t_UInt64 . I8)
                     (,t_Char . I4)
-		    (,t_IntPtr . I)
+                    (,t_IntPtr . I)
                     (,t_Double . R8)
                     (,t_Single . R4)))
 
@@ -34,8 +34,8 @@
  (let ((tp (if (IsEnum ttp) t_Int32 ttp)))
   (let ((x (filter (fun (x) (t_eq tp (car x))) _ldind_ar)))
    (if (null? x) `(Ldobj ,ttp)
-    (wrap 
-     (string->symbol 
+    (wrap
+     (string->symbol
        (buildstring 'Ldind_ (cdar x))))))))
 
 
@@ -66,13 +66,13 @@
           (o (if (> tp 0) '(*O*) nil))
           (classt (r_typerx class))
           (rett (RetType metod))
-	  (isbool (r_boolmethodp metod))
+          (isbool (r_boolmethodp metod))
           )
-     (if (null? metod) 
+     (if (null? metod)
        `(r_bind0 ,tp ,class ,method ,@args)
        `(fun (,@o ,@(map-car alist))
            (n.asm (,@o ,@(map-car alist))
-             ,@(if (null? o) o `((expr *O*) 
+             ,@(if (null? o) o `((expr *O*)
                      ,@(if (isBoxed classt) (_unbox_type classt)
                                           `((Castclass ,classt)))
                ))
@@ -80,27 +80,27 @@
              ,@(pre-emit (foreach-map (a alist)
                              `((expr ,(car a))
                                 ,@(if (isBoxed (cdr a))
-				      (_unbox_type (cdr a))
+                                      (_unbox_type (cdr a))
                                      `((Castclass ,(cdr a))))
                                )
                          ))
              ,@(if (IsVirtual metod) `((Callvirt ,metod)) `((Call ,metod)))
-	     ,@(if isbool
-		 (with-syms (TRUE NEXT)
-	           `((Brtrue (label ,TRUE))
-		     (Ldnull)
-		     (Br (label ,NEXT))
-		     (label ,TRUE)
-		     (Ldsfld ,fld_True)
-		     (label ,NEXT)))
-                 (if (void-p metod) '((Ldnull)) 
-		     (if (not (isBoxed rett))
-			 `(
-			   (Castclass ,t_object)
-			   ) 
-			 `((Box ,rett)))
-		     ))
-	     )))))
+             ,@(if isbool
+                 (with-syms (TRUE NEXT)
+                   `((Brtrue (label ,TRUE))
+                     (Ldnull)
+                     (Br (label ,NEXT))
+                     (label ,TRUE)
+                     (Ldsfld ,fld_True)
+                     (label ,NEXT)))
+                 (if (void-p metod) '((Ldnull))
+                     (if (not (isBoxed rett))
+                         `(
+                           (Castclass ,t_object)
+                           )
+                         `((Box ,rett)))
+                     ))
+             )))))
 
 (macro r_constr (tp . args)
  (let* ((alist (mapi (fun (i x) (cons
@@ -112,10 +112,10 @@
         )
    `(fun ,(map-car alist)
       (n.asm ,(map-car alist)
-           ,@(pre-emit (foreach-map (a alist) 
+           ,@(pre-emit (foreach-map (a alist)
                              `((expr ,(car a))
                                 ,@(if (isBoxed (cdr a))
-				      (_unbox_type (cdr a))
+                                      (_unbox_type (cdr a))
                                      `((Castclass ,(cdr a))))
                                )
                          ))
@@ -123,7 +123,7 @@
            ,@(if (not (isBoxed rett))
                  `(
                    (Castclass ,t_object)
-                  ) 
+                  )
            `((Box ,rett)))
         ))))
 

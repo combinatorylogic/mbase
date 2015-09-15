@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -28,24 +28,24 @@
   (string->symbol (__mkname n i)))
 
 (ctime `(top-begin
-	  ,@(formap (i 0 MAXARGS)
-		    `(define ,(__mksname "AltFun" i)
-		       (dotnet ,(__mkname "AltFun" i))))
-	  ,@(formap (i 0 MAXARGS)
-		    `(define ,(__mksname "AltClosure" i)
-		       (dotnet ,(__mkname "AltClosure" i))))
-	  ,@(formap (i 0 MAXARGS)
-		    `(define ,(__mksname "AltClFun" i)
+          ,@(formap (i 0 MAXARGS)
+                    `(define ,(__mksname "AltFun" i)
+                       (dotnet ,(__mkname "AltFun" i))))
+          ,@(formap (i 0 MAXARGS)
+                    `(define ,(__mksname "AltClosure" i)
+                       (dotnet ,(__mkname "AltClosure" i))))
+          ,@(formap (i 0 MAXARGS)
+                    `(define ,(__mksname "AltClFun" i)
                        (r_mtd ,(__mksname "AltClosure" i)
                                "run" ,@(formap (j 0 i) 'object))))
 
-	  (define AltFuns (list ,@(formap (i 0 MAXARGS)
-					  (__mksname "AltFun" i))))
-	  (define AltClosures (list ,@(formap (i 0 MAXARGS)
-					  (__mksname "AltClosure" i))))
+          (define AltFuns (list ,@(formap (i 0 MAXARGS)
+                                          (__mksname "AltFun" i))))
+          (define AltClosures (list ,@(formap (i 0 MAXARGS)
+                                          (__mksname "AltClosure" i))))
           (define AltClFuns (list ,@(formap (i 0 MAXARGS)
-					  (__mksname "AltClFun" i))))
-	  ))
+                                          (__mksname "AltClFun" i))))
+          ))
 
 (define t_nint32 (r_typebyname "System.Int32"))
 ;; 1st try loading the existing dll

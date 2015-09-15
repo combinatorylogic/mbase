@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -88,9 +88,9 @@
 ;- given expression, using a provided [[add]] collector. Another common
 ;- trick is used here: temporary node renaming. When a visitor starts on [[ex]],
 ;- it assumes that it is a node of a virtual type [[d_expr]], inheriting all
-;- the properties of [[expr]]. But all the [[expr]] sub--nodes referenced from 
+;- the properties of [[expr]]. But all the [[expr]] sub--nodes referenced from
 ;- this node are still of [[expr]] type, and processed with [[expr]] pattern.
-;- This means that an outer expression is untouched, and all the sub--expressions 
+;- This means that an outer expression is untouched, and all the sub--expressions
 ;- are raised unless they are variables. For example, {\tt (plus (const ...) (const ...))}
 ;- will be translated into {\tt (plus (var ...) (var ...)} with two raised variables
 ;- bindings for constants.
@@ -114,7 +114,7 @@
     (get)))
 
 ;- [[stage2schedule]] function compiles a flat code into an MBase register scheduling
-;- mini--language in order to 
+;- mini--language in order to
 ;- get an optimal variables distribution. It is easy since we only have
 ;- one datatype: a double precision floating point number.
 (function stage2schedule (tex)
@@ -152,7 +152,7 @@
   (stage2 (stage1 (stage0 e))))
 
 ;- Our imaginable register target machine has only 3 floating point registers,
-;- and all other variables should be spilled into a stack frame. 
+;- and all other variables should be spilled into a stack frame.
 ;-
 ;- Here we will just count the register use frequency in order to decide what to
 ;- spill.
@@ -170,7 +170,7 @@
 
 ;- If we have just 3 variables, all are mapped to registers. Otherwise
 ;- one register is reserved for spills, and two others are bound. This is
-;- not the most efficient way, but all the complex optimisations are 
+;- not the most efficient way, but all the complex optimisations are
 ;- beyond the scope of this tutorial.
 ;-
 
@@ -217,10 +217,10 @@
        (stage3rename es (zip (map cadr count)
                              '(R1 R2 R3))))
       )
-     (else 
+     (else
       (format count ((_ r1) (_ r2) . spilled)
         (cons (length spilled)
-         (stage3spills es r1 r2 
+         (stage3spills es r1 r2
                        (zip (map cadr spilled)
                             (fromto 0 (length spilled)))))
         )))))
@@ -249,9 +249,9 @@
 (function stage4emit (instr tgt)
   (calc05x:visit d_expr instr
     ((d_expr expr) DEREF
-      ((var 
-	(if (eqv? nm tgt) "NOP"
-	    (S<< "MOVR8 " (stage4var nm) ", " tgt)))
+      ((var
+        (if (eqv? nm tgt) "NOP"
+            (S<< "MOVR8 " (stage4var nm) ", " tgt)))
        (const (S<< "MOVR8 #F" v ", " tgt))
        (plus (S<< "ADDR8 " a ", " b ", " tgt))
        (minus (S<< "SUBR8 " a ", " b ", " tgt))
@@ -259,7 +259,7 @@
        (div (S<< "DIVR8 " a ", " b ", " tgt))))
     (expr DEEP
        ((var (stage4var nm))
-	(else nil)))
+        (else nil)))
     ))
 
 ;- And to bind everything together, to emit correct stack frame initialisation
@@ -272,8 +272,8 @@
     (foreach (e es)
       (calc05t:iter topexpr e
         (topexpr _
-         ((mov (add (S<< "MOVR8 " (stage4var n1) 
-			 ", "  (stage4var n2))))
+         ((mov (add (S<< "MOVR8 " (stage4var n1)
+                         ", "  (stage4var n2))))
           (def (add (stage4emit val nm)))
           (return (begin
                     (add (stage4emit val 'R1))
@@ -334,12 +334,12 @@
 ;- And we can now print out the compiled code. Unlike other examples,
 ;- there is no actual
 ;- evaluation here, our target machine does not exist in reality.
-(define code 
+(define code
   (S<< "let x = let t = 1+1+1 in t*t in "
          "let y = 1.1+(-x*t) in "
          "(1-y)+x/2+x*x-(2+x)/y"))
 
-(define src 
+(define src
   (lex-and-parse calclexer calcparser code))
 
 (iter println (emit src))

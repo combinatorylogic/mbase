@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -60,14 +60,14 @@
 (macro p-fail? (r)
    "[#t] if parsing result [r] is a failure."
    `(eqv? ---p-fail--- (car ,r)))
-   
+
 (macro p-success? (r)
    "[#t] if parsing result [r] is a success."
    `(not (p-fail? ,r)))
 
 (macro p-rest0 (r)
    `(cdr ,r))
-   
+
 (macro p-result (r)
    "Returns a contents of the successful parsing result [r]."
    `(car ,r))
@@ -77,10 +77,10 @@
       (if (list? cd) nil
          (if (null? cd) nil
            (set-cdr! cc (cd))))))
-             
+
 (function p-rest (r)
    "Returns a remaining stream for the parsing result [r] (either successful or unsuccessful)."
-   (p-lookahead-a-bit r) ;; unroll the nearest lazy tail       
+   (p-lookahead-a-bit r) ;; unroll the nearest lazy tail
    (cdr r))
 
 (macro p-rest (r)
@@ -88,11 +88,11 @@
   (with-syms (rr)
     `(let ((,rr ,r))
         (p-lookahead-a-bit ,rr) (cdr ,rr))))
-   
+
 (macro p-mkresult (d rest)
   "Makes a successful parsing result with given result value [d] and remaining stream [rest]."
    `(cons ,d ,rest))
-   
+
 (macro p-mkfail (res rest) ;; ignore the failure reason for now
    "Makes a parsing failure result with a given remaining stream [rest]."
    `(cons ---p-fail--- ,rest))
@@ -100,7 +100,7 @@
 ;; Generic characters
 (include "./parsing_chars.al")
 
-;; Combinators 
+;; Combinators
 (include "./parsing_0.al")
 
 ;; Auxillary stuff
@@ -133,7 +133,7 @@
    "              the current input stream position."
    ""
    "  <body> + <body>"
-   "  <body> <body>   - sequential parsing" 
+   "  <body> <body>   - sequential parsing"
    "  <body>|<body>   - variant parsing, leftmost option first"
    "  <body> -> <expr> - applies <expr> function to <body> parsing result"
    "  <body> :-> <expr> - applies <expr> function to <body> parsing result,"
@@ -168,9 +168,9 @@
                ((->) `(p<R> ,(cons '<r> (car body)) ,(caddr body)))
                ((X->) `(p<xR> ,(cons '<r> (car body)) ,(caddr body)))
                ((T>) `(p<xR> ,(cons '<r> (car body))
-			     (p[xTap] (quote ,(caddr body)) ,(cadddr body))))
+                             (p[xTap] (quote ,(caddr body)) ,(cadddr body))))
                ((D->) `(p<dR> ,(cons '<r> (car body)) ,(caddr body)))
-               ((:->) `(p<R> ,(cons '<r> (car body)) 
+               ((:->) `(p<R> ,(cons '<r> (car body))
                   (lambda (X) (wrap (,(caddr body) X)))))
                ((*) `(p<*> ,(cons '<r> (car body))))
                ((+*) `(p<+*> ,(cons '<r> (car body))))
@@ -185,5 +185,5 @@
      (else body)))
 
 
-;; the rest 
+;; the rest
 (include "./parsing_2.al")

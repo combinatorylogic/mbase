@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (Section "R6RS--style syntax-case")
@@ -29,19 +29,19 @@
     (mp! nm la)
     (let loop ((l a))
       (p:match l
-	(_ nil)
-	($$M (mp! l nm))
-	(($a . $b) (loop a) (loop b))
-	(else nil)))))
+        (_ nil)
+        ($$M (mp! l nm))
+        (($a . $b) (loop a) (loop b))
+        (else nil)))))
 
 (function get-nm (mp a)
   (use-hash (mp)
     (let loop ((l a))
       (p:match l
-	(_ nil)
-	($$M (alet x (mp> l) (if x x nil)))
-	(($a . $b) (alet x (loop a) (if x x (loop b))))
-	(else nil)))
+        (_ nil)
+        ($$M (alet x (mp> l) (if x x nil)))
+        (($a . $b) (alet x (loop a) (if x x (loop b))))
+        (else nil)))
     (mp> a)))
 
 (function get-ptn (mp nm)
@@ -59,19 +59,19 @@
 ; Translate a syntax-rule pattern into an MBase p:match pattern
 (function compile-pattern (capt mp p)
   (let loop ((x p))
-    (p:match x 
+    (p:match x
       (($a ... . $rest)
        (with-syms (nm)
-	 (alet la (loop a)	     
-	  (reg-names mp nm a la)
-	  `(,(Sm<< "$$RP:" nm) ,la ,@(loop rest)))))
+         (alet la (loop a)
+          (reg-names mp nm a la)
+          `(,(Sm<< "$$RP:" nm) ,la ,@(loop rest)))))
       (($a . $b) (cons (loop a) (loop b)))
       (_ '$_)
       ($$M ; todo: check with capt
        (if (memq x capt) x
-	 (begin
-	   (reg-binding mp x)
-	   (Sm<< "$" x))))
+         (begin
+           (reg-binding mp x)
+           (Sm<< "$" x))))
       (() x)
       (else (ccerror `(PATTERN: ,x))))))
 
@@ -86,91 +86,91 @@
     (p:match x
       (($a ... . $rest)
        (let* ((nm (get-nm mp a))
-	      (ptn (get-ptn mp nm))
-	      (mk-a (loop a)))
-	 (with-syms (idx)
-	   `(append (foreach-map (,idx ,nm)
-		    (p:match ,idx (,ptn ,(loop a))))
-		    ,(loop rest)))))
+              (ptn (get-ptn mp nm))
+              (mk-a (loop a)))
+         (with-syms (idx)
+           `(append (foreach-map (,idx ,nm)
+                    (p:match ,idx (,ptn ,(loop a))))
+                    ,(loop rest)))))
       (($a . $b) `(cons ,(loop a) ,(loop b)))
       ($$M (if (is-it-a-binding? mp x)
-	       x
-	       (if (p-success? (parse-~ (symbol->list x)))
-		   (let* ((id (S<< "~. " x))
-			  (tst (mp> id))
-			  (t1 (if tst tst (with-syms (xx)
-					     (mp! id xx)
-					     xx))))
-		     (add t1)
-		     t1)
-		   `(quote ,x))))
+               x
+               (if (p-success? (parse-~ (symbol->list x)))
+                   (let* ((id (S<< "~. " x))
+                          (tst (mp> id))
+                          (t1 (if tst tst (with-syms (xx)
+                                             (mp! id xx)
+                                             xx))))
+                     (add t1)
+                     t1)
+                   `(quote ,x))))
       (() 'nil)
       ))))
 
 (function compile-template (mp t)
   (collector (add get)
     (let* ((inner (compile-template-inner mp add t))
-	   (g (get)))
+           (g (get)))
       (if g
-	  `(with-syms ,g ,inner)
-	  inner))))
+          `(with-syms ,g ,inner)
+          inner))))
 
 ; Check the macro pattern head
 (function compile-pattern-template (hdref capt p t)
   ; Check its head
   (if (not (eqv? '_ (car p)))
       (if (deref hdref)
-	  (if (not (eqv? (car p) (deref hdref))) (ccerror `(PATTERN: ,p)))
-	  (r! hdref (car p))))
+          (if (not (eqv? (car p) (deref hdref))) (ccerror `(PATTERN: ,p)))
+          (r! hdref (car p))))
   ; Compile pattern to p:match
   (with-hash (mp)
    (let* ((pm (compile-pattern capt mp (cdr p)))
-	  (tm (compile-template mp t)))
+          (tm (compile-template mp t)))
      `(,pm ,tm))))
 
 ; Wrapper compiler
 (function compile-syntax-rules (capt rules)
   (let* ((hd (mkref nil))
-	 (patns
-	  (foreach-map (r rules)
-	    (format r (p t)
-	      (compile-pattern-template hd capt p t)))))
+         (patns
+          (foreach-map (r rules)
+            (format r (p t)
+              (compile-pattern-template hd capt p t)))))
     (with-syms (arg)
      `(fun (,arg)
-	(p:match ,arg
-	  ,@patns
-	  (else (ccerror (quote (RULES-SYNTAX-ERROR ,(car hd))))))
-	))))
+        (p:match ,arg
+          ,@patns
+          (else (ccerror (quote (RULES-SYNTAX-ERROR ,(car hd))))))
+        ))))
 ; Syntax local macro - built specifically for a leftside pattern
 (function preserve-mp (mp)
   (with-syms (tname arg)
     `(fun (,arg)
       (format ,arg (hd arg)
-	(with-hash (,tname)
-	 (init-hash ,tname (quote ,(hashmap (fun (a b) (list a b)) mp)))
-	 (syntax-case-util:compile-template ,tname arg))))))
+        (with-hash (,tname)
+         (init-hash ,tname (quote ,(hashmap (fun (a b) (list a b)) mp)))
+         (syntax-case-util:compile-template ,tname arg))))))
 
 ; Check the macro pattern head
 (function compile-pattern-code (hdref capt p c)
   ; Check its head
   (if (not (eqv? '_ (car p)))
       (if (deref hdref)
-	  (if (not (eqv? (car p) (deref hdref))) (ccerror `(PATTERN: ,p)))
-	  (r! hdref (car p))))
+          (if (not (eqv? (car p) (deref hdref))) (ccerror `(PATTERN: ,p)))
+          (r! hdref (car p))))
   ; Compile pattern to p:match
   (with-hash (mp)
    (let* ((pm (compile-pattern capt mp (cdr p)))
-	  (hdef (preserve-mp mp)))
+          (hdef (preserve-mp mp)))
      `(,pm (with-macros ((syntax ,hdef))
-	       ,c)))))
+               ,c)))))
 
 ; Wrapper compiler
 (function compile-syntax-case (arg capt rules)
   (let* ((hd (mkref nil))
-	 (patns
-	  (foreach-map (r rules)
-	    (format r (p c)
-	       (compile-pattern-code hd capt p c)))))
+         (patns
+          (foreach-map (r rules)
+            (format r (p c)
+               (compile-pattern-code hd capt p c)))))
     `(p:match ,arg
        ,@patns
        (else (ccerror (quote (RULES-SYNTAX-ERROR ,(car hd))))))

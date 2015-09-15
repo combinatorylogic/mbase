@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -12,14 +12,14 @@
 (define m_Call_Generic_00 (r_mtd _t_call_generic "call_generic"
                               t_object_array t_object))
 
-(define ms_Call_Generics_00 
+(define ms_Call_Generics_00
   (ctime `(list
-           ,@(formap (i 0 SMAXARGS) 
+           ,@(formap (i 0 SMAXARGS)
                      `(r_mtd _t_call_generic ,(buildstring "call_generic__" i) ,@(formap (j 0 i) 't_object) t_object)))))
 
-(define ms_Call_RevGenerics_00 
+(define ms_Call_RevGenerics_00
   (ctime `(list
-           ,@(formap (i 0 SMAXARGS) 
+           ,@(formap (i 0 SMAXARGS)
                      `(r_mtd _t_call_generic ,(buildstring "call_r_generic__" i) ,@(formap (j 0 i) 't_object) t_object)))))
 
 ;;; now register the delegate callback:

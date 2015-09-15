@@ -2,8 +2,8 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-// This file is distributed under the terms of the Q Public License version 1.0.
+// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+//
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -65,7 +65,7 @@ namespace Meta.Scripting
               {
                 Console.WriteLine("global name " + s.v + " undefined");
                 throw new
-                  Meta.Scripting.MBaseException("global name " + 
+                  Meta.Scripting.MBaseException("global name " +
                                                 s.v + " undefined");
               }
             }
@@ -253,7 +253,7 @@ namespace Meta.Scripting
       int len0 = parts.Length - 1;
       Object fun = runone(frame, envframe, parts[0]);
       bool isclosure = fun is Closure;
-            
+
       Object[] newframe = new Object[len0];
       Object[] newenvframe;
       if (isclosure && ((Closure)fun).frame != null)

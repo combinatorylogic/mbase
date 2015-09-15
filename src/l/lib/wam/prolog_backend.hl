@@ -19,12 +19,12 @@ function prolog_codegen(b)
       | arg -> id
       };
       deep expr {
-        intros -> 'let'(map v in vars do 
+        intros -> 'let'(map v in vars do
                          [v;'prolog_alloc_cell'('prolog_environment')],
                         body)
       | unify -> 'if'('prolog_unify'('prolog_environment',a,b),tr,
                       'prolog_failure'('prolog_environment'))
-      | choose -> 
+      | choose ->
          'prolog_choice_point'('prolog_environment',
                                'prolog_continuation',
                                'list'(@map e in es do
@@ -45,10 +45,10 @@ function prolog_codegen(b)
       | const -> 'prolog_const'(v)
       };
       deep top {
-        define_prolog_function -> 
+        define_prolog_function ->
            '_prolog_toplevl_function'(%Sm<<("_prolog_function_",id),
                          ['prolog_environment';
-                          'prolog_continuation';@args], 
+                          'prolog_continuation';@args],
                          body)
       | define_prolog_dynamic_function ->
           '_prolog_toplevl_function'(%Sm<<("_prolog_function_",id),
@@ -62,7 +62,7 @@ function prolog_codegen(b)
 \pfcode{
 function %_prolog_call_function_cps(v)
   match v with
-   [id;fnm;@fargs] -> 
+   [id;fnm;@fargs] ->
       if(shashget(getfuncenv(), fnm))
            #`(cons 'CPS (fun () (,fnm ,@fargs)))
       else #`(let ((ff (ohashget *PROLOGENV* ',fnm)))
@@ -104,7 +104,7 @@ function %_prolog_call_wrapper_cps(v)
 #(macro prolog_failure rest `(prolog_failure_f ,@rest))
 #(macro _prolog_call_function rest rest)
 #(macro _prolog_call_wrapper (rest) rest)
-#(macro _prolog_toplevl_function (nm args . rest) 
+#(macro _prolog_toplevl_function (nm args . rest)
    `(recfunction ,nm ,args ,@rest))
 }
 
@@ -119,15 +119,16 @@ function prolog_remember_cell(env, cell) {
 function prolog_alloc_cell(env) cons('var',[])
 function prolog_alloc_struct(env, id, args) { return ['str';id;@args] }
 function prolog_const(c) cons('const',c)
+function prolog_weak(v) cons('weak',[v])
 function prolog_save_chpoint(env, c) { %set-cdr!(env, c)}
 function prolog_last_chpoint(env) { cdr(env) }
 function prolog_deref(v) // Fall through constraint
-   match v with 
+   match v with
       'ref':x -> prolog_deref(x)
     | 'constraint':x:c -> prolog_deref(x)
     | else -> v
 function prolog_deref_c(v) // Stop at constraint
-   match v with 
+   match v with
       'ref':x -> prolog_deref_c(x)
     | else -> v
 function prolog_failure_f(env) {
@@ -151,7 +152,7 @@ function prolog_next_choice_point(chp)
     if(cnts) {
       chp := [env;prev;cont;cdr(cnts);vars];
       (car(cnts))(env, cont);
-    } else if (prev) { prolog_save_chpoint(env, prev); prolog_failure_f(env); } 
+    } else if (prev) { prolog_save_chpoint(env, prev); prolog_failure_f(env); }
     else []
 }
 function prolog_choice_point(env, cont, cnts) {
@@ -171,45 +172,94 @@ function prolog_unify_structs(env, a, b) {
     do loop (aa = argsa, ab = argsb) {
       match [aa;ab] with
          [(hd:tl);(hdb:tlb)] ->
-             if (prolog_unify_inner(env, hd, hdb)) loop(tl, tlb) 
+             if (prolog_unify_inner(env, hd, hdb)) loop(tl, tlb)
              else []
        | else -> true
     }
   } else []
 }
+function prolog_fuse_weaklings(a, b) {
+  //TODO: remove duplicates (strict equality)
+  return a::b}
+
+function prolog_merge_weaklings(env, a, b) {
+  bodya = cdr(a); bodyb= cdr(b);
+  nw = cons('weak',prolog_fuse_weaklings(bodya, bodyb));
+  %set-car!(a, 'ref');
+  %set-car!(b, 'ref');
+  %set-cdr!(a, nw);
+  %set-cdr!(b, nw);
+}
+
 function prolog_is_var(a) match a with 'var':x -> true | else -> []
 function prolog_is_struct(a) match a with 'str':x -> true | else -> []
 function prolog_is_const(a)  match a with 'const':x -> true | else -> []
+function prolog_is_weak(a) match a with 'weak':x -> true | else -> []
 function prolog_unify_inner(env, a, b) {
    da = prolog_deref(a); db = prolog_deref(b);
    if (da === db) true
-   else if (prolog_is_var(a)) {prolog_set_var(env, a, b);true}
-   else if (prolog_is_var(b)) {prolog_set_var(env, b, a);true}
+   else if (prolog_is_var(da)) {prolog_set_var(env, da, db);true}
+   else if (prolog_is_var(db)) {prolog_set_var(env, db, da);true}
    else if (prolog_is_struct(da) && prolog_is_struct(db)) {
      prolog_unify_structs(env, da,db)
    } else if (prolog_is_const(da) && prolog_is_const(db)) {
      cdr(da) == cdr(db)
+   } else if (prolog_is_weak(da) && prolog_is_weak(db)) {
+     prolog_merge_weaklings(env, da, db); // fuse both into one
+     return true // weak entries always unify
    } else []
 }
 function prolog_unify(env, a, b) {
   ret = prolog_unify_inner(env, a,b);
   return ret;}
 
-% "Translate the backend internal term representation 
+% "Translate the backend internal term representation
    into the source AST form"
-function prolog_decode_result(varenv, v) {
+function prolog_decode_result_inner(varenv, v, vis) {
   dv = prolog_deref(v);
-  match dv with
-     str(id,@args) -> 'term'(id,@map a in args do 
-                                   prolog_decode_result(varenv, a))
-   | 'const':v -> if(%string?(v)) 'string'(v) else 'number'(v)
-   | 'var':x -> { chk = ohashget(varenv, dv);
-         if (chk) 'var'(chk) else {
-            nm = gensym(); ohashput(varenv, dv, nm);
-            return 'var'(nm)}
-         }
-   | else -> [] // error?
-  }
+ <[vish;doneh;visa]> = vis;
+  chk = ohashget(vish, dv);
+  if(chk) {
+    match chk with
+      'none'() -> {
+           chk1 = ohashget(varenv, dv);
+           if (chk1) {
+             ohashput(vish, dv, 'var'(chk1));
+             return 'var'(chk1)
+           } else symbols(newref) {
+              ohashput(vish, dv, 'var'(newref));
+              ohashput(varenv, dv, newref);
+              visa(newref, dv);
+              return 'var'(newref)}}
+    | 'var'(x) -> return chk
+  } else {
+   ohashput(vish, dv, #'(none));
+   ret = {
+    match dv with
+       str(id,@args) -> 'term'(id,@map a in args do
+                                     prolog_decode_result_inner(varenv, a, vis))
+     | 'const':v -> if(%string?(v)) 'string'(v) else 'number'(v)
+     | 'var':x -> { chk = ohashget(varenv, dv);
+           if (chk) 'var'(chk) else {
+              nm = gensym(); ohashput(varenv, dv, nm);
+              return 'var'(nm)}
+          }
+     | 'weak':l -> 'weakset'(@map x in l do prolog_decode_result_inner(varenv, x, vis))
+     | else -> [] // error?
+  };
+  ohashput(doneh, dv, ret);
+  return ret}}
+function prolog_decode_result(varenv, v, addback) {
+  vish = mkhash();doneh = mkhash();visrev=mkhash();
+  visa(nm,v) = { ohashput(visrev, nm, v) };
+  ret1 = prolog_decode_result_inner(varenv, v, [vish;doneh;visa]);
+  backrefs = hashmap(fun(k,v)[k;v], visrev);
+  if(backrefs)
+    iter [nm;v] in backrefs do {
+       d = ohashget(doneh, v);
+       addback(nm, d)};
+  return ret1;
+}
 function prolog_default_continuation(env) env
 }
 
@@ -254,13 +304,13 @@ function %_prolog_make_isfun (op)
   } else prolog_failure(env);}}
 
 \pfcode{
-define %_prolog_function_isadd/3 = 
+define %_prolog_function_isadd/3 =
    %_prolog_make_isfun (fun(a,b) a+b)
-define %_prolog_function_issub/3 = 
+define %_prolog_function_issub/3 =
    %_prolog_make_isfun (fun(a,b) a-b)
-define %_prolog_function_ismul/3 = 
+define %_prolog_function_ismul/3 =
    %_prolog_make_isfun (fun(a,b) a*b)
-define %_prolog_function_isdiv/3 = 
+define %_prolog_function_isdiv/3 =
    %_prolog_make_isfun (fun(a,b) a/b)
 }
 
@@ -272,22 +322,28 @@ function %_prolog_make_cmp (op)
       ca = cdr(da); cb = cdr(db);
       if (op(ca, cb)) cnt(env) else prolog_failure(env)
     } else prolog_failure(env)}}
-  
+
 
 \pfcode{
-define %_prolog_function_gr/2 = 
+define %_prolog_function_gr/2 =
   %_prolog_make_cmp (fun(a, b) a>b)
-define %_prolog_function_lt/2 = 
+define %_prolog_function_lt/2 =
   %_prolog_make_cmp (fun(a, b) a<b)
-define %_prolog_function_ge/2 = 
+define %_prolog_function_ge/2 =
   %_prolog_make_cmp (fun(a, b) a>=b)
-define %_prolog_function_le/2 = 
+define %_prolog_function_le/2 =
   %_prolog_make_cmp (fun(a, b) a<=b)
 }
 
 \pfcode{
 function %_prolog_function_fail/0 (env, cnt)
   prolog_failure(env)}
+
+\pfcode{
+function %_prolog_function_raise/2 (env, cnt, msg, src)
+{ dm = prolog_deref(msg); ds = prolog_deref(src);
+  ds1 = prolog_term_to_string(prolog_decode_result(mkhash(), ds, fun(k,v)[]));
+  ccerror('prolog_message'(dm, ds, ds1))}}
 
 \pfcode{
 function %_prolog_function_debug/1 (env, cnt, v) {
@@ -297,9 +353,18 @@ function %_prolog_function_debug/1 (env, cnt, v) {
 
 \pfcode{
 function %_prolog_function_print/1 (env, cnt, v) {
-  println(prolog_term_to_string(prolog_decode_result(mkhash(), v)));
+  println(prolog_term_to_string(prolog_decode_result(mkhash(), v, fun(k,v)[])));
   cnt(env);
 }}
+
+\pfcode{
+function %_prolog_function_weak/2 (env, cnt, dst, v) {
+  dd = prolog_deref(dst);
+  if (prolog_is_var(dd)) {
+    if(prolog_unify(env, dst, prolog_weak(v)))
+       cnt(env)
+    else prolog_failure(env)
+  } else prolog_failure(env)}}
 
 \subsection{Backend-specific query compilation}
 
@@ -328,7 +393,7 @@ function prolog_backend_driver_generic(parsed, exec, getexec, failure, outp) {
       qnamescreen = %Sm<<("_prolog_function_",qname);
       env0 = 'env':[];
       cnt0 = fun(env) env;
-      result = 
+      result =
          prolog_query_wrapper(apply(getexec(qnamescreen), env0:cnt0:vars));
 
       if (result) {
@@ -337,18 +402,19 @@ function prolog_backend_driver_generic(parsed, exec, getexec, failure, outp) {
             if (res) {
              println(%S<<("Solution N",resnum,":"));
              iter [n;v] in zip(qargs, vars) do {
-                nv = prolog_decode_result(venv, v);
+                nv = prolog_decode_result(venv, v,fun(k,v)[]);
                 println(%S<<(n, " = ", prolog_term_to_string(nv)))
              };
              printloop(prolog_query_wrapper(failure(res)), resnum+1)}}
         } else
-          do resultloop(res = result, resnum = 0) {
+          do resultloop(res = result, resnum = 0) collector(addb0, getback) {
             if (res) {
+             addback(k,v) = addb0([k;v]);
              resmap = map [n;v] in zip(qargs, vars) do {
-                nv = prolog_decode_result(venv, v);
+                nv = prolog_decode_result(venv, v, addback);
                 [n; nv]
              };
-             return resnum : resmap : fun() 
+             return resnum : (getback()::resmap) : fun()
                 { resultloop(failure(res), resnum+1) }
             } else return []
           }
@@ -363,7 +429,7 @@ function prolog_backend_driver_generic(parsed, exec, getexec, failure, outp) {
 
 \pfcode{
 function prolog_backend_driver(parsed, exec, outp)
-  prolog_backend_driver_generic(parsed, exec, 
+  prolog_backend_driver_generic(parsed, exec,
        fun(nm) shashget(getfuncenv(), nm), prolog_failure_f, outp)}
 
 
@@ -385,7 +451,7 @@ collector(add, get) {
    na = visit:prolog(clauses:a) {
       deep term {
         evar -> {
-           chk = ohashget(ev, id); 
+           chk = ohashget(ev, id);
            if (chk) [] else {ohashput(ev,id,id); add(id)};
            return 'var'(id)
         }
@@ -396,7 +462,7 @@ collector(add, get) {
 }}
 
 \pfcode{
-syntax in expr, start (prolog): 
+syntax in expr, start (prolog):
    ' [qident]:nm "<-?" cslist<[plgterm],",">:ts "." '
 {
    app0 = [prolog_parse_fix_arity_clause('query'(@ts))];
@@ -408,13 +474,13 @@ syntax in expr, start (prolog):
    cgen = %map(prolog_codegen, capp); // expecting single recfunction
   <['_prolog_toplevl_function'(id,args,body)]> = cgen;
    env0 = gensym();
-   lcode = 
+   lcode =
       ['flatbegin-inside-begin-with-defs';
              ['inblock-def';qname;'fun'(args,body)];
              ['inblock-def';env0;'cons'('quote'('env'),'nil')];
             @map v in newvars do {
                ['inblock-def';v;'cons'('quote'('var'),'nil')]
-             }; 
+             };
              ['inblock-def';nm;
                 ['prolog_loop_results';
                     [qname;env0; 'prolog_default_continuation';@(^qstat)];

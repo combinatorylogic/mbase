@@ -2,8 +2,8 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-// This file is distributed under the terms of the Q Public License version 1.0.
+// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+//
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -21,23 +21,23 @@
 // An AST for a Not.Net parser:
 ast pfnotnetast {
     member =
-       field(type:tp, ident:name, *mod:mods) 
+       field(type:tp, ident:name, *mod:mods)
      | method(type:tp, ident:name, *argdef:args , stmt:body);
     top = notnet(*argdef:args, stmt:body)
         | class(ident:nm, *any:mods,*ident:inh,*member:body)
         | mixclass(ident:nm, *any:mods,*ident:inh,*mixmember:body)
-	;
+        ;
     member = field(type:tp, ident:nm, *accs:mods)
            | method(type:tp, ident:nm, *accs:mods, *argdef:args, stmt:body)
-	   | constructor(*accs:mods, ident:chknm, *argdef:args, stmt:body)
-	   | entry(ident:nm)
-	   ;
+           | constructor(*accs:mods, ident:chknm, *argdef:args, stmt:body)
+           | entry(ident:nm)
+           ;
     mixmember = dnet(member:m)
            | mbmethod(type:tp, ident:nm, *accs:mods, *argdef:args, any:body)
-	   ;
+           ;
     type =   simple(ident:nm)
            | array(type:t)
-	   | generic(ident:nm,*type:args)
+           | generic(ident:nm,*type:args)
            ;
     argdef is ( type:tp, ident:name);
     stmt = goto(ident:lbl)
@@ -62,9 +62,9 @@ ast pfnotnetast {
          | label(ident:lbl)
          | expr(expr:e)
 
-	 | verbatim(any:v)
+         | verbatim(any:v)
 
-	 | unquote(any:v)
+         | unquote(any:v)
 
          ;
     exprortype = expr(expr:e) | type(type:tp);
@@ -96,11 +96,11 @@ ast pfnotnetast {
          | typetoken(type:tp)
          | ref(expr:a)
          | new(type:tp,*expr:args)
-	 | newarr(type:tp, expr:sz)
-	 | newdelegate(type:tp, exprortype:inst, ident:nm)
+         | newarr(type:tp, expr:sz)
+         | newdelegate(type:tp, exprortype:inst, ident:nm)
          | mtdcall(expr:e, ident:mtd, *expr:args)
          | smtdcall(ident:nm, *expr:args)
-         | fldaccess(expr:e, ident:fld) 
+         | fldaccess(expr:e, ident:fld)
          | arrayacc(expr:ar, expr:idx)
          | embedbegin(*stmt:sts)
          | null()
@@ -112,9 +112,9 @@ ast pfnotnetast {
          | int(any:v)
          | string(any:v)
 
-	 | verbatim(any:v)
+         | verbatim(any:v)
 
-	 | unquote(any:v)
+         | unquote(any:v)
 
          ;
 }
@@ -122,7 +122,7 @@ ast pfnotnetast {
 // Not.Net parser, with a syntax somewhat similar to C#
 parser pfnotnet ( pfront )
 {
-  !!Spaces;       
+  !!Spaces;
   [lexical:] := [lexical] => {ctoken = lexic};
   [keyword:] := [keyword] ![IdentRest] => {ctoken = keyword};
 
@@ -137,7 +137,7 @@ parser pfnotnet ( pfront )
 
   @pfmbsemi := ";"?;
 
-  pfnotnettop := 
+  pfnotnettop :=
     {[pfclsmodifiers]:mods class [pfclassname]:nm [pfclassargs]:args
       "{" eslist<[pfclassmember]>:members "}" =>
       class(nm, mods, args, members)}
@@ -151,16 +151,16 @@ parser pfnotnet ( pfront )
        => notnet(args,b)
    ; // More to be defined
 
-  pfargdef := [pftype]:type [pfident]:name => $list(type,name);  
+  pfargdef := [pftype]:type [pfident]:name => $list(type,name);
 
   @tkfloat := "-"? [Digit]+ "." [Digit]+ "f";
   @tkdouble := "-"? [Digit]+ "." [Digit]+ ("d")?;
   @tkint := "-"? [Digit]+;
 
-  pffloat := [tkfloat]:v => {ctoken = const} $val(v);  
-  pfdouble := [tkdouble]:v => {ctoken = const} $val(v);  
+  pffloat := [tkfloat]:v => {ctoken = const} $val(v);
+  pfdouble := [tkdouble]:v => {ctoken = const} $val(v);
   pfint := [tkint]:v => {ctoken = const} $val(v);
-  
+
   pfstring := [string] => {ctoken = const};
 
   @@dot := ".";
@@ -168,39 +168,39 @@ parser pfnotnet ( pfront )
   @@clsident := [Letter] [IdentRest]*;
   @tkpfident := [clsident];
   pfident :=
-        {"\" [tkpfident]:i "\" => {qstate = unquote} unquote($sval(i))} 
+        {"\" [tkpfident]:i "\" => {qstate = unquote} unquote($sval(i))}
     /   { [tkpfident]:i => {ctoken = ident} $sval(i)};
 
   @tkpfclassname := {([clsident] [dot])+ [clsident]} / [clsident];
 
   pfclassname :=
-         {"\" [tkpfident]:i "\" => {qstate = unquote} unquote($sval(i))} 
+         {"\" [tkpfident]:i "\" => {qstate = unquote} unquote($sval(i))}
      /   { [tkpfclassname]:e => {ctoken = ident} $sval(e)};
 
   pfclsmodifiers := eslist<[pfclsmodifier]>:lst => lst;
 
   pfclsmodifier := {public => public()} / {static => static()} /
                 {private => private()} / {protected => protected()} /
-		{sealed => sealed()}
+                {sealed => sealed()}
                 ; // more?
-  
+
   pfmodifiers := eslist<[pfmodifier]>:lst => lst;
 
   pfmodifier := {public => public()} / {static => static()} /
                 {private => private()} / {protected => protected()} /
-		{virtual => virtual()} / {override => override()} / {final => final()}
+                {virtual => virtual()} / {override => override()} / {final => final()}
                 ; // more?
- 
+
   pfclassargs := {":" slist<[pfclassname]>:inher => inher }
               /  {!":" => $nil()} ;
 
-  pftype := 
+  pftype :=
       {[pftype]:n "[" "]" => array(n) }
    /  {[pfclassname]:n "<" cslist<[pftype],",">:args ">" => generic(...) }
    /  {[pfclassname]:n => {ctoken = keyword} simple(...)} ; // Add generics here!
 
   pfmixclassmember :=
-     { mbase [pfmodifiers]:mods [pftype]:tp [pfident]:name 
+     { mbase [pfmodifiers]:mods [pftype]:tp [pfident]:name
         "(" ecslist<[pfargdef],",">:args ")" [expr]:b ";"?
          => mbmethod(tp,name,mods,args,b) }
    / { [pfclassmember]:m => dnet(m) }
@@ -208,7 +208,7 @@ parser pfnotnet ( pfront )
 
   pfclassmember :=
      {entry ":" [pfident]:name ";" => entry(...)}
-   / {[pfmodifiers]:mods [pftype]:tp [pfident]:name 
+   / {[pfmodifiers]:mods [pftype]:tp [pfident]:name
        "(" ecslist<[pfargdef],",">:args ")" [pfnetbody]:b ";"?
       => method(tp,name,mods,args,b)}
    / {[pfmodifiers]:mods [pfident]:name
@@ -227,31 +227,31 @@ parser pfnotnet ( pfront )
                / { return  [pfexpr]:ex ";" => return(...) }
                / { leave  [pfexpr]:ex ";" => leave(...) }
                / { return ";" => vreturn() }
- 	       / { if "(" [pfexpr]:cnd ")" (then)? [pfstatement]:iftr
+                / { if "(" [pfexpr]:cnd ")" (then)? [pfstatement]:iftr
                    else [pfstatement]:iffl => if3(...) }
- 	       / { if "(" [pfexpr]:cnd ")" (then)? [pfstatement]:iftr
+                / { if "(" [pfexpr]:cnd ")" (then)? [pfstatement]:iftr
                     => if2(...) }
-	       / { try [pfstatement]:tr catch "(" [pftype]:tp [pfident]:nm ")"
-	           [pfstatement]:cblock 
-		   => try(tr,$list(tp,nm),cblock) }
-	       / { throw [pfexpr]:ex ";" => throw(...) }
+               / { try [pfstatement]:tr catch "(" [pftype]:tp [pfident]:nm ")"
+                   [pfstatement]:cblock
+                   => try(tr,$list(tp,nm),cblock) }
+               / { throw [pfexpr]:ex ";" => throw(...) }
                / { foreach "(" [pfident]:var in [pfexpr]:e ")" [pfstatement]:b
                    =>
                    foreach(...) }
                / { while "(" [pfexpr]:e ")" [pfstatement]:b
                    =>
                    while(...) }
-	       / { lift ":" [pfclassmember]:mem => lift(...) }
-	       / { [pftype]:tp [pfident]:id ";"
-	           => vardef(id, tp) }
-	       / { [pftype]:tp [pfident]:id "=" [pfexpr]:ex ";"
+               / { lift ":" [pfclassmember]:mem => lift(...) }
+               / { [pftype]:tp [pfident]:id ";"
+                   => vardef(id, tp) }
+               / { [pftype]:tp [pfident]:id "=" [pfexpr]:ex ";"
                    => varinit(id,tp, ex) }
-	       / { var [pfident]:l "=" [pfexpr]:v ";" => uvarinit(...) } 
-	       / { [pfexpr]:l "=" [pfexpr]:v ";" => set(...) } 
-	       / { [pfexpr]:l ":=" [pfexpr]:v ";" => set(...) } 
+               / { var [pfident]:l "=" [pfexpr]:v ";" => uvarinit(...) }
+               / { [pfexpr]:l "=" [pfexpr]:v ";" => set(...) }
+               / { [pfexpr]:l ":=" [pfexpr]:v ";" => set(...) }
                / { [pfident]:lbl ":"  => label(...) }
                / { "\" [tkpfident]:i "\" ";" => {qstate = unquote} unquote($sval(i)) }
-	       / { [pfexpr]:e ";" => expr(e) }
+               / { [pfexpr]:e ";" => expr(e) }
                / { ";" => begin($nil()) }
                ; // more to come
 
@@ -261,7 +261,7 @@ parser pfnotnet ( pfront )
 
          | (300) [pfexpr] "<<" [pfexpr] => lshift(L,R)
          | (300) [pfexpr] ">>" [pfexpr] => rshift(L,R)
-         | (200) [pfexpr] ">=" [pfexpr] => greq(L,R) 
+         | (200) [pfexpr] ">=" [pfexpr] => greq(L,R)
          | (200) [pfexpr] "<=" [pfexpr] => lteq(L,R)
          | (200) [pfexpr] ">"  [pfexpr] => gr(L,R)
          | (200) [pfexpr] "<"  [pfexpr] => lt(L,R)
@@ -280,45 +280,45 @@ parser pfnotnet ( pfront )
          | [pfexprasis]
          ;
 
-  pfexprasis := 
-	   { [pfexpr5]:L is   [pftype]:R => istype ... }
-	 / { [pfexpr5]:L as   [pftype]:R => typecast ... }
+  pfexprasis :=
+           { [pfexpr5]:L is   [pftype]:R => istype ... }
+         / { [pfexpr5]:L as   [pftype]:R => typecast ... }
          / [pfexpr5]
          ;
-         
+
   pfexpr5 := { "!" [pfexpr5]:a => unot(a) }
           /  { "-" [pfexpr5]:a => uminus(a) }
-	  /  { "null?" [pfexpr5]:a => isnull(a) }
-	  /  { typeof [pfexpr5]:a => typeof(a) }
-	  /  { type [pftype]:t => typetoken(t) }
+          /  { "null?" [pfexpr5]:a => isnull(a) }
+          /  { typeof [pfexpr5]:a => typeof(a) }
+          /  { type [pftype]:t => typetoken(t) }
           /  { ref [pfexpr5]:a => ref(a) }
-	  /  { "(" [pftype]:tp ")" [pfexpr5]:a => typecast(a,tp) }
-	  /  { delegate [pftype]:tp "(" [pftype]:e ":" [pfident]:nm ")" =>
-	        newdelegate(tp, type(e), nm) }
-	  /  { delegate [pftype]:tp "(" [pfexpr]:e ":" [pfident]:nm ")" =>
-	        newdelegate(tp, expr(e), nm) }
-	  /  { new [pftype]:tp "(" ecslist<[pfexpr],",">:args ")" => 
+          /  { "(" [pftype]:tp ")" [pfexpr5]:a => typecast(a,tp) }
+          /  { delegate [pftype]:tp "(" [pftype]:e ":" [pfident]:nm ")" =>
+                newdelegate(tp, type(e), nm) }
+          /  { delegate [pftype]:tp "(" [pfexpr]:e ":" [pfident]:nm ")" =>
+                newdelegate(tp, expr(e), nm) }
+          /  { new [pftype]:tp "(" ecslist<[pfexpr],",">:args ")" =>
                 new(tp,args) }
-	  /  { new [pftype]:tp "[" [pfexpr]:sz "]" => 
+          /  { new [pftype]:tp "[" [pfexpr]:sz "]" =>
                 newarr(tp,sz) }
           /  [nnexpr_unary]
-	  /  [pfprim]
-	  ;
+          /  [pfprim]
+          ;
 
   pfprim :=
              { [pfprim]:ex "." [pfident]:mtd "(" ecslist<[pfexpr],",">:args ")" =>
                mtdcall(ex,mtd,args) }
-          / { [pfprim]:ex "." [pfident]:fld 
+          / { [pfprim]:ex "." [pfident]:fld
                => fldaccess(ex, fld) }
-	  / { [pfprim]:ex "[" [pfexpr]:idx "]"
+          / { [pfprim]:ex "[" [pfexpr]:idx "]"
                => arrayacc(ex, idx) }
           / { [pfident]:id "(" ecslist<[pfexpr],",">:args ")" =>
-               smtdcall(id,args) }                    
+               smtdcall(id,args) }
           / [nnexpr_prim]
-	  / [pfatom]
-	  ;
+          / [pfatom]
+          ;
 
-  pfatom := 
+  pfatom :=
             { "(" [pfexpr]:e ")" => e}
          /  { "{" slist<[pfstatement]>:body "}" => embedbegin(body) }
          /  { "\" [tkpfident]:i "\" => {qstate = unquote} unquote($sval(i)) }
@@ -330,8 +330,8 @@ parser pfnotnet ( pfront )
          /  { [pffloat]:num => float(num) }
          /  { [pfdouble]:num => double(num) }
          /  { [pfint]:num => int(num) }
-	 /  { [pfstring]:str => string(str) }
-	 ;
+         /  { [pfstring]:str => string(str) }
+         ;
 }
 
 // Replace initial sets with uvarinits where appropriate
@@ -341,8 +341,8 @@ function pfnotnet_sets (nn)
   visit:pfnotnetast(stmt: nn) {
     deep stmt {
       set -> (match left with
-                var(id) -> if (hashget(ht,id)) then node 
-                             else { hashput(ht,id,id); 
+                var(id) -> if (hashget(ht,id)) then node
+                             else { hashput(ht,id,id);
                                     'uvarinit'(id,right); }
               | else      -> node)
     | varinit -> {hashput(ht,id,id); node}
@@ -382,9 +382,9 @@ function pfnotnet_top (nn)
        |  flatbegin -> 'begin':body
        |  loc -> {
             <[Src;F;T]> = L;
-	    <[fl;fc]> = %peg:decode-pos(F);
-	    <[tl;tc]> = %peg:decode-pos(T);
-	    return 'debugpoint'(Src,fl+1,fc+1,tl+1,tc+1)
+            <[fl;fc]> = %peg:decode-pos(F);
+            <[tl;tc]> = %peg:decode-pos(T);
+            return 'debugpoint'(Src,fl+1,fc+1,tl+1,tc+1)
           }
        |  goto  -> 'goto'(lbl)
        |  return -> 'return'(v)
@@ -403,8 +403,8 @@ function pfnotnet_top (nn)
        |  uvarinit -> [id;'=';v]
        |  lift -> {
             match m with
-	       'field':_ -> 'lift-field'(m)
-	     | 'method':_ -> 'lift-method'(m)
+               'field':_ -> 'lift-field'(m)
+             | 'method':_ -> 'lift-method'(m)
           }
        |  set -> [left;'<-';right]
        |  verbatim -> v
@@ -480,23 +480,23 @@ function pfnotnet_expr (nn)
 
 // Binding the parser defined above to the PFront core syntax:
 
-syntax in top, start (pfnotnet): '[pfnotnettop]:nn' 
+syntax in top, start (pfnotnet): '[pfnotnettop]:nn'
 {
    'expr'('lisp'('ctime'('pfnotnet_top'('quote'(nn)))))
 }
 
-syntax in expr, start (pfnotnet): '[pfnotnet]:nn' 
+syntax in expr, start (pfnotnet): '[pfnotnet]:nn'
 {
    'lisp'(pfnotnet_top(nn))
 }
 
-syntax in expr, start (pfnotnet): '".net" "(" ecslist<[pfident],",">:args ")" ":" [pfexpr]:b' 
+syntax in expr, start (pfnotnet): '".net" "(" ecslist<[pfident],",">:args ")" ":" [pfexpr]:b'
 {
    'lisp'('not.neth'((map a in args do 'object'(a)),
              'begin'('leave'(pfnotnet_expr(b)))))
 }
 
-syntax in expr, start (pfnotnet): '".net" ":" [pfexpr]:b' 
+syntax in expr, start (pfnotnet): '".net" ":" [pfexpr]:b'
 {
    'lisp'('not.neth'(nil,
              'begin'('leave'(pfnotnet_expr(b)))))
@@ -523,7 +523,7 @@ syntax in top, start: '".net-macro" [qident]:name "(" ecslist<[fqident],",">:arg
   }
 {
   e1 = %L[;hlevel-compile-expr;](e);
-  argslist = do iloop ( a = args ) 
+  argslist = do iloop ( a = args )
              {
                match a with
                  a(i) : rest -> i

@@ -14,18 +14,18 @@ function ssa_find_loops_inner(DT, m, n, edges)
       do loop(i = x, path = []) {
          if(^stop || ohashget(visit, i)) [] else {
             nxts = ohashget(edges, i);
-	    ohashput(visit, i, i);
-	    if ( i === m || ohashget(pathcache, i) )
-	      { iter p in path do ohashput(pathcache, p, p);
-	        stop := true; }
+            ohashput(visit, i, i);
+            if ( i === m || ohashget(pathcache, i) )
+              { iter p in path do ohashput(pathcache, p, p);
+                stop := true; }
             else {
-	      iter n1 in nxts do {
-	         if (n1 === n) [] else {
-		    loop(n1, i:path);
-		 }
-	      }
-	    }
-	 }
+              iter n1 in nxts do {
+                 if (n1 === n) [] else {
+                    loop(n1, i:path);
+                 }
+              }
+            }
+         }
       };
       if (ohashget(pathcache, x)) [x] else []
    };
@@ -39,7 +39,7 @@ function ssa_loops_nesting(nloops)
    subsetp(s1, s2) = {
       length(filter(fun(x) memq(x, s2), s1)) == length(s1)
    };
-   map append [nm;X;xs] in nloops do { 
+   map append [nm;X;xs] in nloops do {
       map append [nm1;X1;xs1] in nloops do {
         if (nm===nm1) [] else
         if (subsetp(xs, xs1)) return ['subloop'(nm, nm1)]
@@ -52,7 +52,7 @@ function ssa_loops_nesting(nloops)
 \pfcode{
 function ssa_loops_classify_edges(DT, edges, loops)
 {
-   CNT = mkref(1); 
+   CNT = mkref(1);
    genname() = { ret = ^CNT; CNT := ret + 1; return %Sm<<("L",ret) };
    collector(add, get) {
      // Name the loops
@@ -65,24 +65,24 @@ function ssa_loops_classify_edges(DT, edges, loops)
        add('backedge'(nm, bf, bt));
        iter x in xs do {
          ohashput(bbh, x, nm : ohashget(bbh, x));
-	 add('inaloop'(x, nm));
+         add('inaloop'(x, nm));
        };
        return 'loop'(nm, xs);
      };
      // Classify the edges
      iter [ef;et] in edges do {
         fl = ohashget(bbh, ef);
-	tl = ohashget(bbh, et);
-	// Loops, for which ef -> et is an exit edge:
-	exitedge =  [x | x <- fl where not(memq(x, tl)) ];
-	// Loops, for which ef -> et is an entry edge:
-	entryedge = [x | x <- tl where not(memq(x, fl)) ];
-	// Loops, for which ef -> et is inner transitions:
-	inneredge = [y | x <- fl, y <- tl where x === y ];
-	// Issue annotations
-	iter L in exitedge  do add('exitedge'(L, ef, et));
-	iter L in entryedge do add('entryedge'(L, ef, et));
-	iter L in inneredge do add('inneredge'(L, ef, et));
+        tl = ohashget(bbh, et);
+        // Loops, for which ef -> et is an exit edge:
+        exitedge =  [x | x <- fl where not(memq(x, tl)) ];
+        // Loops, for which ef -> et is an entry edge:
+        entryedge = [x | x <- tl where not(memq(x, fl)) ];
+        // Loops, for which ef -> et is inner transitions:
+        inneredge = [y | x <- fl, y <- tl where x === y ];
+        // Issue annotations
+        iter L in exitedge  do add('exitedge'(L, ef, et));
+        iter L in entryedge do add('entryedge'(L, ef, et));
+        iter L in inneredge do add('inneredge'(L, ef, et));
      };
      return [rloops; get()]
    };
@@ -98,9 +98,9 @@ function ssa_find_loops(code, DT)
    edges = collector(eadd, eget) {
      iter:genssa(code: code) {
         deep bblock {
-	   b ->  { iter n in nexts do eadd([name;n]);
+           b ->  { iter n in nexts do eadd([name;n]);
                    ohashput(hedges, name, nexts); }
-	}
+        }
      };
      return eget();
    };

@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -31,7 +31,7 @@
 (include "../core/pmatch.al")
 
 ;- Emitting IL via System.Reflection.Emit
-(include "../core/emit.al") 
+(include "../core/emit.al")
 
 ;- There are two different modes of asmlib embedding. First is to compile it as a separate
 ;- dll, and second is to compile it into MBaseBin.dll in the last stage.
@@ -89,8 +89,8 @@
 ; Register scheduling -
 ;   used only at the last stage
 (ctime (if (shashget (getfuncenv) 'stage-final)
-	   `(include "../core/graphsort.al")
-	   `(begin)))
+           `(include "../core/graphsort.al")
+           `(begin)))
 
 (include "../core/liveness.al")
 (include "../core/coloring.al")

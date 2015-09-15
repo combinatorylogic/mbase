@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -113,10 +113,10 @@
       `(,l ,@(car e1h)
             ,@(let ((nl (+ l 1)))
                 (map (fmt (nk v)
-		       (if (and (> (length v) simple-threshold)
-				(> nk 0))
-			   `(,nk ,(loop v nl))
-			   `(,nk (() ,@v))))
+                       (if (and (> (length v) simple-threshold)
+                                (> nk 0))
+                           `(,nk ,(loop v nl))
+                           `(,nk (() ,@v))))
                   (cadr e1h)))))))
 
 
@@ -126,21 +126,21 @@
   (let loop ((t tree))
     (format t (lev . entries)
       (let* ((sorted (qsort (fun (a b) (< (car a) (car b))) entries))
-             (nens (filter (fmt (a (v . _)) 
-				(or (null? v) (number? v))) sorted)))
+             (nens (filter (fmt (a (v . _))
+                                (or (null? v) (number? v))) sorted)))
         `(symcase (,lev ,vn ,(null? nens) ,erlabel)
           ,@(map-over sorted
                (fmt (k (s . v))
-		 (cond
-		  ((null? s)
-		   `(,k () (simple-case ,vn
-			     ,@(map-over v
-				 (fmt (s e)
-				    `(,s (n.goto ,e))))
-			     (else (n.goto ,erlabel)))))
-		  ((symbol? s)
+                 (cond
+                  ((null? s)
+                   `(,k () (simple-case ,vn
+                             ,@(map-over v
+                                 (fmt (s e)
+                                    `(,s (n.goto ,e))))
+                             (else (n.goto ,erlabel)))))
+                  ((symbol? s)
                    `(,k ,s (n.goto ,@v)))
-		  (else
+                  (else
                    `(,k () ,(loop `(,s ,@v))))))))))))
 
 (cmacro symcase (hdr . opts)
@@ -200,7 +200,7 @@
        (when o
         (alet lbl (Sm<< pfx "__" i)
            (format o ((ss . act) . tl)
-             (if (eqv? ss 'else) 
+             (if (eqv? ss 'else)
                  (begin
                    (r! ex act)
                    )
@@ -210,7 +210,7 @@
                    (add `(,lbl (begin ,@act)))
                    (loop tl (+ i 1))))))))
      (let* ((intry
-             (cc-mark vn 
+             (cc-mark vn
                       (cc-htab (hashmap (fun (s v) `(,(Sm<< s) ,v)) sh))
                       exit))
             (icode
@@ -232,7 +232,7 @@
 (macro cc-newgencase (v . opts)
   (with-syms (vv v1)
     `(let* ((,vv ,v)
-            (,v1 (if (null? ,vv) 
+            (,v1 (if (null? ,vv)
                      (quote ,cc-newgencase-elsesym)
                      (if (symbol? ,vv) ,vv (quote ,cc-newgencase-elsesym))
                      )))

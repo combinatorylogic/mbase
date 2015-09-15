@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -11,7 +11,7 @@
 (Section "\\Lone{} basic macros")
 
 ;; format macro - the most primitive form of it.
-   
+
 (macro ___xfmt0 (aarg formt . body)
   (let ((arg (gensym)))
    `(let ((,arg ,aarg))
@@ -28,7 +28,7 @@
                          `(let ((,f ,p)) ,@body))
                    (else `(begin ,@body)))))))
 
-;; extended format macro - allow nested lists                   
+;; extended format macro - allow nested lists
 (macro format (aarg formt . body)
    ("Binds a pattern to an argument value. No checks are done, the value is expected to conform the format."
     "A pattern language is following:"
@@ -54,18 +54,18 @@
          `(___xfmt0 ,aarg ,fmt2 ,(let loop ((s substs)) (if (null? s) `(begin ,@body)
                               `(format ,(caar s) ,(cadar s) ,(loop (cdr s)))))))
        ;; otherwise it is just flat
-       `(___xfmt0 ,aarg ,formt ,@body)))                       
+       `(___xfmt0 ,aarg ,formt ,@body)))
 
-                   
+
 (macro fmt (formt . body)
   "Creates a function accepting an argument of a given format, see [format] macro for details."
    (let ((arg (gensym))) `(fun (,arg) (format ,arg ,formt ,@body))))
 (macro fmt0 (formt . body) (let ((arg (gensym))) `(fun (,arg) (___xfmt0 ,arg ,formt ,@body))))
 
-(macro funct (nm args . body) 
+(macro funct (nm args . body)
   "Creates a global function accepting an argument of a given format, see [fmt] and [format] for details."
   `(define ,nm (fmt ,args ,@body)))
-            
+
 ;; case-car + format macro
 ; elt: (carvlu[s] format body)
 
@@ -98,7 +98,7 @@
    " (letf ((<format> <value>)*) <expr>*)"
    "]]"
    )
-   (if (null? fs) 
+   (if (null? fs)
       `(begin ,@body)
       (format fs ((f1 v1) . rest)
          (if (list? f1)
@@ -107,7 +107,7 @@
 
 ;; helper function
 (recfunction -do-counter-for- (f from to step)
-  (if (< from to) 
+  (if (< from to)
       (begin (f from) (-do-counter-for- f (+ from step) to step))
       nil))
 
@@ -119,7 +119,7 @@
        (if (< i to) (cons (f i) (loop (+ i step))) nil)))
 
 )
-       
+
 (cli-only
 
 (function -do-counter-formap- (f from to step) ;; constant stack space formap function
@@ -148,7 +148,7 @@
 (macro for (aft . body)
   ("Iterates the [body] expressions with a counter."
    ""
-   "Usage:" 
+   "Usage:"
    "[["
    "(for (<var> <number-from> <number-to>) <expr>*)"
    "]]"
@@ -174,12 +174,12 @@
 (function reverse (lst)
    "Returns the reversed list."
   (let inner ( (l lst)
-	       (acc nil) )
+               (acc nil) )
     (cond
      ((null? l) acc)
      (else (inner (cdr l) (cons (car l) acc))))))
 
-(function fromto (a b) 
+(function fromto (a b)
    "Creates a list of numbers from a to b (exclusive)"
    (formap (i a b) i))
 
@@ -198,12 +198,12 @@
 (macro foreach-count rest
   (format rest ((id lst cnt) . body)
      (with-syms (ret dcnt)
-	`(let ((,dcnt (mkref 0)))
-	   (foreach (,id ,lst)
-	     (let* ((,cnt (deref ,dcnt))
-		    (,ret (begin ,@body)))
-	       (r! ,dcnt (+ ,cnt 1))
-	       ,ret))))))
+        `(let ((,dcnt (mkref 0)))
+           (foreach (,id ,lst)
+             (let* ((,cnt (deref ,dcnt))
+                    (,ret (begin ,@body)))
+               (r! ,dcnt (+ ,cnt 1))
+               ,ret))))))
 
 (macro foreach-map rest
   ("Iterates over a given list, making a list of body evaluation values."
@@ -220,22 +220,22 @@
 (macro foreach-map-count rest
   (format rest ((id lst cnt) . body)
      (with-syms (ret dcnt)
-	`(let ((,dcnt (mkref 0)))
-	   (foreach-map (,id ,lst)
-	     (let* ((,cnt (deref ,dcnt))
-		    (,ret (begin ,@body)))
-	       (r! ,dcnt (+ ,cnt 1))
-	       ,ret))))))
+        `(let ((,dcnt (mkref 0)))
+           (foreach-map (,id ,lst)
+             (let* ((,cnt (deref ,dcnt))
+                    (,ret (begin ,@body)))
+               (r! ,dcnt (+ ,cnt 1))
+               ,ret))))))
 
 (macro foreach-mappend-count rest
   (format rest ((id lst cnt) . body)
      (with-syms (ret dcnt)
-	`(let ((,dcnt (mkref 0)))
-	   (foreach-mappend (,id ,lst)
-	     (let* ((,cnt (deref ,dcnt))
-		    (,ret (begin ,@body)))
-	       (r! ,dcnt (+ ,cnt 1))
-	       ,ret))))))
+        `(let ((,dcnt (mkref 0)))
+           (foreach-mappend (,id ,lst)
+             (let* ((,cnt (deref ,dcnt))
+                    (,ret (begin ,@body)))
+               (r! ,dcnt (+ ,cnt 1))
+               ,ret))))))
 
 (macro foreach-map-filter rest
   (format rest ((id lst) query . body)
@@ -279,7 +279,7 @@
              (else (loop (cdr x) (cons (car x) c)))))))
      (if (null? br) `(begin ,@b1)
                     `(let* ,br ,@b1))))
-     
+
 (function hashput-seq (me k v)
    (if (list? me) (ohashput (car me) k v)
                   (ohashput me k v)))
@@ -331,7 +331,7 @@
 (macro mtailsplit2 (fn a1 lst)
   (with-syms (lst1)
   `(let* ((,lst1 ,lst)
-	  (a (cons 1 nil))
+          (a (cons 1 nil))
           (b (cons 1 nil))
           (ar (cons 1 a))
           (br (cons 1 b)))
@@ -364,13 +364,13 @@
                 (if (eq? (car e) '<>)
                     (cons (car a) (loop (cdr e) (cdr a)))
                     (cons (car e) (loop (cdr e) a))))))))
-                  
+
 (recfunction qsort (cf lst)
   "Sorts a list using a given comparison function."
   (if (null? lst) nil
       (let ((a (car lst)) (b (cdr lst)))
          (do (append (qsort cf (car lr)) (cons a (qsort cf (cdr lr))))
-             (where (lr  
+             (where (lr
                       (tailsplit (cut cf <> a) b)))))))
 
 (macro mqsort (cf lst)
@@ -380,8 +380,8 @@
      (if (null? ,lst1) nil
        (let ((,a (car ,lst1)) (,b (cdr ,lst1)))
          (do (append (,loop (car ,lr)) (cons ,a (,loop (cdr ,lr))))
-             (where (,lr  
-		     (mtailsplit2 ,cf ,a ,b)))))))))
+             (where (,lr
+                     (mtailsplit2 ,cf ,a ,b)))))))))
 
 (function interleave (lst del)
   "Makes a list of [lst] elements interleaved with [del]'s."
@@ -397,7 +397,7 @@
 (function map-stop (fn lst)
    (let loop ((l lst))
        (if (null? l) nil
-          (if (fn (car l)) nil 
+          (if (fn (car l)) nil
              (cons (car l) (loop (cdr l)))))))
 
 ;;;
@@ -461,9 +461,9 @@
   "Executes [body] expressions one by one until non--nil value is returned."
   (if (null? body) '(quote nil)
       (if (null? (cdr body)) (car body)
-	  (with-syms (a)
-	     `(let ((,a ,(car body)))
-		(if ,a ,a (try-some ,@(cdr body))))))))
+          (with-syms (a)
+             `(let ((,a ,(car body)))
+                (if ,a ,a (try-some ,@(cdr body))))))))
 
 (macro when (cnd . body)
   "Equivalent to ([if] [cnd] (begin [body]))"
@@ -525,9 +525,15 @@
                         (loop (cdr b) (append (cdr ab) e) u)
                         `(inner.module-using-export ,name ,e ,u ,@b))))))
         '(begin ))))
-               
+
 
 (macro inner.module-using-export (name exs uss . body)
+  `(top-begin
+     (inner.module-using-export-push ,name ,exs ,uss)
+     ,@body
+     (inner.module-using-export-pop)))
+
+(macro inner.module-using-export-push (name exs uss)
   (let* ((makepath (lambda (path)
                      (string->symbol
                       (let loop ((p path))
@@ -541,19 +547,17 @@
          (sympath (append (bootlib:get-module-namespace) (list name)))
          (path (makepath sympath))
          (privatepath (makepath (append sympath '(private)))))
-    `(top-begin
-       (ctimex (begin
-                 (bootlib:push-module-env)
-                 (bootlib:push-module-namespace (quote ,name))
-                 (bootlib:add-exports (quote ,exs))
-                 (bootlib:add-module-env (quote (,path ,@uss)))
-                 (bootlib:add-module-env (quote (,privatepath)))))
-       
-       ,@body
-       
-       (force-class-flush)
-       (ctimex (begin
-                 (bootlib:pop-module-namespace)
-                 (bootlib:pop-module-env)))
-       )))
-                                       
+    `(ctimex (begin
+               (bootlib:push-module-env)
+               (bootlib:push-module-namespace (quote ,name))
+               (bootlib:add-exports (quote ,exs))
+               (bootlib:add-module-env (quote (,path ,@uss)))
+               (bootlib:add-module-env (quote (,privatepath)))))))
+
+(macro inner.module-using-export-pop ()
+  `(begin
+     (force-class-flush)
+     (ctimex (begin
+               (bootlib:pop-module-namespace)
+               (bootlib:pop-module-env)))
+     ))

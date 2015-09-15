@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -32,8 +32,8 @@
             (p:match dfn
               ((Closure $cloname $clorename $clenv $rest)
                (let* ((iclenv (mapi (fun (i v) (list i v)) clenv))
-                      (captch (filter 
-                               (fmt (i v) 
+                      (captch (filter
+                               (fmt (i v)
                                     (hashget ht1 v))
                                iclenv)))
                  (if captch `((PatchClosure ,nm ,cloname ,@captch)) nil)))
@@ -55,7 +55,7 @@
 ;= to self, added later with a closure patcher.
 
 (function cc:doletsrec (liftloop bound rrec stickyname get defs body)
-  (let* 
+  (let*
             ((alst (map car defs))
              (nbound (append alst bound))
 ;= [[ndefs0]] is a list of annotated definitions --- simple references and
@@ -64,8 +64,8 @@
               (map-over defs
                 (fmt (nm vl)
                   (let* ((vars (cc:count-refs vl))
-                         (nbound0 (append 
-                                   (filter 
+                         (nbound0 (append
+                                   (filter
                                     (fun (x)
                                       (not (eqv? x nm)))
                                     alst)
@@ -74,7 +74,7 @@
                     (if (null? env) ; simple recursion
                         `(,nm SIMPLE ,vl)
                                     ; otherwise: closure
-                        `(,nm CCAPTURE 
+                        `(,nm CCAPTURE
                               ,(cc:capture-recursion vl)
                               ,env
                               ))))))
@@ -85,23 +85,23 @@
              (ndefs1
               (map-over ndefs0
                  (fmt (nm tp vl)
-                   (alet nbound0 
+                   (alet nbound0
                           (case tp
                             ((SIMPLE)
-                             (append 
+                             (append
                               (filter
                                (fun (x)
                                  (not (eqv? x nm)))
                                alst)
                               bound))
-                            ((CCAPTURE) 
+                            ((CCAPTURE)
                              (append alst bound))
                             )
                      `(,nm ,(cc:fix-closuremaker ndefs01
                                 (liftloop vl nbound0 nm stickyname)))))))
              )
 ;= And finally a patched [[SLetRec]] code is emitted:
-            `(SLetRec ,ndefs1 
+            `(SLetRec ,ndefs1
                       (Begin
                        ,@(cc:make-patchers ndefs0 (get))
                        ,(liftloop body nbound nil stickyname)))

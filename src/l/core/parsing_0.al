@@ -2,13 +2,13 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-  
+
 ;;; Generic parsing combinators.
 
 ; Sequence combinator
@@ -35,7 +35,7 @@
    "Variant combinator."
    (fun (l)
       (let ((r1 (p1 l)))
-         (if (p-success? r1) 
+         (if (p-success? r1)
                r1
                (p2 l)))))
 
@@ -45,7 +45,7 @@
        (if (null? (cdr parsers)) (car parsers)
            `(p<|> ,(car parsers) (pm<|> ,@(cdr parsers))))))
 
-; Negation combinator               
+; Negation combinator
 (function p<!> (p)
   "Negation combinator"
    (fun (l)
@@ -83,8 +83,8 @@
                  (n.goto LBL) )))
        (p-mkresult (cdr res) ll))))
 )
-                
-; One-or-many combinator                
+
+; One-or-many combinator
 (function p<+*> (p)
   "Parse-one-or-many combinator."
   (p<+> p (p<*> p)))
@@ -114,14 +114,14 @@
             (p-mkresult (f (p-result r) nil) (p-rest0 r))
             r))))
 
-            
+
 (function p<?> (p)
   (fun (l)
      (let ((r (p l)))
         (if (p-success? r) r
             (p-mkresult nil l)))))
 
-            
+
 (function p<?|> (p dr)
   (fun (l)
      (let ((r (p l)))

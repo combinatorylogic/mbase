@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -20,9 +20,9 @@
 (function cc:comperror (e)
   (ccerror `(COMP ,e)))
 
-(define t_ass? 
+(define t_ass?
   (r_tbind "System.Type" "IsAssignableFrom" "System.Type"))
-  
+
 ;-
 ;-
 ;-
@@ -57,7 +57,7 @@
    (pipeline>
      cc:scope-transform   ; make unique names
      (fun (e)
-       (ctime 
+       (ctime
         (if (shashget (getfuncenv) 'compiler-final)
             '(cc:optimise e)
             'e)))
@@ -66,10 +66,10 @@
      ;  (cc:resolve-globals env e))
      (fun (e)
        (when (shashget (getfuncenv) 'debug-compiler-prelift)
-	     
-	     (println '-PRE-LIFT-)
-	     (iter writeline e)
-	     (println '-------------------PRE-LIFT))
+
+             (println '-PRE-LIFT-)
+             (iter writeline e)
+             (println '-------------------PRE-LIFT))
        e
        )
 
@@ -84,9 +84,9 @@
 
      (fun (e)
        (when (shashget (getfuncenv) 'debug-compiler-postlift)
-	     (println '-POST-LIFT-)
-	     (iter writeline e)
-	     (println '-------------------POST-LIFT))
+             (println '-POST-LIFT-)
+             (iter writeline e)
+             (println '-------------------POST-LIFT))
        e
        )
 
@@ -101,21 +101,21 @@
 
      (fun (e)
        (when (shashget (getfuncenv) 'debug-compiler-flat0)
-	     (println '-PRE-SCHEDULE-)
-	     (iter writeline e)
-	     (println '-------------------PRE-SCHEDULE))
+             (println '-PRE-SCHEDULE-)
+             (iter writeline e)
+             (println '-------------------PRE-SCHEDULE))
        e
        )
-     (fun (e) 
+     (fun (e)
       (if (and (shashget (getfuncenv) 'core-environment-compiled)
-	       (not (shashget (getfuncenv) 'compiler-scheduler-off)))
+               (not (shashget (getfuncenv) 'compiler-scheduler-off)))
           (cc:lifted-reschedule e) ; get rid of redundant local variables
           e))
      (fun (e)
        (when (shashget (getfuncenv) 'debug-compiler-flat)
-	     (println '-FLAT-)
-	     (iter writeline e)
-	     (println '-------------------FLAT))
+             (println '-FLAT-)
+             (iter writeline e)
+             (println '-------------------FLAT))
        e
        )
      )))

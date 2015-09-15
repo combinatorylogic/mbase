@@ -5,7 +5,7 @@
 (function visitor-backend-mbase (lfsrc? lfdst? src)
   (visitorbackend:visit expr src
    (expr DEEP
-    ((let 
+    ((let
       `(let* ,ds ,b))
      (var id)
      (bind
@@ -58,10 +58,11 @@
      ;; for optimisation primarily (we can move everything at once, no need
      ;; to jump anywhere).
      (move `(*MOVE* ,(fun (dstid)
-                       `(begin 
+                       `(begin
                           (ast2:set_target_simple ,dstid ,pos ,src)))))
 
-     (setup_macros `(ast2:setup_macros ,ps ,e))
+     (setup_macros `(ast2:setup_macros ,ps (begin ,@e)))
+     (debugmessage `(println ,c))
      (set `(n.stloc! ,id ,v))
      (get_tagged_tuple `(ast2:get_tagged_tuple ,e ,f))
      (get_tuple `(ast2:get_tuple ,e ,f))
@@ -160,7 +161,7 @@
      (dummy `(cons '(T) (mkovector '(() ()))))
      (dummyslot 0)
      (getdummy `(ast2:aget (cdr ,d) 1))
-     
+
      ;; TODO:
      (else node)
      ))))
@@ -197,7 +198,8 @@
   `(ast2:aget (cdr ,s) ,n))
 
 (macro ast2:get_metadata (s)
-  `(ast2:aget (cdr ,s) 0))
+  (with-syms (t)
+     `(let ((,t ,s)) (ast2:aget (if (list? ,t) (cdr ,t) ,t) 0))))
 
 (macro ast2:set_metadata (dst v)
   `(aset (cdr ,dst) 0 ,v))
@@ -238,11 +240,13 @@
   (ohashget vt (car v)))
 
 (function ast2:thisnodeval (d)
-  (let* ((tg (caar d)))
-    (if (eqv? tg 'L)
-        (let* ((get (cdr (cdr d))))
-          (get))
-        (cdr d))))
+  (p:match d
+    (  ((L) . $rest)
+       (let* ((get (cdr (cdr d))))
+         (get)))
+    (  ((M) . $rest) rest)
+    (  ((T . $x) . $rest) rest)
+    (  else d)))
 
 (function ast2:set_target (d s v)
   ;; Differentiate between tagged and simple tuples dynamically
@@ -278,7 +282,7 @@
                   )
               (aset (cdr d) s vl)))
         )))
-      
+
 (macro ast2:make_continuation_record (d p s)
   ;; TODO: optimise!
   `(mkovector (list 'C ,d ,s ,p)))
@@ -357,7 +361,7 @@
     (if v
         (if (eqv? (car v) t) i
             (loop (cdr v) (+ i 1))))))
-                       
+
 ;; Do the actual heavy-lifting, with format already expanded
 (macro ast2:transform_listform_inner (dst0 frmt tp tag vars)
   ;; 1. Build a p:match format expression
@@ -453,8 +457,8 @@
 
 (macro ast2:wrap_misc (v)
   `(cons '(M) ,v))
-    
-  
+
+
 (function ast2:make_dyn_tags_map (ids)
   (let* ((ht (mkhash)))
     (foreach-count (i ids n)
@@ -471,28 +475,77 @@
     (ast-node-format)
     (ast-variant)
     (ast-dst-tags)
+    (ast-visitor-to)
     ))
 
+
+(function ast2:ast-var-name (id) (Sm<< "ast2::" id "::src"))
+
+(function ast2:default-ifun (id)
+  (let* ((ret (shashget (getfuncenv)
+                        (ast2:ast-var-name id))))
+    (if ret ret
+        (ccerror `(AST-NOT-FOUND ,id)))))
+
 (macro ast2:mknode-inner (qargs nd ndtype ndformat ndvar
-                                ndtags)
+                                ndtags astdst)
   (let* ((args (cadr qargs))
+         (ast (ast2:default-ifun astdst))
+         (asth (ast-make-cache ast))
          (tpl  (gensym))
          (fd (ast-pattern-entries ndformat))
          (tagid (if (eqv? ndtype 'variant)
                     (ast2:find-position ndvar ndtags)
                     nil))
+         (mtdarg (find (fmt (nm v)
+                           (eqv? nm '*metadata*)) args))
+
          (tplalloc (if (eqv? ndtype 'variant)
                        `(ast2:allocate_tagged_tuple ,ndvar ,tagid ,fd)
                        `(ast2:allocate_tuple ,fd))))
     `(let ((,tpl ,tplalloc)
-           ,@args ;; TODO: sanitise!
+           ,@(foreach-mappend (a args)
+               (format a (nm v)
+                 (if (eqv? nm '*metadata*)
+                     nil
+                     (let* ((afmt (find (fmt (xtp xnm xpos) (eqv? nm xnm))
+                                          fd))
+                              (_ (if (not afmt)
+                                     (ccerror `(NODE-CTOR-ARG-NOT-FOUND ,nm))))
+                              (etp (car afmt)))
+                       `((,nm (ast2:setup_macros ((ast-node ,etp)
+                                                  (ast-node-is-top ())) ,v)))
+                              ))))
+               ;; TODO: sanitise!
            )
        ;; TODO: inherit metadata
        ,@(foreach-map (f fd)
            (format f (tp nm pos)
                    `(ast2:set_target ,tpl ,pos (cons '(M) ,nm))))
-       (ast2:set_metadata ,tpl (ast-current-metadata))
-       (return ,tpl))))
-       
-       
-  (macro ast-current-metadata () 'nil)
+       (ast2:set_metadata ,tpl
+                          ,(if mtdarg
+                               (cadr mtdarg)
+                               '(ast-current-metadata)))
+       (inner-expand-first ast2:mknode-return (ast-node-is-top) (quote ,tpl)))))
+
+(macro ast2:mknode-return (cd tpl)
+  (if cd (cadr tpl) `(cdr ,(cadr tpl)))
+  )
+
+(macro ast-current-metadata () 'nil)
+
+(macro ast-with-metadata (m . e)
+  (with-syms (nm)
+    `(let ((,nm ,m))
+       (with-macros ((ast-current-metadata (fun (_) (quote ,nm))))
+          (begin ,@e)))))
+
+
+
+(macro ast2-debugmsg-node (pfx)
+  `(inner-expand-first ast2-debugmsg-inner ,pfx (ast-node)))
+
+(macro ast2-debugmsg-inner rest
+  `(list ,@(foreach-map (r rest) `(quote ,r))))
+
+(macro ast-node-is-top () '())

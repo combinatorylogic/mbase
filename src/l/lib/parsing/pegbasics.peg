@@ -2,8 +2,8 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-// This file is distributed under the terms of the Q Public License version 1.0.
+// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+//
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -22,7 +22,8 @@ parser pegbasics extends basics (
 
    IdentRest := alpha/digit/'_';
    token ident0 := !keyword (alpha IdentRest*) => {ctoken=ident};
-   token ident1x := alpha (alpha/'_'/'-'/digit)* => {ctoken=ident};
+   token ident1x := (alpha/'_'/'-'/'*'/'@'/'^'/'$'/'%'/'&'/digit)+
+        => {ctoken=ident};
    term ident := { ident0:i => $sval(i)}
               /  { '[[' ident1x:x ']]' => $sval(x)};
 

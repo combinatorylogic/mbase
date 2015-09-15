@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -16,11 +16,11 @@
 
 ; Pass 1.: normalise @-s
 
-(define r@xp (<r> 
-	      (
-	       (((! ("@" | "#")) +*) :-> list->symbol)
-	       |
-	       (("@" | "#") :-> list->symbol)) *))
+(define r@xp (<r>
+              (
+               (((! ("@" | "#")) +*) :-> list->symbol)
+               |
+               (("@" | "#") :-> list->symbol)) *))
 
 (function match@s (str)
   (p-result (r@xp (string->list str))))
@@ -56,7 +56,7 @@
        ((array $x) `(array ,(compile-type x)))
        ((generic $x . $args) `(generic ,x ,@(map compile-type args)))
        (else
-	`(T ,@p))))))
+        `(T ,@p))))))
 
 (function isitatypename (n)
   (p:match (compile-type n)
@@ -71,11 +71,11 @@
               (($l [#] $r) (append (loop l) (loop r)))
               ($$M (strsplit (<r> ".") (S<< p)))
               (else (ccerror `(LL-DOTPATH ,n))))))
-         (resolv 
+         (resolv
           (let loop ((p (cdr pth)) (tp (car pth)) (c (car pth)) (lst nil))
             (let* ((atmpt (isitatypename (Sm<< tp))))
               (if p
-                  (if atmpt 
+                  (if atmpt
                       (loop (cdr p) (S<< tp "." (car p)) tp
                             (list c p))
                       (loop (cdr p) (S<< tp "." (car p)) c lst)
@@ -92,30 +92,30 @@
 
 (function dotpath? (expr)
   (if (let loop ((n expr))
-        (p:match n 
+        (p:match n
           (($a [#] $b) (loop a))
           ($$M #t)
           (else nil)))
       (checkdotpath expr)
       expr))
 
-(define fltprs 
+(define fltprs
   (<r>
    (((_ "f") (?? "-") ((p.digit +*) "." (p.digit +*)))
     -> (fun (l)
-	 `(fc ,(list->string l))))
+         `(fc ,(list->string l))))
    |
    (((_ "d") (?? "-") ((p.digit +*) "." (p.digit +*)))
     -> (fun (l)
-	 `(dfc ,(list->string l))))
+         `(dfc ,(list->string l))))
    |
    (((_ "l.") (?? "-") (p.digit +*))
     -> (fun (l)
-	 `(i64c ,(list->string l))))
+         `(i64c ,(list->string l))))
    |
    (((_ "h.") ((p.digit | p.alpha) +*))
     -> (fun (l)
-	 `(ic ,(HX->N (list->string l)))))
+         `(ic ,(HX->N (list->string l)))))
    |
    ((_ (p. *)))))
 
@@ -132,7 +132,7 @@
        `(bin ,op ,(loop x) ,(loop y)))
       (($x . $rest)
        `(bin ,op ,(loop x) ,(xloop rest))))))
-  
+
 (function compile-erest (loop l)
   (p:match l
       ((typeof $expr)
@@ -141,20 +141,20 @@
        `(istype ,(loop expr) ,(compile-type tp)))
       (([&&] $$M:smthng [@] $$M:name . $argtyps)
        `(funref (( ,(compile-type smthng) (unknown)
-		   ,@(map compile-type argtyps)) ,name)))
+                   ,@(map compile-type argtyps)) ,name)))
       (([&&&] $$M:smthng $tpore $$M:name)
        (let* ((tpe (if (isitatypename tpore)
-		       (cons
-			(compile-type tpore)
-			'(null))
-		       (cons
-			'(unknown)
-			(loop tpore))))
-	      (tp (car tpe))
-	      (ee (cdr tpe)))
-	 `(newdelegate ,(compile-type smthng)
-		       ,tp
-		       ,name ,ee)))
+                       (cons
+                        (compile-type tpore)
+                        '(null))
+                       (cons
+                        '(unknown)
+                        (loop tpore))))
+              (tp (car tpe))
+              (ee (cdr tpe)))
+         `(newdelegate ,(compile-type smthng)
+                       ,tp
+                       ,name ,ee)))
       (($s [@] $$M:name . $rest)
        (alet dp (dotpath? s)
          (if (and (symbol? dp)
@@ -199,17 +199,17 @@
       (self '(ldthis))
       ($$M
        (let* ((tst (tryparsefloat l)))
-	 (if tst tst
-	     `(v ,l))))
+         (if tst tst
+             `(v ,l))))
       ($$S
        `(sc ,l))
       ($$N `(ic ,l))
       (($$M:x) (loop x))
       (($$M:mcr . $rst)
        (let ((tst (hashget *lltnet-macros* mcr)))
-	 (if tst
-	     (loop (normalise@s (tst l)))
-	     (ccerror `(EXPR:ERRORM: ,l)))))
+         (if tst
+             (loop (normalise@s (tst l)))
+             (ccerror `(EXPR:ERRORM: ,l)))))
       (($$L:l) (loop l))
       (else (ccerror `(EXPR:ERROR: ,l)))))
 
@@ -242,15 +242,15 @@
        `(ar ,(loop x) ,(loop idx)))
       ((begin . $l)
        `(embedded-begin ,(map bigloop (cuttail l))
-			,(loop (check-leave (car (lasttail l))))))
+                        ,(loop (check-leave (car (lasttail l))))))
       ((new $tp . $args)
        `(asm () (( ,(compile-type tp) (unknown)
-		,@(map (fun (_) '(unknown)) args))
-	      ,(Sm<< ".ctor")) ,@(map loop args)))
+                ,@(map (fun (_) '(unknown)) args))
+              ,(Sm<< ".ctor")) ,@(map loop args)))
       (($$M:smthng [#] $$M:member)
        (if (isitatypename smthng)
-	   `(sf ((,(compile-type smthng) (unknown)) ,member))
-	   `(f ,(loop smthng) (( (unknown) (unknown)) ,member))))
+           `(sf ((,(compile-type smthng) (unknown)) ,member))
+           `(f ,(loop smthng) (( (unknown) (unknown)) ,member))))
       (($smthng [#] $$M:member)
        (alet dp (dotpath? smthng)
           (if (symbol? dp)
@@ -258,14 +258,14 @@
               `(f ,(loop dp) (( (unknown) (unknown)) ,member)))))
       (($$M:smthng [@] $$M:name . $rest)
        (if (isitatypename smthng)
-	   `(asm () (( ,(compile-type smthng) (unknown)
-		    ,@(map (fun (_) '(unknown)) rest))
-		  ,name)
-		 ,@(map loop rest))
-	   `(am () ,(loop smthng) (( (unknown) (unknown)
-			       ,@(map (fun (_) '(unknown)) rest))
-			     ,name)
-		,@(map loop rest))))
+           `(asm () (( ,(compile-type smthng) (unknown)
+                    ,@(map (fun (_) '(unknown)) rest))
+                  ,name)
+                 ,@(map loop rest))
+           `(am () ,(loop smthng) (( (unknown) (unknown)
+                               ,@(map (fun (_) '(unknown)) rest))
+                             ,name)
+                ,@(map loop rest))))
       (else (compile-erest loop l)))))
 
 (function compile-operator (lms lfs lst )
@@ -273,24 +273,24 @@
    (let ((compile-expr (fun (e) (compile-expr-0 loop e))))
     (p:match l
       ((begin . $ops) `(begin
-			 ,@(map loop ops)))
+                         ,@(map loop ops)))
       ((quote $$M:l) `(label ,l))
       ((debugpoint . $d) `(debugpoint ,@d))
       ((for (($$M:v $i $s) $e) . $b)
        `(for ((,v ,(compile-expr i)) ,(compile-expr s) ,(compile-expr e))
-	   (begin
-		,@(map loop b))))
+           (begin
+                ,@(map loop b))))
       ((while $e . $b)
        `(while ,(compile-expr e)
-	   (begin
-		,@(map loop b))))
+           (begin
+                ,@(map loop b))))
       ((dowhile $e . $b)
        `(dowhile ,(compile-expr e)
-	   (begin
-		,@(map loop b))))
+           (begin
+                ,@(map loop b))))
       ((foreach ($v $i) . $b)
        `(foreach (,v ,(compile-expr i))
-		 (begin ,@(map loop b))))
+                 (begin ,@(map loop b))))
       ((goto $$M:l) `(goto ,l))
       ((goto-if $e $$M:l) `(gotoif ,(compile-expr e) ,l))
       ((goto-if-not $e $$M:l) `(gotoiff ,(compile-expr e) ,l))
@@ -315,10 +315,10 @@
        `(vreturn))
       ((try $b (catch ($tp $nm) . $bs))
        `(tryblock
-	 ,(loop b)
-	 (,nm ,(compile-type tp))
-	 (begin
-	   ,@(map loop bs))))
+         ,(loop b)
+         (,nm ,(compile-type tp))
+         (begin
+           ,@(map loop bs))))
       ((throw $e)
        `(throw ,(compile-expr e)))
       ((asm . $body)
@@ -329,9 +329,9 @@
       (($$XXX:lvalue [<-] $e) `(set ,(compile-expr lvalue) ,(compile-expr e)))
       (($$M:mcr . $rst)
        (let ((tst (hashget *lltnet-macros* mcr)))
-	 (if tst
-	     (loop (normalise@s (tst l)))
-	     `(e ,(compile-expr l)))))
+         (if tst
+             (loop (normalise@s (tst l)))
+             `(e ,(compile-expr l)))))
       (else `(e ,(compile-expr l)))))))
 
 (function lltnet-hl (lmethods lfields src)
@@ -345,8 +345,8 @@
   (let ((s (gensym)) (arg (gensym)))
     `(top-begin
        (function ,s (,arg)
-	   (format ,arg (macro-name ,@args)
-	     ,@body))
+           (format ,arg (macro-name ,@args)
+             ,@body))
        (lltnet-defmacro (quote ,name) ,s)
        (force-class-flush)
        )))
@@ -354,31 +354,31 @@
 
 (function not.neth0 (pure? xtp blk? args body )
   (let* ((lmethods (cons nil nil))
-	 (lfields (cons nil nil))
-	 (domethod 
-	  (fun (m)
-	    (format m ("method" acc tp nm args . body)
-		    `(method ,acc (,(lltnet-hl-compile-type tp) ,nm 
-				   ,@(map (fmt (t n)
-					       `(,(lltnet-hl-compile-type t)
-						 ,n)) args))
-			     ,(lltnet-hl lmethods lfields
-					 `(begin ,@body))))))
-	 (dofield 
-	  (fun (f)
-	    (format f ("field" type . nameopts)
-		(let* ((fname (car nameopts))
-		       (fopts (if (null? (cdr nameopts))
-				  '((public)) (cdr nameopts))))
-		  `(field ,fopts ,(lltnet-hl-compile-type type) ,fname (null))
-		  ))))
-	 (code (lltnet-hl lmethods lfields `(begin ,@body))))
+         (lfields (cons nil nil))
+         (domethod
+          (fun (m)
+            (format m ("method" acc tp nm args . body)
+                    `(method ,acc (,(lltnet-hl-compile-type tp) ,nm
+                                   ,@(map (fmt (t n)
+                                               `(,(lltnet-hl-compile-type t)
+                                                 ,n)) args))
+                             ,(lltnet-hl lmethods lfields
+                                         `(begin ,@body))))))
+         (dofield
+          (fun (f)
+            (format f ("field" type . nameopts)
+                (let* ((fname (car nameopts))
+                       (fopts (if (null? (cdr nameopts))
+                                  '((public)) (cdr nameopts))))
+                  `(field ,fopts ,(lltnet-hl-compile-type type) ,fname (null))
+                  ))))
+         (code (lltnet-hl lmethods lfields `(begin ,@body))))
     (f.not.net.lift pure? xtp blk?
                   (map-over args
                             (fmt (tp nm)
                                  `(,(lltnet-hl-compile-type tp) ,nm)))
                   `(,@(map domethod (cdr lmethods)) ,@(map dofield (cdr lfields))
-		    )
+                    )
                   code
                   )))
 
@@ -403,7 +403,7 @@
   ("Compiles and substitutes a function containing a Not.Net simple form code.")
   `(function ,name ,(map cadr args)
      (not.nethf ,args
-	,@body)
+        ,@body)
      ))
 
 (define int->byte-hook (cons nil nil))
@@ -422,52 +422,52 @@
 (function f.not.class (name body0)
   (let* ((body (f.not.topexpand body0))
          (extends (select-car 'extends body))
-	 (implements (select-car 'implements body))
-	 (fields (select-car 'field body))
-	 (ifields (select-car 'initfield body))
-	 (methods0 (select-car 'method body))
-	 (constrs (select-car 'constructor body))
-	 (methods (append (map-over constrs
-			    (fmt ("constructor" acc args . body)
-				 `(method ,acc this ,(not.ctor-name acc)
+         (implements (select-car 'implements body))
+         (fields (select-car 'field body))
+         (ifields (select-car 'initfield body))
+         (methods0 (select-car 'method body))
+         (constrs (select-car 'constructor body))
+         (methods (append (map-over constrs
+                            (fmt ("constructor" acc args . body)
+                                 `(method ,acc this ,(not.ctor-name acc)
                                           ,args ,@body)))
-			  methods0))
-	 (others (select-car 'custom body))
-	 (lmethods (cons nil nil))
-	 (lfields (cons nil nil))
-	 (domethod 
-	  (fun (m)
-	    (format m ("method" acc tp nm args . body)
-		    `(method ,acc (,(lltnet-hl-compile-type tp) ,nm 
-				   ,@(map (fmt (t n)
-					       `(,(lltnet-hl-compile-type t)
-						 ,n)) args))
-			     ,(lltnet-hl lmethods lfields
-					 `(begin ,@body))))))
-	 (dofield 
-	  (fun (f)
-	    (format f ("field" type . nameopts)
-		(let* ((fname (car nameopts))
-		       (fopts (if (null? (cdr nameopts))
-				  '((public)) (cdr nameopts))))
-		  `(field ,fopts ,(lltnet-hl-compile-type type) ,fname (null))
-		  ))))
+                          methods0))
+         (others (select-car 'custom body))
+         (lmethods (cons nil nil))
+         (lfields (cons nil nil))
+         (domethod
+          (fun (m)
+            (format m ("method" acc tp nm args . body)
+                    `(method ,acc (,(lltnet-hl-compile-type tp) ,nm
+                                   ,@(map (fmt (t n)
+                                               `(,(lltnet-hl-compile-type t)
+                                                 ,n)) args))
+                             ,(lltnet-hl lmethods lfields
+                                         `(begin ,@body))))))
+         (dofield
+          (fun (f)
+            (format f ("field" type . nameopts)
+                (let* ((fname (car nameopts))
+                       (fopts (if (null? (cdr nameopts))
+                                  '((public)) (cdr nameopts))))
+                  `(field ,fopts ,(lltnet-hl-compile-type type) ,fname (null))
+                  ))))
          (doifield
           (fun (f)
             (format f ("initfield" name opts . data)
               `(initfield ,opts ,name ,@(map (car int->byte-hook) data)))))
-	 )
+         )
     (lltnet-emit
      (lltnet-prepare-top
       `((,name ,(if (null? extends) 'System.Object (cadar extends))
-	       ,@(foldl append nil (map cdr implements)))
-	,@(map domethod methods)
-	,@(map dofield fields)
+               ,@(foldl append nil (map cdr implements)))
+        ,@(map domethod methods)
+        ,@(map dofield fields)
         ,@(map doifield ifields)
-	,@(map domethod (cdr lmethods)) ;;TODO: lmethods can be updated here
-	,@(map dofield (cdr lfields))
-	,@others
-	))
+        ,@(map domethod (cdr lmethods)) ;;TODO: lmethods can be updated here
+        ,@(map dofield (cdr lfields))
+        ,@others
+        ))
      nil
      )
     ))
@@ -493,15 +493,15 @@
    (if (< (length l) 5)
        `(string@Concat ,@l)
        (p:match l
-	 (($a $b $c . $rest)
-	  `(string@Concat (string@Concat ,a ,b ,c) ,(loop rest)))
-	 (($h . $tl)
-	  `(string@Concat ,h ,(loop tl)))))))
+         (($a $b $c . $rest)
+          `(string@Concat (string@Concat ,a ,b ,c) ,(loop rest)))
+         (($h . $tl)
+          `(string@Concat ,h ,(loop tl)))))))
 
 
 (lltnet-macro mbase (fn . args)
    `(Meta.Scripting.Runtime@Apply ,fn (arr ,@(foreach-map (a args)
-							  `((object) ,a)))))
+                                                          `((object) ,a)))))
 
 (function ll-ftype-hl (tp)
   (alet tt0 (ll-ftype tp)
@@ -579,6 +579,6 @@
                   (,type ,x))
           ((aref ,xar ,xpos) <- ,x)
           (leave ((object) ,xar))))))
-                
+
 (Par
 "\\include{notnet}")

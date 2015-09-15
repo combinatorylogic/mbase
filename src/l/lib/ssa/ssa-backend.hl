@@ -59,7 +59,7 @@ ast cc_flat_bb: cc_flatast () {
        | Patchclosure(ident:id, ident:liftid, .*patcharg:args)
 
        | Pushapp(expr:fn, .*expr:args)
-       | Setlocapp(ident:nm, expr:fn, . *expr:args) 
+       | Setlocapp(ident:nm, expr:fn, . *expr:args)
        | Retapp(expr:fn, .*expr:args)
        | Dropapp(expr:fn, .*expr:args)
        // We assume that Asm does not do any external control flow
@@ -124,7 +124,7 @@ function cc_flat_fuse(code)
     } else return a;
   };
   do loop(c = code, p = []) {
-    if(c) 
+    if(c)
      match car(c) with
        'Label'(id) -> {np = fuse(id, p); loop(cdr(c),np)}
      | 'Iflabel'(id) -> {np = fuse(id, p); loop(cdr(c),np)}
@@ -140,14 +140,14 @@ function cc_flat_ssa_bblocks(code)
 collector(bbadd, bbget) {
   // Assuming equivalent labels are fused already
   bbuilder(bbuilder, lbl, tryenv) = {
-    collector(iadd, iget) 
+    collector(iadd, iget)
       fun(self, flatinst) {
          // Classify an instruction: new label, terminal or a special case: tail call
          tp0 = case(car(flatinst)) {
           | 'Last' -> 'new'
           | 'Iflabel' | 'Label' -> 'new'
           | 'Return'  | 'Goto' | 'Switch' -> 'term'
-          | 'GotoNull' | 'GotoPairP' 
+          | 'GotoNull' | 'GotoPairP'
           | 'GotoEqv'  | 'Gotoif' | 'Gotoifnot' -> 'cterm'
           | 'Retapp' -> 'tcall' | else -> 'norm'
          };
@@ -358,7 +358,7 @@ function cc_ssa_match_slots(code) {
             add_match(hd, car(s));
             loop(cdr(s), tl)}
        | [] -> out :: s}};
-  process(entry) = 
+  process(entry) =
    do loop(e = entry, stk = []) {
     idnt = %S<<(e, stk);
     if (hashget(visited, idnt)) []
@@ -459,11 +459,11 @@ ast cc_ssa: cc_flat_bb () {
 
        | Store(expr:ptr, expr:value)
        | Load(expr:ptr)
-       
+
        | Patchclosure(expr:id, extident:liftid, .*patcharg:args)
        | Call(calltype:t, expr:fn, .*expr:args)
        | Asm(atarget:tgt, *varident:use, .any:body)
-       
+
        | InitGlobalVar(expr:a1, expr:a2, expr:a3)
        | InitGlobalFun(expr:a1, expr:a2, expr:a3)
        | InitGlobalMac(expr:a1, expr:a2)
@@ -545,7 +545,7 @@ function cc_ssa_pre_refine(code) {
   visit:cc_flat_bb(block:code) {
      deep bbcode {
         bb -> {
-           ncd0 = map append c in cd do 
+           ncd0 = map append c in cd do
                 { <[a;b]> = liftvars(c); a :: [b] };
            <[nxt;nt]> = liftvars(t);
            ncd = ncd0 :: nxt;
@@ -563,17 +563,17 @@ function cc_ssa_refine(code) {
     deep bbcode {
        bb -> {
          newcode_0 = map append c in cd do {
-           match c with 
+           match c with
              'ins'(@rst) -> rst
            | [] -> []
            | else -> [c]
          };
          newcode = map c in newcode_0 do {
-            match c with 
+            match c with
               [dst;v] -> c
             | [v] -> [gensym();v] // todo: dummy namespace
          };
-         'bb'(name, args, newcode, fix(t),@rs)} 
+         'bb'(name, args, newcode, fix(t),@rs)}
      | else -> node};
     deep code {
        // We're assuming that Var refs had been lifted already
@@ -605,7 +605,7 @@ function cc_ssa_refine(code) {
 \pfcode{
 % "Final refinement touch, removine Rewrite nodes"
 function cc_ssa_refine_finish(code)
-{ 
+{
   rewrites=mkhash();
   rewrite(n) = {
      chk = ohashget(rewrites, n);
@@ -652,7 +652,7 @@ function cc_ssa_abstract(code) {
         Reg -> add(id)
      |  else -> []}};
     return unifiq(get())};
-  maketusesexits(s) = 
+  maketusesexits(s) =
    collector(uadd, uget) collector(eadd, eget) {
     iter:cc_ssa(term: s) {
       deep label: if(node!='*End*') eadd(node);
@@ -786,11 +786,11 @@ ast cc_ssa_tree : cc_ssa () {
 
        | Store(expr:ptr, expr:value)
        | Load(expr:ptr)
-       
+
        | Patchclosure(expr:id, extident:liftid, .*patcharg:args)
        | Call(pure:p, calltype:t, expr:fn, .*expr:args)
        | Asm(atarget:tgt, *varident:use, .any:body)
-       
+
        | InitGlobalVar(expr:a1, expr:a2, expr:a3)
        | InitGlobalFun(expr:a1, expr:a2, expr:a3)
        | InitGlobalMac(expr:a1, expr:a2)
@@ -1017,8 +1017,8 @@ function cc_ssa_tree_phis(code)
   // Execute demotion
   return visit:cc_ssa_tree(block: code) {
     deep bbcode {
-      bb -> { mk:node(cd = 
-                     (if (name == '*Entry*') 
+      bb -> { mk:node(cd =
+                     (if (name == '*Entry*')
                         hashmap(fun(k,v) [v;'Alloca'('generic'())], vars) else []
                       )  :: cd :: ohashget(stores, name)) }
     };
@@ -1183,7 +1183,7 @@ function cc_ssa_bb_flatten(code)
                 -> ['Push'(node)]
 
      |  Catcharg -> 'Pop'()
-                
+
      |  Reg     -> 'Var'(id)
      |  Pop     -> [] //'Pop'()
      |  Push    -> v
@@ -1193,7 +1193,7 @@ function cc_ssa_bb_flatten(code)
      |  IntUnbox   -> [@arg;'IntUnbox'('Pop'())]
      |  Car        -> [@arg;'Car'('Pop'())]
      |  Cdr        -> [@arg;'Cdr'('Pop'())]
-     
+
      |  BinOp      -> [@left;@right;'BinOp'(op,'Pop'(),'Pop'())]
      |  Cons       -> [@a;@b;'Cons'('Pop'(),'Pop'())]
 
@@ -1206,7 +1206,7 @@ function cc_ssa_bb_flatten(code)
      |  Setglobal     -> [@value; 'Setglobal'(nm, 'Pop'())]
      |  Setnewglobal  -> [@value; 'Setnewglobal'(nm, 'Pop'())]
      |  Patchclosure  -> ['Patchclosure'(getvar(id), liftid,@map [n;v] in args do [n;getvar(v)])]
-     
+
      |  InitGlobalVar -> [@a1;@a2;@a3;'InitGlobalVar'('Pop'(),'Pop'(),'Pop'())]
      |  InitGlobalFun -> [@a1;@a2;@a3;'InitGlobalFun'('Pop'(),'Pop'(),'Pop'())]
      |  InitGlobalMac -> [@a1;@a2;'InitGlobalMac'('Pop'(),'Pop'())]
@@ -1266,7 +1266,7 @@ function cc_ssa_chain_bbs_inner(code)
         bb -> {
           ohashput(bbs, name, node);
           return [name]} | else -> []}} do b;
-  lst = lst0 :: 
+  lst = lst0 ::
     hashmap(fun(nm, nd) { ohashput(bbs, nm, nd); nm }, proxies);
   done = mkhash();
   do loop(next = '*Entry*', rest = lst) {

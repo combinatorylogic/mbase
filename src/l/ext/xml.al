@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -23,19 +23,19 @@
 
   (function new_Reader (nm)
     (new t_XmlTextReader (t_string nm)))
- 
-  (define xmlRead (r_tbind t_XmlTextReader "Read")) 
+
+  (define xmlRead (r_tbind t_XmlTextReader "Read"))
   (define moveToAttr (r_tbind t_XmlTextReader "MoveToNextAttribute"))
 
 
-  (define _xmlNodeType (r_tbind t_XmlTextReader "get_NodeType")) 
+  (define _xmlNodeType (r_tbind t_XmlTextReader "get_NodeType"))
   (function xmlNodeType (rdr)
     (string->symbol (e_name t_XmlNodeType (_xmlNodeType rdr))))
 
   (function sxml-stacker ()
     (let* ((top (cons '*TOP* nil))
            (stk (cons nil (list top)))
-           (poplevel 
+           (poplevel
              (fun ()
                (set-cdr! stk (cddr stk))) )
            (addsimple
@@ -68,12 +68,12 @@
   (function xml-read-stream (rdr)
      (format (sxml-stacker) (top poplevel addsimple nodetail addnode)
       (let loop ()
-        (if (not (xmlReadG rdr)) nil 
+        (if (not (xmlReadG rdr)) nil
          (begin
           (case (xmlNodeType rdr)
            ((Element)
             (let ((ee (g-> rdr "IsEmptyElement")))
-              (addnode 
+              (addnode
                 (g-> rdr "Name")
                 (if (g-> rdr "HasAttributes")
                  (let attr-loop ()
@@ -87,7 +87,7 @@
            ((CDATA)
             (addsimple (g-> rdr "Value")))
            ((ProcessingInstruction)
-            (addsimple `(*PI* 
+            (addsimple `(*PI*
                               ,(string->symbol (g-> rdr "Name")) ,(g-> rdr "Value"))))
            ((Comment)
             nil)
@@ -113,39 +113,39 @@
    (strreplace* _rgxp_q "&quot;" str))
 
 (function sindent (i)
-   (list->string (formap (t 0 i) #\Space))) 
+   (list->string (formap (t 0 i) #\Space)))
 
 (function pindent (f i)
    (fprint f (sindent i)))
 
 (function pxmlargs-old (i a)
-  (foldl string-append "" 
+  (foldl string-append ""
          (map-over (cdr a)
                    (fmt (nm vl)
                       (buildstring "\n" (sindent (+ 1 i)) nm "=\"" (xmlquotestring vl) "\"")))))
 
 
-   
+
 (function pxmlargs (i a)
-  (foldl string-append "" 
+  (foldl string-append ""
          (map-over (cdr a)
                    (fmt (nm vl)
                       (buildstring " " nm "=\"" (xmlquotestring vl) "\"")))))
 
 
-   
+
 
 (function printxml (file sx)
   (let loop ((stak `((0 ,sx))))
     (if (null? stak) nil
-      (format stak ((i l) . stk)           
-       (let 
+      (format stak ((i l) . stk)
+       (let
         ((newstk
           (cond
             ((string? l)
              (pindent file i)
              (fprintln file l) stk)
-            ((symbol? l) 
+            ((symbol? l)
              (pindent file i)
              (fprintln file (buildstring "&" l ";")) stk)
             ((eqv? '//R (car l))
@@ -158,8 +158,8 @@
                      (cons (list i (cadr res)) (cons (list i (cons '//R (cdr res))) stk))))))
             ((eqv? '/ (car l))
              (pindent file i)
-             (fprintln file (buildstring "</" (cdr l) ">")) stk) 
-            ((null? (cdr l)) 
+             (fprintln file (buildstring "</" (cdr l) ">")) stk)
+            ((null? (cdr l))
              (pindent file i)
              (fprintln file (buildstring "<" (car l) "/>")) stk)
             (else ;; have members
@@ -172,33 +172,33 @@
                 (fprint file (buildstring "<" (car l) (if as (pxmlargs i as) "") ))
                 (if (null? (cdr rs) )
                   (begin (fprintln file "/>") stk)
-		  (if (and (begin (p-lookahead-a-bit (cdr rs)) #t)
-			   (null? (cddr rs))
-			   (string? (cadr rs)))
-		      (begin
-			(fprint file ">")
-			(fprint file (cadr rs))
-			(fprintln file (buildstring "</" (car l) ">"))
-			stk
-			)
-		      (begin
-			(fprintln file ">")
-			(cons 
-			 (list (+ i 1) (cons '//R rs))
-			 (cons (list i (cons '/ (car l))) stk))))))))))
+                  (if (and (begin (p-lookahead-a-bit (cdr rs)) #t)
+                           (null? (cddr rs))
+                           (string? (cadr rs)))
+                      (begin
+                        (fprint file ">")
+                        (fprint file (cadr rs))
+                        (fprintln file (buildstring "</" (car l) ">"))
+                        stk
+                        )
+                      (begin
+                        (fprintln file ">")
+                        (cons
+                         (list (+ i 1) (cons '//R rs))
+                         (cons (list i (cons '/ (car l))) stk))))))))))
         (loop newstk)
         )))))
-                 
+
 (function dumpxml (filnm xml enc)
    ("Dumps a given SXML tree into an XML file.")
-    (call-with-output-file filnm 
-         (fun (fil) 
+    (call-with-output-file filnm
+         (fun (fil)
             (fprintln fil (S<< "<?xml version=\"1.0\" encoding=\"" (if enc enc "utf-8") "\"?>"))
             (printxml fil xml))))
 
 
 (function sxml-attr (nm nd)
-  (if (null? (cdr nd)) nil 
+  (if (null? (cdr nd)) nil
     (let ((x (cadr nd)))
       (if (and (list? x) (eqv? '@ (car x)))
           (let ((y (find (fun (i) (eqv? (car i) nm)) (cdr x))))
@@ -227,9 +227,9 @@
                                  (cons (car rest) (cdr rest))
                                  (cons nil rest)) ))
               (if (null? r) nde
-                  (let ((nxt 
-                          (mapahead 
-                            (fun (x) 
+                  (let ((nxt
+                          (mapahead
+                            (fun (x)
                                (sxml-revisit vfun (if (list? x) (vfun x) x)))
                             r)))
                      (cons ndnm (if (null? a) nxt (cons a nxt)))))))))
@@ -291,7 +291,7 @@
    (else nil)))
 
 (recfunction sxmlp:deepall (fn tree)
- (cond 
+ (cond
   ((null? tree) nil)
   ((and (list? tree) (symbol? (car tree)))
    (if (eqv? '@ (car tree)) nil
@@ -301,7 +301,7 @@
 (recfunction sxmlp:fetchall (v tree)
  (filter (fun (a) a)
    (foreach-map (t tree)
-     (cond 
+     (cond
        ((and (list? t) (symbol? (car t)) (not (eqv? '@ (car t))))
         (if (eqv? v (car t)) t nil))
        (else nil)))))
@@ -315,7 +315,7 @@
       (sxmlp:fetch (cdr tree) v))))
    ((list? tree) (sxmlp:fetch (cdr tree) v))
    (else nil)))
-   
+
 
 (function sxmlp:find-first (v)
   (fun (x)

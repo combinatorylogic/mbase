@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -22,7 +22,7 @@
           ,@(map cadr args)))))
 
 (cmacro let* (args . body)
-   (if (null? args) 
+   (if (null? args)
      `(begin ,@body)
       (if (null? (cdr args))
          `(inner.let (,(car args)) (begin ,@body))
@@ -49,7 +49,7 @@
 (cmacro try rest
   (with-syms (tr)
    `(alet ,tr (inner.try ,@rest)
-	  ,tr)))
+          ,tr)))
 
 (cmacro n.asm (args . body)
   `(inner.asm normal ,args ,@body))
@@ -118,12 +118,12 @@
        (Ldnull))
      (let ((,chk (n.asm () (Ldsfld (field ,sn)))))
        (if ,chk ,chk
-	   (let ((,mk ,code))
-	     (n.asm (,mk)
-	       (expr ,mk)
-	       (Stsfld (field ,sn))
-	       (Ldnull))
-	     ,mk))))))
+           (let ((,mk ,code))
+             (n.asm (,mk)
+               (expr ,mk)
+               (Stsfld (field ,sn))
+               (Ldnull))
+             ,mk))))))
 
 (unit-test 3 (let ((abc (fun (x) (list (straise (cons x x)) x))))
                (list (abc 10) (abc 20) (abc 30)))
@@ -131,25 +131,25 @@
              ((10 . 10) 20)
              ((10 . 10) 30)))
 
-(define _force_assembly_load 
+(define _force_assembly_load
   (let ((GetTypes (r_tbind t_assembly "GetExportedTypes"))
-	(tfh 
-	 (r_mtd "System.Type" "GetTypeFromHandle"
-		(dotnet "System.RuntimeTypeHandle")))
-	(gtas
-	 (r_mtd "System.Type" "get_Assembly"))
-	)
+        (tfh
+         (r_mtd "System.Type" "GetTypeFromHandle"
+                (dotnet "System.RuntimeTypeHandle")))
+        (gtas
+         (r_mtd "System.Type" "get_Assembly"))
+        )
     (fun (as)
       (let* ((ts (GetTypes as))
-	     (t (car (a->l ts))))
-	`(n.asm ()
-	    (Ldtoken ,t)
-	    (Call ,tfh)
-	    (Callvirt ,gtas))))))
+             (t (car (a->l ts))))
+        `(n.asm ()
+            (Ldtoken ,t)
+            (Call ,tfh)
+            (Callvirt ,gtas))))))
 
 (cmacro add-assembly (nm)
   (let* ((rnm (read-int-eval nm))
-	 (as (lookup-assembly-inner rnm)))
+         (as (lookup-assembly-inner rnm)))
     `(try-context-assembly-wrapper ,(_force_assembly_load as) ,((r_tbind t_assembly "get_FullName") as))))
 
 (expand-if (shashget (getfuncenv) 'compiler-final)
@@ -176,8 +176,8 @@
                   )
                (n.stloc! ,lx (cdr ,lx))
                (n.goto ,lbl)
-	       nil
-	       )))))
+               nil
+               )))))
 
 (cmacro mkhash ()
   `(n.asm ()
@@ -189,37 +189,37 @@
   (with-syms (aa bb)
     `(inner.let ((,aa ,a) (,bb ,b))
        (n.asm (,aa ,bb)
-	 (expr ,aa)
-	 (Castclass ,t_Hashtable)
-	 (expr ,bb)
-	 (Call ,m_getItem)
-	 ))))
+         (expr ,aa)
+         (Castclass ,t_Hashtable)
+         (expr ,bb)
+         (Call ,m_getItem)
+         ))))
 
 (cmacro hashputODD (a b c)
   (with-syms (aa bb cc)
     `(inner.let ((,aa ,a) (,bb ,b) (,cc ,c))
        (n.asm (,aa ,bb ,cc)
-	 (expr ,aa)
-	 (Castclass ,t_Hashtable)
-	 (expr ,bb)
-	 (expr ,cc)
-	 (Call ,m_hashSetItem)
-	 (Ldnull)))))
+         (expr ,aa)
+         (Castclass ,t_Hashtable)
+         (expr ,bb)
+         (expr ,cc)
+         (Call ,m_hashSetItem)
+         (Ldnull)))))
 
 (cmacro println (a)
   (with-syms (aa)
     `(inner.let ((,aa ,a))
        (n.asm (,aa)
-	  (expr ,aa)
-	  (Call ,m_WriteLine)
-	  (Ldnull)))))
+          (expr ,aa)
+          (Call ,m_WriteLine)
+          (Ldnull)))))
 
 (cmacro foreach-map ((id lst) . body)
   (with-syms (lx ly lz lf lbl)
     `(with-macros ((foreach-break (fun ()
-				    (list 'begin
-					  (list 'n.stloc! (quote ,lx) 'nil)
-					  (list 'n.goto (quote ,lbl))))))
+                                    (list 'begin
+                                          (list 'n.stloc! (quote ,lx) 'nil)
+                                          (list 'n.goto (quote ,lbl))))))
      (let ((,lx ,lst) (,ly nil) (,lz nil))
         (n.label ,lbl)
         (if (null? ,lx) ,ly
@@ -230,48 +230,48 @@
                   )
                (n.stloc! ,lx (cdr ,lx))
                (n.goto ,lbl)
-	       nil
+               nil
                ))))))
 
 (cmacro foreach ((id lst) . body)
    (with-syms (lx lbl)
     `(with-macros ((foreach-break (fun ()
-				    (list 'begin
-					  (list 'n.stloc! (quote ,lx) 'nil)
-					  (list 'n.goto (quote ,lbl))))))
+                                    (list 'begin
+                                          (list 'n.stloc! (quote ,lx) 'nil)
+                                          (list 'n.goto (quote ,lbl))))))
       (let ((,lx ,lst))
         (n.label ,lbl)
-        (if (null? ,lx) nil 
+        (if (null? ,lx) nil
             (begin
                (let ((,id (car ,lx)))
                   ,@body)
                (n.stloc! ,lx (cdr ,lx))
-               (n.goto ,lbl) 
-	       nil
+               (n.goto ,lbl)
+               nil
                ))))))
 
 (cmacro collector ((add get) . body)
  (with-syms (clec cren v v1)
    `(let* ((,cren (cons nil nil))
-	   (,clec (mkref ,cren))
-	   (,add (fun (,v) (alet ,v1 (cons ,v nil)
-			    (set-cdr! (deref ,clec) ,v1)
-			    (r! ,clec ,v1)
-			    ,v)))
-	   (,get (fun () (cdr ,cren))))
+           (,clec (mkref ,cren))
+           (,add (fun (,v) (alet ,v1 (cons ,v nil)
+                            (set-cdr! (deref ,clec) ,v1)
+                            (r! ,clec ,v1)
+                            ,v)))
+           (,get (fun () (cdr ,cren))))
       ,@body)))
 
 (cmacro foreach-mappend ((id lst) . body)
  (with-syms (add get id2)
   `(collector (,add ,get)
-     (foreach (,id ,lst) 
+     (foreach (,id ,lst)
        (foreach (,id2 (begin ,@body)) (,add ,id2)))
      (,get))))
 
 (cmacro map-over (lst ffun) `(map ,ffun ,lst))
-          
+
 )
-        
+
 (cmacro set-car! (xp xv)
   (with-syms (p v)
    `(let ((,p ,xp) (,v ,xv))
@@ -280,7 +280,7 @@
         (Castclass ,t_Pair)
         (expr ,v)
         (Stfld ,_car_fld)
-	(Ldnull)
+        (Ldnull)
         )
      )))
 
@@ -292,7 +292,7 @@
         (Castclass ,t_Pair)
         (expr ,v)
         (Stfld ,_cdr_fld)
-	(Ldnull)
+        (Ldnull)
         )
      )))
 
@@ -316,7 +316,7 @@
         ,(_ldc_i4 const-id)
         (expr ,v)
         (Stelem_Ref)
-	(Ldnull)
+        (Ldnull)
         )
     )))
 
@@ -346,7 +346,7 @@
   (cmacro gencase rest
           `(cc-newgencase ,@rest))
   )
-)   
+)
 
 (define t_Stringbuilder (dotnet "System.Text.StringBuilder"))
 (define ctr_Stringbuilder (r_getconstructorf t_Stringbuilder nil))
@@ -356,14 +356,14 @@
   (with-syms (sbild)
     `(let* ((,sbild (n.asm () (Newobj ,ctr_Stringbuilder) (Castclass ,t_object))))
        ,@(foreach-map (a args)
-	   (with-syms (na)
-	     `(let ((,na ,a))
-		(n.asm (,sbild ,na) 
-		       (expr ,sbild)
-		       (Castclass ,t_Stringbuilder)
-		       (expr ,na)
-		       (Call ,_Stringbuilder_AppendObject)
-		       (Pop) (Ldnull)))))
+           (with-syms (na)
+             `(let ((,na ,a))
+                (n.asm (,sbild ,na)
+                       (expr ,sbild)
+                       (Castclass ,t_Stringbuilder)
+                       (expr ,na)
+                       (Call ,_Stringbuilder_AppendObject)
+                       (Pop) (Ldnull)))))
        (->s ,sbild))))
 
 
@@ -377,11 +377,11 @@
      (Unbox_Any (othertype "System.Int32"))
      (Rem)
      (Box (othertype "System.Int32"))
-     )) 
+     ))
 )
 
 (include "./pmatchcomp.al")
-       
-       
-       
+
+
+
 

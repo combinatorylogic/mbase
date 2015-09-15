@@ -2,15 +2,15 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; TeX pretty printer to be used with the vsparser thing
 
 
-(define wwTabsX 
+(define wwTabsX
   (strreplacers*
    (">" "$>$")
    ("<" "$<$")
@@ -65,7 +65,7 @@
 
 (function pprint-buffer (lexer parser rules prules lines)
   (let* ((v (mkovector lines))
-         (bpars (lex-and-parse lexer parser 
+         (bpars (lex-and-parse lexer parser
                               (lazy_strs_reader
                                v)))
          (nl (alength v))
@@ -73,15 +73,15 @@
     (let gloop ((l 0) (stt nil))
       (if (>= l nl) nil
          (let* ((ln ([ l ] v))
-                (stn 
+                (stn
                  (let loop ((i 0) (s (string->list ln)) (st stt))
-		   (alet c (bnf-chkcache cac i l)
+                   (alet c (bnf-chkcache cac i l)
                     (if (null? s) (begin
-				   (if (not (null? st))
-				       (print-end))
+                                   (if (not (null? st))
+                                       (print-end))
                                    (print-endline)
                                    c)
-		     (begin
+                     (begin
                       (cond
                        ((and c
                              (not (state-comp st c)))
@@ -89,13 +89,13 @@
                             (if st (print-end))
                             (print-begin prules c)))
                        ((and st (not c))
-			(print-end)))
-		      (print (wwTabs (S<< (car s))))
+                        (print-end)))
+                      (print (wwTabs (S<< (car s))))
                       (loop (+ i 1) (cdr s) c)))))))
 
            (gloop (+ l 1) stn))))))
-                          
-         
-    
+
+
+
 
 

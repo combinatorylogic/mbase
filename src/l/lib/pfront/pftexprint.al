@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -55,9 +55,9 @@
 
     (else
      (iter println '
-        ("Usage:" 
-         " pfront.exe <outfile> <filename> - execute a file" 
-         " pfront.exe <outfile> /c <exename> <filename> - compile a file" 
+        ("Usage:"
+         " pfront.exe <outfile> <filename> - execute a file"
+         " pfront.exe <outfile> /c <exename> <filename> - compile a file"
          " pfront.exe <outfile> /d <dllname> <filename> - compile a file into a dll"
          )))
     )))

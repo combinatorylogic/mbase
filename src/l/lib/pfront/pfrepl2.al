@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -11,16 +11,16 @@
 (sysdll MBaseFront)
 
 (function pf-very-lazy-reader (redr)
-  (__peg:lst2stream 
+  (__peg:lst2stream
    (let loop ()
     (alet chr (not.neth ((System.IO.StreamReader redr))
                         (chr = (redr@Read))
                         (object ret = null)
                         (if (>= chr 0) (ret <- ((object)((char)chr))))
                         (leave ret))
-	  (writeline `(C: ,chr))
-	  (if (not chr) nil
-	      (cons chr loop)))) nil))
+          (writeline `(C: ,chr))
+          (if (not chr) nil
+              (cons chr loop)))) nil))
 
 (function pf-read-eval-print (lst)
   (alet res (read-compile-eval (hlevel-compile lst))
@@ -51,7 +51,7 @@
   (peg:easyparse peg_pftehrepl
    (pf-very-lazy-reader
      (not.neth ()
-       (leave ((object)(new System.IO.StreamReader 
+       (leave ((object)(new System.IO.StreamReader
                             (System.Console@OpenStandardInput))))))))
 
 

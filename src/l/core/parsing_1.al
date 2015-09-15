@@ -2,29 +2,29 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 (function p[T] (tn)
    (fun (l) (list (list tn l))))
- 
+
 (function p[xT] (tn pf)
    (fun (l r) (list (list tn (pf l) r))))
 
 (function p[xTap] (tn pf)
    (fun (l r)
        (list (list tn (pf (genvalue l)) r (genposition l)))))
-  
+
 (function p[xTp] (tn pf)
    (fun (l r pos)
      (let ((vv (pf l)))
        (list (list tn vv r pos)))))
-  
+
 (function p[lT] (tn)
-   (fun (l) 
+   (fun (l)
      (list (list tn (genlist->string l)))))
 
 (function p.t (tk) (cadr tk))
@@ -64,26 +64,26 @@
          (if (,pr (car l))
            (p-mkresult (list (car l)) (cdr l))
            (p-mkfail '? l)))))
-          
+
 (function p>eq (v)
   ("Makes an equality recogniser, using [eq?] predicate."
    "Same effect as [(p>pred (cut eq? v <>))]."
    )
    (fun (l)
-	(if (null? l) (p-mkfail 'eof l)
-	    (if (eq? v (car l))
-		(p-mkresult (list (car l)) (cdr l))
-		(p-mkfail v l)))))
+        (if (null? l) (p-mkfail 'eof l)
+            (if (eq? v (car l))
+                (p-mkresult (list (car l)) (cdr l))
+                (p-mkfail v l)))))
 
 (function p>chareq (v)
   ("Makes a character equality recogniser, using [genchar=?] predicate."
    )
   (let ((va (ascii v)))
    (fun (l)
-	(if (null? l) (p-mkfail 'eof l)
-	    (if (genachar=? va (car l))
-		(p-mkresult (list (car l)) (cdr l))
-		(p-mkfail v l))))))
+        (if (null? l) (p-mkfail 'eof l)
+            (if (genachar=? va (car l))
+                (p-mkresult (list (car l)) (cdr l))
+                (p-mkfail v l))))))
 
 (function p>touch (p)
   ("Makes a recogniser which is successful if [p] is successful, discarding [p] application results,"
@@ -97,43 +97,43 @@
 
 ;;; Derivative parsers
 
-(macro c# (ch) 
-  "Expands into an integer representing the given character code." 
+(macro c# (ch)
+  "Expands into an integer representing the given character code."
   (ascii ch))
 
-(function p.any (l) 
+(function p.any (l)
   "An always successful recogniser with no result value."
   (p-mkresult nil l))
 
-(define p. 
+(define p.
   "Recogniser, successful for any non-EOF input stream element. Result contains that one element."
   (p>pred (fun (x) #t)))
-(define p.lcalpha 
+(define p.lcalpha
   "Regonises a lower case latin character."
-  (p>pred 
-    (fun (x) (if (genchar? x) 
+  (p>pred
+    (fun (x) (if (genchar? x)
                (let ((a (genascii x)))
                  (and (>= a (c# #\a)) (<= a (c# #\z))))))))
 
-(define p.ucalpha 
+(define p.ucalpha
   "Recognses an upper case latin character."
-  (p>pred 
-    (fun (x) (if (genchar? x) 
+  (p>pred
+    (fun (x) (if (genchar? x)
                (let ((a (genascii x)))
                  (and (>= a (c# #\A)) (<= a (c# #\Z))))))))
 
 (define p.alpha
   "Recognises any latin character."
   (p<|> p.ucalpha p.lcalpha))
- 
-                     
-(define p.digit 
+
+
+(define p.digit
   "Recognises any decimal digit."
-  (p>pred 
-    (fun (x) (if (genchar? x) 
+  (p>pred
+    (fun (x) (if (genchar? x)
                (let ((a (genascii x)))
                  (and (>= a (c# #\0)) (<= a (c# #\9))))))))
-                     
+
 (function p>string (str)
   "Makes a recogniser for a string."
   (let ((sl (string->list str)))
@@ -141,7 +141,7 @@
         (if (null? l) p.any
             (if (null? (cdr l)) (p>chareq (car l))
                 (p<+> (p>chareq (car l)) (loop (cdr l))))))))
- 
+
 (macro pm>string (str)
   "Macro version of [p>string]."
   (let ((sl (string->list str)))

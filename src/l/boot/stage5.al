@@ -2,8 +2,8 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2014, Meta Alternative Ltd. All rights reserved.
-;; This file is distributed under the terms of the Q Public License version 1.0.
+;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -51,26 +51,26 @@
                              (define compiler-final #t)
                              (define compiled-environment #t)
                              (define core-environment-compiled #t)
-			     (include "../boot/boot.al")
-			     (include "../boot/initlib.al")
-			     (include "../boot/dotnetlib.al")
-			     (include "../boot/common.al")
+                             (include "../boot/boot.al")
+                             (include "../boot/initlib.al")
+                             (include "../boot/dotnetlib.al")
+                             (include "../boot/common.al")
 
-			     ;;;;;
+                             ;;;;;
 
-			     (include "../core/compiler.al")
+                             (include "../core/compiler.al")
                              (include "../core/unit.al")
                              (include "../core/final.al")
                              (include "../boot/extra.al")
-			     (include "../core/clibsystem.al")
-			     (include "../ext/tcprepl.al")
-			     (include "../core/native.al")
-			     (include "../ext/unittests.al")
-			     
-			     ;; Things needed to run pfront programs
-			     (include "../lib/pfront/backport.al")
+                             (include "../core/clibsystem.al")
+                             (include "../ext/tcprepl.al")
+                             (include "../core/native.al")
+                             (include "../ext/unittests.al")
 
-			     ))
+                             ;; Things needed to run pfront programs
+                             (include "../lib/pfront/backport.al")
+
+                             ))
   (cc:env:printreport (cc:env:report ENV))
   (cc:dump-module ENV)
   )
