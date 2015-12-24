@@ -19,6 +19,7 @@ parser pliter extends pfront (
  token pltbeg3 := 'ppcode' TSpace* '{' TSpace* => { state = empty};
  token pltbeg1x := 'phcode' TSpace* '{' TSpace* => { state = empty};
  token pltdll := 'pfdllref' TSpace* '{' TSpace* => { state = empty};
+ token pltsysdll := 'pfsysdllref' TSpace* '{' TSpace* => { state = empty};
  token pltend := Space* '}' => {state = empty};
 
  term pltbeg4 := 'parse' '[' ident:p ':' ident:e ']' TSpace* '{' TSpace* => {state = empty} [[parser]](p,e) ;
@@ -34,11 +35,12 @@ parser pliter extends pfront (
                 /  {pltbeg2 slist<atopexpr>:e pltend => plqexpr(e)}
                 /  {pltbeg3 slist<plminipeg>:e pltend => plqexpr(e)}
                 /  {pltbeg1x slist<atopexpr>:e pltend => { uberstate = empty } plqhexpr(e)}
+                /  {pltsysdll string:s pltend => { uberstate = empty } $pfchecksysdll(s) }
                 /  {pltdll string:s pltend => { uberstate = empty } $pfcheckdll(s) }
                 /  {pltbeg4:pars #invokeparser<pars>:e pltend => plqexpr(e)}
                 ;
 
- nottex := !('\pfcode'/'\pfqode'/'\ppcode'/'\phcode'/'\parse') .;
+ nottex := !('\pfcode'/'\pfqode'/'\ppcode'/'\phcode'/'\parse'/'\pfdllref'/'\pfsysdllref') .;
 
  token tex := nottex +;
  term texexpr := tex:v => {screen=none} {state=texcomment} pltexstring($val(v));

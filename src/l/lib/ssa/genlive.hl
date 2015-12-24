@@ -1,13 +1,11 @@
 %literate:
 
-\section{Generic liveness analysis}
+\section{To be moved to genssa library}
 
-For each basic block, used variables are propagated to the incoming basic blocks
-and defined variables are propagated to the next basic blocks. This is repeated
-as long as any changes to the lists of defined and used variables are changing.
-Use lists are not propagated upwards from the basic blocks where the variables
-are destroyed. If the variable is used and destroyed in the same block, the
-order is taken into account.
+For each basic block, used variables are propagated to the incoming basic blocks and defined variables are propagated
+to the next basic blocks. This is repeated as long as any changes to the lists of defined and used variables are changing.
+Use lists are not propagated upwards from the basic blocks where the variables are destroyed. If the variable is used and destroyed in the same block,
+the order is taken into account.
 
 
 

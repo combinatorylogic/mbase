@@ -1,3 +1,32 @@
+define glogf = mkref([])
+
+function fprintlnf(f, s)
+{
+   if(f) {
+     fprintln(f,s); .net(f): ((System.IO.StreamWriter)f).Flush();
+   }
+}
+
+function logg(str)
+  fprintlnf(^glogf, str)
+
+#(function pfcheckdll1 (nm)
+   (logg (S<< "DLL: " nm))
+   (alet chk (ohashget pf__dllglobcache nm)
+              (if chk nil
+                  (try
+                   (begin
+                     (logg (S<< "Reading dll: " nm))
+                     (read-compile-eval `(usedll ,(Sm<< nm)))
+                     (logg (S<< "Done reading dll: " nm))
+                     (ohashput pf__dllglobcache nm nm))
+                   t_Exception
+                   (fun (e) (logg (S<< "ERRORRRR: " (->s e))) nil)))
+              `(pldllref ,nm)
+              ))
+
+//#(r! pf_checkdll_external pfcheckdll1)
+
 function psignal(msg)
    println(%S<<(msg,"|"))
 
@@ -16,7 +45,7 @@ function ploop11(env, str, p, fn, fst, ini)
     f = %PegEnv.failure(env);
     fpos = match f with
                           [] -> cdr(res) :: "<ERROR>"
-           | [loc;pos;names] -> pos :: %S<<(names);
+           | [loc;pos;names] -> [pos] :: %S<<(names);
     if(fst) {
        peg_cleanse_stream(cdr(res),fst);
        ploop11(env, mkref(ini), p, fn, [], [])
@@ -211,13 +240,6 @@ function %make-stream (lf, pshash, ipos)
   }
 }
 
-function fprintlnf(f, s)
-{
-   if(f) {
-     fprintln(f,s); .net(f): ((System.IO.StreamWriter)f).Flush();
-   }
-}
-
 function mainloop_inner(logf)
 {
   do loop(pshash = mkhash()) {
@@ -236,10 +258,9 @@ function mainloop_inner(logf)
                         (fun (tag first last signal)
                           (alet msg `((,(peg:decode-pos (sposloc first))
                                        ,(peg:decode-pos (sposloc last))) ,signal)
-                           (fprintlnf logf msg)
                              (psignal msg)
                           ))
-                        nil
+                        #t
                         nil
                         nil
                         );
@@ -254,6 +275,7 @@ function mainloop(logf)
 {
   try {
     try {
+      glogf := logf;
       mainloop_inner(logf)
     } catch (t_MBaseException e) {
       fprintlnf(logf,%S<<("MBase exception: ", mbaseerror(e)));
@@ -261,6 +283,7 @@ function mainloop(logf)
     }
   } catch (t_Exception e) {
       fprintlnf(logf,%S<<(e));
+      mainloop(logf)
   }
 }
 

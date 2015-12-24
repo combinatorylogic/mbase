@@ -209,6 +209,10 @@
         `(try ,e ,tp (fun (,nm) ,proc)))
        ))
 
+    (xllpair DEEP
+       ((p `(,nm ,v))
+        (e `(*NEXT* ,v))))
+    
     (lmacrodef DEEP
        ((def `(,nm ,v))))
 

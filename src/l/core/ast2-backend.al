@@ -487,13 +487,27 @@
     (if ret ret
         (ccerror `(AST-NOT-FOUND ,id)))))
 
+(function ast2:unnamed-only (args)
+  (not
+   (filter (fmt (nm v)
+             (not (eqv? nm '*NEXT*))) args)))
+
+(function ast2:fix-mknode-args (args fd)
+  (if (ast2:unnamed-only args)
+      (foreach-map (af (zip fd args))
+        (format af ((tp nm pos) (_ v))
+          `(,nm ,v) ;; TODO: check!
+          ))
+      args))
+
 (macro ast2:mknode-inner (qargs nd ndtype ndformat ndvar
                                 ndtags astdst)
-  (let* ((args (cadr qargs))
+  (let* ((args0 (cadr qargs))
          (ast (ast2:default-ifun astdst))
          (asth (ast-make-cache ast))
          (tpl  (gensym))
          (fd (ast-pattern-entries ndformat))
+         (args (ast2:fix-mknode-args args0 fd))
          (tagid (if (eqv? ndtype 'variant)
                     (ast2:find-position ndvar ndtags)
                     nil))

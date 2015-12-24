@@ -110,3 +110,8 @@
           (stopwatch-stop ,sw)
           (println (S<< "Elapsed time (" ,msg "): " (stopwatch-elapsed ,sw)))
           (return ,ret))))
+
+(macro swbenchmark0 (msg code)
+  (if (shashget (getfuncenv) 'debug-compiler-benchmarks)
+      `(swbenchmark ,msg ,code)
+      code))

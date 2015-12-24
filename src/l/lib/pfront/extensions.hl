@@ -442,3 +442,37 @@ function error_hook(stream, res)
 #(r! pfront-report-syntax-error-hook error_hook)
 
 endmodule.
+
+----------------------
+
+
+
+syntax in expr, start: ' "." bitpack "(" [number]:bits "|" cslist<[bitentry],",">:es ")" '
+ + {
+     bitentry := [number]:n ":" [expr]:e => bits(n, e);
+   }
+{
+   return 'lisp'('bitpack_macro'(bits, es))
+}
+
+function n_bitand(a,b) 
+  notnet(int a, int b)
+    {leave a&b;}
+
+
+function n_lshift(a, b) 
+  notnet(int a, int b)
+    {leave a<<b;}
+
+
+macro bitpack_macro(bits, es) {
+  poss = do loop(e = es, pos = 0) {
+     match e with
+       [bits(n, v);@rest] -> [pos; n; pfront_expr(v)]:loop(rest, pos+n)
+     | else -> []};
+  foldl(fun(prev, vv) {
+           <[pos;n;v]> = vv;
+           c = #`(n_lshift (n_bitand ,v ,(- (n_lshift 1 n) 1)) ,pos);
+           if(prev) #`(+ ,prev ,c) else c}, [], poss)
+}
+

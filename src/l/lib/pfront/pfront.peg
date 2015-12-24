@@ -122,9 +122,9 @@ parser pfront extends minipeg (
       => viter(ops,ast,top,e,@b) }
   / { |'mk'| ':' |'node'| '(' %indent(push,firsttab) ecslist<mdargpair,','>:args %indent(pop,firsttab) ')' => mknode(@args) }
   / { |'mk'| ':' ident:nd ':' ident:vtag
-         '(' %indent(push,firsttab) ecslist<mdargpair,','>:args %indent(pop,firsttab) ')' => mkvnode(nd, vtag, @args) }
+         '(' %indent(push,firsttab) ecslist<xmdargpair,','>:args %indent(pop,firsttab) ')' => mkvnode(nd, vtag, @args) }
   / { |'mk'| ':' ident:vtag
-         '(' %indent(push,firsttab) ecslist<mdargpair,','>:args %indent(pop,firsttab) ')' => mkxnode(vtag, @args) }
+         '(' %indent(push,firsttab) ecslist<xmdargpair,','>:args %indent(pop,firsttab) ')' => mkxnode(vtag, @args) }
   / { |'if'| exprwrap:e |'then'|? %indent(push,tab) exprwrap:tr ';'? %indent(pop,tab) |'else'| %indent(push,tab) exprwrap:fl %indent(pop,tab)
       => if3(e,tr,fl) }
   / { |'if'| exprwrap:e |'then'|? %indent(push,tab) exprwrap:tr %indent(pop,tab)
@@ -191,6 +191,9 @@ parser pfront extends minipeg (
 
   term argpair "'nm' = 'value'" := qident:nm '=' expr:e => $list(nm,e);
   term mdargpair "'nm' = 'value'" := mdargnm:nm '=' expr:e => $list(nm,e);
+  term xmdargpair := { mdargnm:nm '=' expr:e => p(nm,e)}
+                  /  { expr:e => e(e) }
+                  ;
   term mdargnm := { '@' => `[[*metadata*]] }
                /  qident;
 

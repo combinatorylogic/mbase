@@ -147,8 +147,8 @@
       (withmacros <*lmacrodef:ds> <expr:e>)
       (withmetadata <expr:m> <expr:e>)
       (mknode . <*llpair:args>)
-      (mkvnode <ident:nd> <ident:tag> . <*llpair:args>)
-      (mkxnode <ident:tag> . <*llpair:args>)
+      (mkvnode <ident:nd> <ident:tag> . <*xllpair:args>)
+      (mkxnode <ident:tag> . <*xllpair:args>)
 
       (if3 <expr:e> <expr:tr> <expr:fl>)
       (if2 <expr:e> <expr:tr>)
@@ -183,6 +183,7 @@
       ))
 
   (llpair (<ident:nm> <expr:v>))
+  (xllpair (| (p <ident:nm> <expr:v>) (e <expr:v>)))
   (lmacrodef (| (def <ident:nm> <expr:v>)))
 
   )

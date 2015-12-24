@@ -120,6 +120,7 @@ function prolog_alloc_cell(env) cons('var',[])
 function prolog_alloc_struct(env, id, args) { return ['str';id;@args] }
 function prolog_const(c) cons('const',c)
 function prolog_weak(v) cons('weak',[v])
+function prolog_empty_weak() cons('weak',[])
 function prolog_save_chpoint(env, c) { %set-cdr!(env, c)}
 function prolog_last_chpoint(env) { cdr(env) }
 function prolog_deref(v) // Fall through constraint
@@ -131,7 +132,12 @@ function prolog_deref_c(v) // Stop at constraint
    match v with
       'ref':x -> prolog_deref_c(x)
     | else -> v
+function prolog_set_failguard(env, fg) ohashput(car(env), ' failguard ', fg)
+function prolog_fail_guard(env) ohashget(car(env), ' failguard ')
+
 function prolog_failure_f(env) {
+    failguard = prolog_fail_guard(env);
+    if (failguard) failguard(env);
     chp =  deref(prolog_last_chpoint(env));
     if(chp) {
       <[env;prev;cont;cnts;vars]> = chp;
@@ -179,7 +185,7 @@ function prolog_unify_structs(env, a, b) {
   } else []
 }
 function prolog_fuse_weaklings(a, b) {
-  //TODO: remove duplicates (strict equality)
+  //TODO!
   return a::b}
 
 function prolog_merge_weaklings(env, a, b) {
@@ -226,7 +232,8 @@ function prolog_decode_result_inner(varenv, v, vis) {
            if (chk1) {
              ohashput(vish, dv, 'var'(chk1));
              return 'var'(chk1)
-           } else symbols(newref) {
+           } else symbols(newref0) {
+              newref = %Sm<<('UB_', newref0);
               ohashput(vish, dv, 'var'(newref));
               ohashput(varenv, dv, newref);
               visa(newref, dv);
@@ -366,22 +373,31 @@ function %_prolog_function_weak/2 (env, cnt, dst, v) {
     else prolog_failure(env)
   } else prolog_failure(env)}}
 
+\pfcode{
+function %_prolog_function_weak/1 (env, cnt, dst) {
+  dd = prolog_deref(dst);
+  if (prolog_is_var(dd)) {
+    if(prolog_unify(env, dst, prolog_empty_weak()))
+       cnt(env)
+    else prolog_failure(env)
+  } else prolog_failure(env)}}
+
 \subsection{Backend-specific query compilation}
 
 \pfcode{
 function prolog_backend_driver_generic(parsed, exec, getexec, failure, outp) {
   flush(c, queryp, prev) = symbols(qname) if(c) {
     cc = reverse(c);
-    app0 = map a in cc do prolog_parse_fix_arity_clause(a);
+    app0 = swbenchmark0("plg parse", map a in cc do prolog_parse_fix_arity_clause(a));
     qstat = mkref([]);
-    app = prolog_sanitise_queries(app0, qname, qstat);
-    capp = prolog_compile(app);
+    app = swbenchmark0("plg sanitise", prolog_sanitise_queries(app0, qname, qstat));
+    capp = swbenchmark0("plg compile", prolog_compile(app));
     if (shashget(getfuncenv(), 'debug-prolog-compile'))
        writeline('PROLOG_COMPILED'(@capp));
-    cgen = %map(prolog_codegen, capp);
+    cgen = swbenchmark0("plg codegen", %map(prolog_codegen, capp));
     if (shashget(getfuncenv(), 'debug-prolog-codegen'))
        writeline('PROLOG_CODEGEN'(@cgen));
-    exec('begin'(@cgen));
+    swbenchmark0("plg cgexec",exec('begin'(@cgen)));
 
     if (queryp) {
       qargs = deref(qstat);
@@ -391,10 +407,11 @@ function prolog_backend_driver_generic(parsed, exec, getexec, failure, outp) {
          ohashput(venv, v, q);
          return v};
       qnamescreen = %Sm<<("_prolog_function_",qname);
-      env0 = 'env':[];
+      envh = mkhash();
+      env0 = envh:[];
       cnt0 = fun(env) env;
       result =
-         prolog_query_wrapper(apply(getexec(qnamescreen), env0:cnt0:vars));
+         swbenchmark0("plg exec",prolog_query_wrapper(apply(getexec(qnamescreen), env0:cnt0:vars)));
 
       if (result) {
         if (outp) {
@@ -410,10 +427,10 @@ function prolog_backend_driver_generic(parsed, exec, getexec, failure, outp) {
           do resultloop(res = result, resnum = 0) collector(addb0, getback) {
             if (res) {
              addback(k,v) = addb0([k;v]);
-             resmap = map [n;v] in zip(qargs, vars) do {
+             resmap = swbenchmark0("plg decode", map [n;v] in zip(qargs, vars) do {
                 nv = prolog_decode_result(venv, v, addback);
                 [n; nv]
-             };
+             });
              return resnum : (getback()::resmap) : fun()
                 { resultloop(failure(res), resnum+1) }
             } else return []

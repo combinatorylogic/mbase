@@ -29,18 +29,34 @@
 
 
 (define pf__dllglobcache (mkhash))
+(define pf_checkdll_external (mkref nil))
 
 (function peg-function-pfcheckdll (nm)
-  (alet chk (ohashget pf__dllglobcache nm)
-     (if chk nil
-         (try
-          (begin
-            (read-compile-eval `(sysdll ,(Sm<< nm)))
-            (ohashput pf__dllglobcache nm nm))
-          t_Exception
-          (fun (e) nil)))
-     `(pldllref ,nm)
-     ))
+  (let* ((c0 (deref pf_checkdll_external)))
+    (if (not c0)
+        (alet chk (hashget pf__dllglobcache nm)
+              (if chk nil
+                  (try
+                   (begin
+                     (read-compile-eval `(usedll ,(Sm<< nm)))
+                     (hashput pf__dllglobcache nm nm))
+                   t_Exception
+                   (fun (e) nil)))
+              `(pldllref ,nm)
+              )
+        (c0 nm))))
+
+(function peg-function-pfchecksysdll (nm)
+        (alet chk (hashget pf__dllglobcache nm)
+              (if chk nil
+                  (try
+                   (begin
+                     (read-compile-eval `(sysdll ,(Sm<< nm)))
+                     (hashput pf__dllglobcache nm nm))
+                   t_Exception
+                   (fun (e) nil)))
+              `(pldllref ,nm)
+              ))
 
 (packrat-file "./pcommon.peg")
 (packrat-file "./minipeg.peg")
@@ -52,8 +68,8 @@
 
 (packrat-file "./pfront.peg")
 
-
 (packrat-file "./pliter.peg")
+
 
 
 

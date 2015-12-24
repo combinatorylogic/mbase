@@ -111,6 +111,7 @@
          (xvs (foreach-mappend (x xs)
                  (p:match x
                    ((screen none) (r! tabsfun I) nil)
+                   ((screen math) (r! tabsfun (fun (s) (S<< "$" s "$"))) nil)
                    (else
                     (alet t (hashget ch (S<< "f:" (car x) "=" (cadr x)))
                           (if t (list t) nil))))))

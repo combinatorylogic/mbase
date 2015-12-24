@@ -739,7 +739,10 @@
                                (let* ((sign (to-string `(,name ,@args)))
                                       (h (ihash> sign)))
                                  (if h h
-                                     (let* ((xcode (packrat-specialise-macro loop (ahash> name)
+                                     (let* ((mdef (ahash> name))
+					    (_ (if (not mdef)
+						   (ccerror `(PACKRAT-UNKNOWN-MACRO ,name))))
+					    (xcode (packrat-specialise-macro loop mdef
                                                                              args))
                                             (nname (car xcode))
                                             (raised (cdr xcode)))
