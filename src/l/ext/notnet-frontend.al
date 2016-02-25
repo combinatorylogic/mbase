@@ -13,6 +13,7 @@
 ; Higher-level language frontent for LLtNET backend
 
 (define *lltnet-macros* (mkhash))
+(define int->byte-hook (cons nil nil))
 
 ; Pass 1.: normalise @-s
 
@@ -310,6 +311,9 @@
       ((lift-field $f)
        (set-cdr! lfs (cons f (cdr lfs)))
        '(nop))
+      ((lift-initfield . $f)
+       (set-cdr! lfs (cons `(initfield ,@f) (cdr lfs)))
+       '(nop))
       ((nop) '(nop))
       ((return)
        `(vreturn))
@@ -366,12 +370,15 @@
                                          `(begin ,@body))))))
          (dofield
           (fun (f)
-            (format f ("field" type . nameopts)
-                (let* ((fname (car nameopts))
+            (p:match f
+              ((field $type . $nameopts)
+               (let* ((fname (car nameopts))
                        (fopts (if (null? (cdr nameopts))
                                   '((public)) (cdr nameopts))))
                   `(field ,fopts ,(lltnet-hl-compile-type type) ,fname (null))
-                  ))))
+                  ))
+              ((initfield $name $opts . $data)
+               `(initfield ,opts ,name ,@(map (car int->byte-hook) data))))))
          (code (lltnet-hl lmethods lfields `(begin ,@body))))
     (f.not.net.lift pure? xtp blk?
                   (map-over args
@@ -406,7 +413,6 @@
         ,@body)
      ))
 
-(define int->byte-hook (cons nil nil))
 
 
 (function f.not.topexpand (body)

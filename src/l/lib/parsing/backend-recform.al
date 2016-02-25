@@ -1,6 +1,6 @@
 
 ;; ASTs are not persistently stored in the binaries
-;(include "../../core/ast2-ast.al")
+(include "../../ext/ast2-ast.al")
 
 ;; Matching rules:
 ;;   @x : @y => x = y

@@ -30,3 +30,5 @@
 (include "../ext/raise.al")
 (include "../ext/extutils.al")
 
+(include "../ext/ast2.al")
+

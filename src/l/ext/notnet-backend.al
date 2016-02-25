@@ -623,6 +623,10 @@
                       ,(accs acc)
                       )
               )
+             (initfield
+              `(initfield ,(S<< name)
+                          ,(accs acc)
+                          ,@mess))
              (else nil)
              ))
          (mtdbody _ (forall

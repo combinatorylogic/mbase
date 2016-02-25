@@ -75,6 +75,26 @@
                             listform_dst)
                     ,entry
                     ,val
+                    ,@body)))
+
+
+(macro ast2:visit-all (srcid entry val fn)
+  (let* ((src (ast2:default-ifun srcid))
+         (nodes (astlang:visit topdef src
+                  (topdef DEEP ((defast ns)))
+                  (astnode DEEP
+                    ((simple `(S ,id))
+                     (varnode `(V ,id))
+                     (extend (ccerror `(AST-IMPOSSIBLE ,srcid)))))))
+         (body (foreach-map (n nodes)
+                 (p:match n
+                   ((V $id)
+                    `(,id DEEP ((else (,fn (thisnode))))))
+                   ((S $id)
+                    `(,id DEEP (,fn (thisnode))))))))
+    `(ast:visit:new ,srcid ((dst ,srcid))
+        ,entry
+        ,val
         ,@body)))
 
 ;; TODO: error checks

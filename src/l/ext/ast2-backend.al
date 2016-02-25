@@ -1,3 +1,21 @@
+(nrec:def ast2stackrecord
+          scnt ; 0
+          thisnodesrc ; 1
+          tpl ; 2
+          cnt ; 3
+          target ;4
+          targetslot  ;5
+          )
+
+(nrec:def ast2cntrecord
+          C ;; 'C or nil
+          d 
+          s
+          p ;; nil for list records
+          )
+
+(include "./ast2-initvector.al")
+
 (macro ast2:aget (a b)
   `(aget ,a ,b))
 
@@ -32,7 +50,7 @@
      (visitor_report_error `(ccerror (list 'VISITOR:ERROR (quote ,id) ,v)))
      (visitor_translate_tag `(ast2:aget ,t ,v))
      (visitor_get_tag `(ast2:get_tag ,lfsrc? ,v))
-     (table `(straise (vector ,@dsts)))
+     (table `(ast2-init-n-vector ,@dsts))
      (push_stack_run
       (with-syms (tplid)
         (let* ((ndeep (foreach-mappend (d deep)
@@ -40,6 +58,8 @@
                           ((*MOVE* $m) nil)
                           (else (wrap d))))))
           `(let ((,tplid ,t))
+             ;; todo: don't even try it for the list collectors
+             ;(writeline (list 'CURRENT: (ast2:print-test (thisnodesrc))))
              (ast2:set_metadata ,tplid (ast-current-metadata))
              (begin
                ,@(foreach-mappend (d deep)
@@ -158,7 +178,7 @@
                        `(straise (ast2:make_dyn_tags_map (quote ,ids)))
                        'nil))
 
-     (dummy `(cons '(T) (mkovector '(() ()))))
+     (dummy `(cons '(T) (ast2:mkemptyvector 2)))
      (dummyslot 0)
      (getdummy `(ast2:aget (cdr ,d) 1))
 
@@ -184,12 +204,11 @@
       )))
 
 (function ast2:make_stack_record (n t c tg ts)
-  ;;TODO: optimise!
-  (mkovector (list nil n t c tg ts)))
+  (ast2stackrecord.new nil n t c tg ts))
 
 (function ast2:add_stack_cnt (rc d)
-  (let* ((d0 (ast2:aget rc 0)))
-    (aset rc 0 (cons d d0))))
+  (let* ((d0 (ast2stackrecord.scnt rc)))
+    (ast2stackrecord.scnt! rc (cons d d0))))
 
 (macro ast2:get_tagged_tuple (s n)
   `(ast2:aget (cdr ,s) (+ 1 ,n)))
@@ -204,15 +223,20 @@
 (macro ast2:set_metadata (dst v)
   `(aset (cdr ,dst) 0 ,v))
 
+(macro ast2:mkemptyvector (len)
+  `(not.neth ()
+      (a = (mkarr object ,len))
+      (leave ((object)a))))
+
 (macro ast2:allocate_tuple (fs)
   ;; TODO: optimise!!!
   `(cons (quote (() ,@fs))
-         (mkovector (quote (() ,@(foreach-map (f fs) '()))))))
+         (ast2:mkemptyvector ,(+ 1 (length fs)))))
 
 (macro ast2:allocate_tagged_tuple (tg tagid fs)
   ;; TODO: optimise!!!
   `(cons (quote (T ,tg ,tagid ,@fs))
-         (ast2:set_tag (mkovector (quote (() () ,@(foreach-map (f fs) '()))))
+         (ast2:set_tag (ast2:mkemptyvector ,(+ 2 (length fs)))
                        ,tagid)))
 
 (macro ast2:allocate_list_collector ()
@@ -284,49 +308,45 @@
         )))
 
 (macro ast2:make_continuation_record (d p s)
-  ;; TODO: optimise!
-  `(mkovector (list 'C ,d ,s ,p)))
+  `(ast2cntrecord.new 'C ,d ,s ,p))
 
 (macro ast2:list_continuation_record (d s)
-  ;; TODO: optimise!
-  `(mkovector (list nil ,d ,s)))
-
+  `(ast2cntrecord.new nil ,d ,s nil))
 
 (function ast2:pop-cnt-rec (s)
-  (let* ((rc (ast2:aget s 0)))
+  (let* ((rc (ast2stackrecord.scnt s)))
     (if rc
         (let* ((hd (car rc)))
-          (aset s 0 (cdr rc))
+          (ast2stackrecord.scnt! s (cdr rc))
           (return hd))
         nil)))
 
 (macro ast2:stackrecord-thisnodesrc (s)
-  `(ast2:aget ,s 1))
+  `(ast2stackrecord.thisnodesrc ,s))
 
 (macro ast2:stackrecord-target (s)
-  `(ast2:aget ,s 4))
+  `(ast2stackrecord.target ,s))
+
 (macro ast2:stackrecord-targetslot (s)
-  `(ast2:aget ,s 5))
+  `(ast2stackrecord.targetslot ,s))
 
 (macro ast2:cntrecord-listp (s)
-  `(not (ast2:aget ,s 0))
+  `(not (ast2cntrecord.C ,s)))
 
 (macro ast2:stackrecord-tpl (s)
-  `(ast2:aget ,s 2))
+  `(ast2stackrecord.tpl ,s))
 
-(function ast2:cntrecord-dst (r)
-  (ast2:aget r 1))
+(macro ast2:cntrecord-dst (r)
+  `(ast2cntrecord.d ,r))
 
-(function ast2:cntrecord-src (r)
-  (ast2:aget r 2))
+(macro ast2:cntrecord-src (r)
+  `(ast2cntrecord.s ,r))
 
-(function ast2:cntrecord-targetslot (r)
-  (if (ast2:aget r 0)
-      (ast2:aget r 3)
-      nil))
+(macro ast2:cntrecord-targetslot (r)
+  `(ast2cntrecord.p ,r))
 
 (macro ast2:stackrecord-cnt (s)
-  `(ast2:aget ,s 3))
+  `(ast2stackrecord.cnt ,s))
 
 ;; Expand the format macro in the current local context
 (macro ast2:transform_listform (dst frmt tp)

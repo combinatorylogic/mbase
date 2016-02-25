@@ -133,10 +133,20 @@
 
 (set-car! int->byte-hook int->byte)
 
+(function int->ibytes (d)
+   (let* ((ba (not.neth ((object d))
+                (a = (System.BitConverter @ GetBytes ((System.Int32)d)))
+                (leave ((object)a))))
+          (bl (a->l ba)))
+     (foreach-map (b bl)
+       (not.neth ((object b))
+         (bb = ((Byte)b))
+         (ib = ((Int32)bb))        
+         (leave ((object)ib))))))
+
 (function intbytelist (data)
   (foreach-mappend (d data)
-    ;;;TODO!
-    `(,d 0 0 0)))
+     (int->ibytes d)))
 
 (macro not.staticdata (name type . data)
   ("Initialise a static data array. Only byte and int types are allowed.")
