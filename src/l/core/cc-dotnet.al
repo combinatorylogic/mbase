@@ -324,7 +324,18 @@
         `((Castclass ,t_Pair)
           (Ldfld ,_cdr_fld)))
 
+       (SetCar
+        `((Stfld ,_car_fld)))
+       (SetCdr
+        `((Stfld ,_cdr_fld)))
+       
+       (CastPair
+        `((Castclass ,t_Pair)))
+
        (Cons `((Newobj ,mtd_Cons)))
+       (Cons1 `((Newobj ,mtd_Cons1)))
+       (Cons0 `((Newobj ,mtd_Cons0)))
+       
        (BinOp `((,op)))
        (IntBox `((Box ,t_Int32)))
        (IntUnbox `((Unbox ,t_Int32) (Ldind_I4)))

@@ -214,6 +214,7 @@
                    `(,tg (pop_stack_with (listnode_complete)))))
              (add next)
              `(push_stack_run
+               1
                (thisnodesrc)
                (make_list_collector)
                ((list_continuation_record ,ref
@@ -273,6 +274,7 @@
                           `((debugmessage (ast2-debugmsg-node ENTERING-NODE))
                             ,@(if tag `((debugmessage (list 'TAG: (quote ,tag)))))))
                     (push_stack_run
+                     ()
                      ;; Saving the current node source
                      (thisnodesrc)
                      ;; Create a new node tuple to be filled by the
@@ -436,7 +438,7 @@
 ;; This pass lowers node_switch and variant_switch into generic switches,
 ;; replaces node labels with numbers, inserts some error handling, and defines
 ;; visitor machine variables (stack, next node id, thisnode, thisnodesrc, etc.)
-(function visitor-lower-further (src)
+(function visitor-lower-further (lfsrc? src)
  (let* ((xmap (visitor-get-nodemap src))
         (xtmap (visitor-get-dsttagmap src)))
  (with-syms (nodeentry nextnodevar thisnodesrc thisnode stackid
@@ -457,7 +459,7 @@
                      (node (ast2:thisnodeval (thisnode)))
                      (alt-mknode ast2)
                      ;; TODO: remove the backend details from here
-                     (ast-current-metadata (ast2:get_metadata (thisnodesrc)))
+                     (ast-current-metadata (ast2:get_metadata_1 ,lfsrc? (thisnodesrc)))
                      )
 
        (let ((,nextnodevar   (make_label ,(xmap srctp)))
@@ -518,7 +520,7 @@
      (get_tagged_tuple `(get_tagged_tuple ,e ,id))
      (get_tuple        `(get_tuple ,e ,id))
 
-     (push_stack_run   `(push_stack_run (var ,stackid) (var ,target)
+     (push_stack_run   `(push_stack_run ,listnd (var ,stackid) (var ,target)
                                         (var ,targetslot)
                                         ,nod ,tpl ,deep ,cnt ,runner))
      (nil              `(nil))

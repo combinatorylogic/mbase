@@ -1,4 +1,4 @@
-(function trajan (g v0)
+(function tarjan (g v0)
   (let* ((g.l (mkhash)) (g.i (mkhash))
          (myval (fun (x)
                   (if (null? x) -1 x)))

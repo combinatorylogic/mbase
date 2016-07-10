@@ -22,8 +22,7 @@ function prolog_codegen(b)
         intros -> 'let'(map v in vars do
                          [v;'prolog_alloc_cell'('prolog_environment')],
                         body)
-      | unify -> 'if'('prolog_unify'('prolog_environment',a,b),tr,
-                      'prolog_failure'('prolog_environment'))
+      | unify -> 'if_prolog_unify'(a,b,tr)
       | choose ->
          'prolog_choice_point'('prolog_environment',
                                'prolog_continuation',
@@ -36,8 +35,15 @@ function prolog_codegen(b)
       | proceed -> '_prolog_call_wrapper'('prolog_continuation'('prolog_environment'))
       };
       deep calltgt: fun(next) {
-        [ '_prolog_call_function'; %Sm<<("_prolog_function_", fn);
-          'prolog_environment'; next ;@a ]
+        match fn with
+           'equals/2' -> {
+              match next with 
+                'fun'(x, cnt) ->
+                    'if_prolog_unify'(@a,cnt)
+              | else -> 'if_prolog_unify'(@a, 'prolog_continuation'('prolog_environment'))}
+         | else -> 
+            [ '_prolog_call_function'; %Sm<<("_prolog_function_", fn);
+              'prolog_environment'; next ;@a ]
       };
       deep callarg {
         var -> id
@@ -219,6 +225,11 @@ function prolog_unify(env, a, b) {
   ret = prolog_unify_inner(env, a,b);
   return ret;}
 
+macro if_prolog_unify(a, b, body) {
+  #`(if (prolog_unify prolog_environment ,a ,b)
+        ,body
+        (prolog_failure prolog_environment))}
+
 % "Translate the backend internal term representation
    into the source AST form"
 function prolog_decode_result_inner(varenv, v, vis) {
@@ -381,6 +392,48 @@ function %_prolog_function_weak/1 (env, cnt, dst) {
        cnt(env)
     else prolog_failure(env)
   } else prolog_failure(env)}}
+
+
+\pfcode{
+function list_to_prolog(env, lst) {
+   do loop (l = lst) {
+      match l with
+        hd: tl -> {
+           ltl = loop(tl);
+           prolog_alloc_struct(env, 'cons/2', [hd; ltl])}
+      | [] -> prolog_alloc_struct(env, 'nil/0', [])}}}
+
+\pfcode{
+function %_prolog_function_weak_to_list/2(env, cnt, wn, dst) {
+  d1 = prolog_deref(wn);
+  d2 = prolog_deref(dst);
+  match d1 with
+     weak(@lst) -> {
+        l1 = list_to_prolog(env, lst);
+        prolog_unify(env, dst, l1);
+        cnt(env)}
+  | else -> prolog_failure(env)}}
+
+\pfcode{
+function prolog_to_list(env, l0) {
+   do loop(l = l0) {
+      x = prolog_deref(l);
+      match x with
+         str('cons/2', hd0, tl0) -> hd0 : loop(tl0)
+      |  str('nil/0') -> []
+      |  else -> ccerror('PROLOG_TO_LIST'())}}}
+
+\pfcode{
+function %_prolog_function_weak_reset/2(env, cnt, wn, src) {
+  d1 = prolog_deref(wn);
+  d2 = prolog_deref(src);
+  match d2 with
+     weak(@x) -> {
+        nw = cons('weak', prolog_to_list(env, d1));
+        %set-car!(d2, 'ref');
+        %set-cdr!(d2, nw);
+        cnt(env)}
+  | else -> prolog_failure(env)}}
 
 \subsection{Backend-specific query compilation}
 

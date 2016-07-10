@@ -26,6 +26,7 @@ syntax in expr, bin1:
   `hashget( \l\ , \r\ )`
 }
 
+
 syntax in expr, bin1:
   ' [basicexpr]:l "/!" [expr]:i "<-" [expr]:r '
 {
@@ -476,3 +477,17 @@ macro bitpack_macro(bits, es) {
            if(prev) #`(+ ,prev ,c) else c}, [], poss)
 }
 
+-----------------
+
+
+syntax in expr, start: ' aif "(" [qident]:id "=" [expr]:e ")" [expr]:tr
+                         (else [expr]:fl)? '
+{
+    vid = 'var'(id);
+    if (fl) {
+       cfl = car(fl);
+       return `{ \id\ = \e\; if (\vid\) \tr\ else \cfl\}`
+    } else {
+       return `{ \id\ = \e\; if (\vid\) \tr\}`
+    }
+}

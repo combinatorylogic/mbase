@@ -81,6 +81,12 @@
     (Car <expr:arg>)
     (Cdr <expr:arg>)
     (Cons <expr:a> <expr:b>)
+    (Cons1 <expr:a>)
+    (Cons0)
+    
+    (SetCar <expr:dst> <expr:e>)
+    (SetCdr <expr:dst> <expr:e>)
+    (CastPair <expr:v>)
 
     (GotoNull <expr:a> <label:lbl>)
     (GotoPairP <expr:a> <label:lbl>)

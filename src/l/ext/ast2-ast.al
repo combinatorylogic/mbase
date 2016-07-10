@@ -137,6 +137,7 @@
                   (node_switch <*nodeident:ids> . <*switchentry:es>)
                   (variant_switch <varswitchids:ids> . <*switchentry:es>)
                   (push_stack_run
+                                  <bool:listnd>
                                   <visitorcode:nod>
                                   <visitorcode:tpl>
                                   <*visitorcode:deep>
@@ -231,7 +232,8 @@
     (get_tagged_tuple      <expr:e> <number:f>)
     (get_tuple             <expr:e> <number:f>)
 
-    (push_stack_run <expr:stk> <expr:target> <expr:targetslot>
+    (push_stack_run <bool:listnd>
+                    <expr:stk> <expr:target> <expr:targetslot>
                     <expr:n> <expr:t> <*expr:deep> <expr:cnt> <label:runner>)
     (set_target     <expr:dst> <expr:slot> <expr:v>)
     (goto           <labelident:dst>)

@@ -61,6 +61,14 @@ namespace Meta.Scripting
     {
       car = a; cdr = b;
     }
+    public Pair(Object a)
+    {
+      car = a; cdr = null;
+    }
+    public Pair()
+    {
+      car = null; cdr = null;
+    }
 
     public override string ToString()
     {

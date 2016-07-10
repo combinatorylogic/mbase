@@ -1,0 +1,108 @@
+% literate:
+
+\pfsysdllref{"MBaseLogic"}
+
+\section{Generic type propagation}
+
+User must provide typing rules for each intrinsic. E.g.: $$x=add(l,r) \to \{T_x = T_l = T_r\}.$$
+
+This can be used for propagating types missing from GEP and $\varphi$ nodes, as well as for typing all the nodes.
+
+\pfcode{
+function genssa2_intrinsic_equations(lenv, env, eqadd, dstreg, dst, args) {
+  eqnmaker = ohashget(env, '*type-equation-maker*');
+  if (eqnmaker) {
+     eqn = eqnmaker(dst);
+     if (eqn) eqn(lenv, eqadd, dstreg, dst, args)}}}
+
+\pfcode{
+function genssa2_make_boolean_type(env) {
+  btype = ohashget(env, '*boolean-type*');
+  if (btype) btype else 'var'('boolean')}}
+
+\pfcode{
+function genssa2_make_type_maker(lenv, env) {
+  tmaker = ohashget(env, '*type-maker*');
+  if (tmaker) fun(t) tmaker(lenv, t) else fun(tp) 'var'(gensym())}}
+
+\pfcode{
+function genssa2_make_ctype_maker(lenv, env) {
+  tmaker = ohashget(env, '*ctype-maker*');
+  if (tmaker) fun(t, c) tmaker(lenv, t, c) else fun(tp,vl) 'var'(gensym())}}
+
+\pfcode{
+function genssa2_type_equations(env, lenv, src)
+collector(eqadd, eqsget) {
+  booltp = genssa2_make_boolean_type(env);
+  mktype = genssa2_make_type_maker(lenv, env);
+  mkctype = genssa2_make_ctype_maker(lenv, env);
+  aeq(l, r) = eqadd('equals'(l, r));
+  aeqv(l, r) = eqadd('equals'('var'(l), r));
+  visit:genssa2(top: src) {
+     deep top { f -> aeqv('*return*', mktype(ret)) };
+     deep argpair: aeqv(name, mktype(t));
+     deep oppair: op(name);
+     deep phiarg(dstreg) { a -> aeqv(dstreg, v)};
+     deep switchdst: v;
+     deep iop(dstreg) {
+        phi -> iter a in args do a(dstreg)
+      | select -> {aeqv(dstreg, t); aeqv(dstreg, f)}
+      | call -> genssa2_intrinsic_equations(lenv, env, eqadd, dstreg, dst, args)};
+     deep term {
+        brc -> aeq(c, booltp)
+      | switch -> iter n in ns do aeq(v, ns)
+      | else -> []};
+     deep expr {
+        var -> 'var'(id)
+      | glob -> 'var'(id)
+      | const -> mkctype(t,v)
+      | other -> mkctype(t,v)}};
+  return eqsget()}}
+
+\pfcode{
+function genssa2_eqn_to_prolog(e0)
+  do loop(e = e0) {
+    match e with
+      'var'(nm) -> 'var'(nm)
+      // A clumsy way to separate 'foo()' from 'foo'
+    | [one] -> 'term'(%Sm<<("tp__",one), 'term'('tpx__dummy'))
+    | 'equals'(l,r) -> 'term'('equals', loop(l), loop(r))
+    | [tg;@args] -> 'term'(%Sm<<("tp__",tg), @map a in args do loop(a))
+    | else -> 'term'(%Sm<<("tp__", e))}}
+
+\pfcode{
+parser prologtmp (prologlex) {
+   prologtmp := {"tp__" [constident]:id => id}
+             / {[constident]:id => wtf(id)};}}
+             
+\pfcode{
+function genssa2_prolog_to_type(d) {
+  s(id) =
+    { t = %S<<(prolog_strip_id(id));
+      parse t as prologtmp};
+  
+  do loop(e = d) {
+     match e with
+         'var'(id) -> '*type-var*'(id)
+       | 'term'(id, 'term'('tpx__dummy/0')) -> [s(id)]
+       | 'term'(id) -> s(id)
+       | 'term'(id, @args) -> [s(id);@map(loop, args)]}}}
+
+\pfcode{
+function genssa2_solve_type_equations(env, lenv, eqns) {
+   prolog = map e in eqns do genssa2_eqn_to_prolog(e);
+   result = prolog_backend_driver(
+                ['query'(@prolog)],
+                %read-compile-eval ,
+                []);
+   match result with
+      num:varmap:nextfn -> {
+         dvars = map [nm;d] in varmap do {
+            return [nm; genssa2_prolog_to_type(d)]};
+         ht = mkhash();
+         iter [nm;d] in dvars do ohashput(ht, nm, d);
+         return ht}
+   | else -> mkhash() // Failed to type
+}}
+
+%%%%%%%%%%%%%

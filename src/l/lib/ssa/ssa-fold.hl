@@ -1,57 +1,305 @@
 % literate:
 
+\section{Rationale}
+
+Many DSLs expose the same core semantics --- there is a control flow, possibly with loops, and there is either
+an imperative destructive assignment or already an equivalent of an SSA or a CPS data flow. Details may differ
+though, which makes it impossible to reuse a powerful optimisation backend such as LLVM, if there is a significant
+semantic mismatch between a DSL and LLVM IR.
+
+Yet, there is a lot of optimisation and analysis passes that do not need any low level details. They can operate
+on a highly abstract IR which only exposes a control flow, an SSA and some abstract "operations" (or "intrinsics"),
+for a further classification of which (if operation is pure, if it is abelian, etc.) a DSL frontend may provide a
+feedback.
+
+The abstract transforms that are possible on a generalised IR include, but not limited to:
+
+\begin{itemize}
+\item Constant folding, given that a concrete DSL frontend is providing evaluators for all of the pure intrinsics.
+\item Agressive dead code elimination, using the constant folding information. Includes redundant $\varphi$
+loops elimination.
+\item Control flow simplification, \verb|if|--to--\verb|select| conversion.
+\item Branch constraint folding
+\item Transforms based on a loop analysis:
+\begin{itemize}
+ \item Loop invariant motion
+ \item Loop induction variable detection
+ \item Strength reduction, if a DSL frontend provides a suitable cost model
+ \item In-loop and out of a loop constraints (potentially reducing to a constant folding)
+ \item Iteration dependency analysis, with a help from a DSL frontend model
+\end{itemize}
+\item Common subexpression elimination and a global value numbering.
+\item Algebraic transforms, also relying on an algebra model of a DSL frontend.
+\item Constraint propagation (abstract interpretation).
+\end{itemize}
+
+This may be useful well beyond the scope of low level languages, where SSA registers represent simple values
+and intrinsics are all simple arithmetic or logic operations. For example, structure composition and decomposition
+operations (for immutable structures) can also be handled on this abstract level, as well as string operations
+and many more. Same backend may also be used for an Array-SSA and other higher level forms.
+
+All that is required from a DSL implementation in order to enjoy the SSA-based optimisations is to implement a
+transformation from this DSL IR into genssa2 and vice versa, and to provide a {\sl model} defining the intrinsics
+behaviour and contraints. Also, a transformation into an SSA form must be done prior to all the genssa2 based
+optimisations, using a different abstract IR, genssa.
+
 \section{A higher level generic SSA representation}
 
 This representation is suitable for doing generic SSA--based transformations,
-like constant folding, DCE, partial application, etc.
+like constant folding, DCE, CSE, partial application, etc.
 
 All the target-specific operations are represented as intrinsic calls.
 User must provide the intrinsic hooks and annotate explicitly the const calls.
+
+By convention, entry basic block is always called ``\verb|entry|''.
 
 \pfcode{
 ast genssa2 {
   top = f(globident:nm, type:ret, *argpair:args, code:body);
   code is (.*bblock:bs);
+  argpair is (type:t, ident:name);
   bblock =
     b(labident:name, *oppair:ops, term:t);
   oppair is (varident:name, iop:op);
   iop = phi(.*phiarg:args)
-      | call(*attr:a, expr:dst, .*expr:args)
+      | select(expr:cnd, expr:t, expr:f)
+      | call(*attr:a, iident:dst, .*expr:args)
       ;
+  switchdst is (expr:v, labident:l);
   term = br(labident:dst)
        | brc(expr:c, labident:tr, labident:fl)
-       | switch(expr:v, labident:d, .*labident:ns)
+       | switch(expr:v, labident:d, .*switchdst:ns)
+       | none()
        ;
   expr = var(varident:id)
        | glob(globident:id)
-       | arg(argident:id)
        | const(type:t, any:v)
+       | other(type:t, any:v)
        ;
+  phiarg = a(labident:src, expr:v);
+  attr = constcall() | sideeffects() | intrinsic() | external();
   varident is id:v;
   labident is id:v;
 }}
 
-Please note that alloca, load and store are missing. They are supposed to be intrinsics too, if needed at all (e.g., an MBase backend won't need
-any of those after an SSA--transform).
-
-Generic constant folding:
-
-- Build a value dependency graph, annotated with the value properties
-- Propagate properties, using the following rules
-  - A constant function applied to all constant arguments yields a constant value
-  - A phi loop with only constant inputs and a constant bound yields a constant value (needs loop analysis data)
-  - Side effect instructions are marked so
-  - Loops not containing side effects are marked so
+Please note that alloca, load and store are missing. They are supposed to be intrinsics too, if needed at all (e.g., an MBase backend won't need any of those after an SSA--transform).
 
 
+\subsection{Genssa2 utility functions}
+
+In order to do the loop analysis, we may need to lower genssa2 to genssa.
+
+\pfcode{
+function genssa2_to_genssa(src) {
+   egetvar(e) = visit:genssa2(expr:e) {
+      once expr { var -> id | else -> '*none*' }};
+   getvars(op) = collector(add, get) {visit:genssa2(iop:op) {
+      deep expr { else -> add(egetvar(node)) }};
+      return get()};
+   visit:genssa2(top: src) {
+      deep top {
+         f -> body};
+      deep bblock {
+         b -> { <[t1;t2]> = t(name); 'b'(name, ops::t1, t2)}};
+      deep oppair: [name;op(name)];
+      deep iop(dstreg) {
+         phi -> 'phi'(dstreg, map(car, args),
+                      map a in args do egetvar(cadr(a)))
+       | else -> 'use'(@getvars(node))};
+      deep term(nm) {
+         br -> [[]; [dst]]
+       | brc -> [[[nm;'use'(egetvar(c))]];[tr;fl]]
+       | switch -> [[[nm;'use'(egetvar(v))]];[d;@ns]]
+       | none -> [[];[]]};
+      deep switchdst: l;
+      deep phiarg { a -> [src;v] }}}}
+     
+
+\pfcode{
+function genssa2_loops(src) {
+   gen1 = genssa2_to_genssa(src);
+  <[vmap;ngen;DT]> = ssa_transform(gen1, []);
+   loops = ssa_find_loops(ngen, DT);
+   return loops}}
+
+\pfcode{
+function depgraph_todot(g) {
+   println("digraph X { node [shape=record];");
+   iter (f:ts) in g do {
+     iter t in ts do
+        println(%S<<(t," -> ",f,";"));
+   };
+   println("}");println("");}
+
+function printgenssa2(g) {
+   visit:genssa2(top:g) {
+     deep top {
+        f -> { println(%S<<("FUN: ", nm, " ", ret, "[", args, "]"));
+               iter b in body do println(b) }};
+     deep oppair: %S<<(name, " = ", op);
+     deep bblock {
+        b -> %S<<(name, ":",
+                  foldl( fun(l,r) %S<<(l,"\n   ", r), "", ops),
+                  "\n\n   ", t)}}}}
+
+\pfcode{
+%"Check if intrinsic is pure"
+function genssa2_is_pure(env, id) {
+   if(id) {
+     aif (chk = ohashget(env, id)) {
+       return chk('purep')} else []}}}
 
 
+\pfcode{
+%"Algebraic classification of an intrinsic"
+function genssa2_classify(env, id) {
+   if (id) {
+      aif(chk = ohashget(env, id)) return chk('classify') else []}}}
+
+\pfcode{
+%"Check if value is phi or pure"
+function genssa2_is_value_pure(env, v) 
+  visit:genssa2(iop: v) {
+    deep iop {
+       phi -> true
+     | select -> true
+     | call -> genssa2_is_pure(env, dst)}}}
 
 
+\pfcode{
+%"Cache the definition origin bblocks"
+function genssa2_cache_origs(src) {
+  oright = mkhash();
+  visit:genssa2(top: src) {
+      deep bblock {
+        b -> iter o in ops do o(name)};
+      deep oppair:
+        fun(bb) ohashput(oright, name, bb)};
+  return oright}}
+
+\pfcode{
+%"Helper function: get exits for a given basic block"
+function genssa2_get_exits(bb) collector(add, get) {
+ getexits(term) = visit:genssa2 (term: term) {
+    deep labident: add(node)};
+ visit:genssa2 (bblock: bb) {
+    deep term { else -> getexits(node) }};
+ return get()}}
+
+\pfcode{
+function genssa2_cache_cfg(src) {
+   cfg = mkhash(); bbs = mkhash();
+   visit:genssa2(top: src) {
+      once bblock {
+         b -> {ohashput(bbs, name, node);
+               ohashput(cfg, name, genssa2_get_exits(node))}}};
+   return [cfg;bbs]}}
 
 
+\section{External language interface}
+
+A language environment is a hash table with the following entries:
+
+\begin{itemize}
+\item \verb|*true?*| --- a function that checks if a constant is true
+\item \verb|*numeric-value*| --- a function that returns a numeric value of a constant suitable for a switch index
+\item Any other entry --- an intrinsic function id, holding a dispatch function with the following possible argument values:
+  \begin{itemize}
+     \item \verb|constantp| --- true if this intrinsic value is constant if its arguments are constant
+     \item \verb|evalfun| --- for the constant intrinsics, an evaluation function taking a list of constant arguments
+     \item \verb|assocp| --- if a binary operation is associative
+     \item \verb|distribp| --- if a binary operation is distributive
+     \item \verb|isincrement| --- if a binary operation is incrementing its first argument by the constant second argument value
+     \item \verb|isdecrement| --- if a binary operation is decrementing its first argument by the constant second argument value
+     \item \verb|isbounds| --- if a binary operation is defining a boundary for its first argument by the constant second argument
+     \item \verb|iscmp| --- if a binary operation is a comparison
+     \item \verb|changeorderfun| --- if available, a function that changes an order of a arguments for
+         a non--associative binary operation (e.g., makes $>=$ from $<$).
+     \item \verb|purep| --- true if does not have any side effects (memory writes, etc.)
+  \end{itemize}
+\end{itemize}
+
+It would make more sense to define a DSL for populating such an environment.
+
+\phcode{litinclude ("./ssa-fold-eval") "./ssa-fold-eval.hl"}
+\input{\docpath/ssa-fold-eval}
+
+\phcode{litinclude ("./ssa-fold-dce") "./ssa-fold-dce.hl"}
+\input{\docpath/ssa-fold-dce}
+
+\phcode{litinclude ("./ssa-fold-select") "./ssa-fold-select.hl"}
+\input{\docpath/ssa-fold-select}
+
+\phcode{litinclude ("./ssa-fold-cfg") "./ssa-fold-cfg.hl"}
+\input{\docpath/ssa-fold-cfg}
+
+\phcode{litinclude ("./ssa-fold-algebra") "./ssa-fold-algebra.hl"}
+\input{\docpath/ssa-fold-algebra}
+
+\phcode{litinclude ("./ssa-fold-branch") "./ssa-fold-branch.hl"}
+\input{\docpath/ssa-fold-branch}
+
+\phcode{litinclude ("./ssa-fold-loops") "./ssa-fold-loops.hl"}
+\input{\docpath/ssa-fold-loops}
+
+\phcode{litinclude ("./ssa-fold-typing") "./ssa-fold-typing.hl"}
+\input{\docpath/ssa-fold-typing}
 
 
+\section{Interface}
+
+\pfcode{
+%"All the abstract SSA steps together"
+function genssa2_process_iter(modenv, src0) {
+   do loop(src = src0) {
+      chgp = mkref([]);
+      
+      // 1. Iterative fold and kill.
+      src1 = genssa2_fold_and_kill(modenv, src, chgp);
+      // 2. Handle the loose phi loops
+      src2 = genssa2_dce_phi(modenv, src1, chgp);
+      // 3. Rewrite eligible phis as selects
+      src3 = genssa2_detect_selects(modenv, src2, chgp);
+      // 4. Clean up CFG
+      src4 = genssa2_merge_basic_blocks(src3, chgp);
+
+      // 5. Move loop invariants
+      src5 = genssa2_loop_invariants(modenv, src4, chgp);
+
+     <[cache;inds]> = genssa2_induction(modenv, src5);
+      if (inds) {
+         tmp1 = genssa2_loop_exits(modenv, cache, inds, src5);
+      };
+
+      src6 = genssa2_analyse_conditions(modenv, src5, chgp);
+
+      // TODO:
+      //
+      // - Branch constraint folding
+      // - CSE and GVN
+      // - Loop unswitching
+      // - Value sinking
+      // - Loop induction variable analysis:
+      //   - Constant exit value folding
+      //   - Bounds analysis
+      //     - Constant-bound loop unrolling
+      //     - Dead loop elimination (reducible loop with only
+      //       pure actions and no external uses)
+      //   - Strength reduction
+      // - Instcombine
+      // 
+
+      // 6. Rince and repeat
+      if (^chgp) loop(src6) else src6}}}
+
+
+\pfcode{
+function genssa2_process(modenv, env, src) {
+   ret = genssa2_process_iter(modenv, src);
+   teq = genssa2_type_equations(modenv, env, ret);
+   th = genssa2_solve_type_equations(modenv, env, teq);
+   return th:ret;
+}}
 
 
 %%%%%%%%%

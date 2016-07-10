@@ -112,6 +112,7 @@
           (p:match (car res)
             ((pltexstring $cstr)
              (fprint outfile cstr))
+            ((plqhexpr $e) nil)
             (else
              (begin
                (fprint outfile "\\pfcodeblockbegin{}")

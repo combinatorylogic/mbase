@@ -1,0 +1,111 @@
+% literate:
+
+\section{Tree--form representation of expressions}
+
+\pfcode{
+ast genssa2tree : genssa2 () {
+   expr += op(iop:e)
+        |  indvar(ident:id, loopident:l)
+        |  rec();}}
+
+\pfcode{
+function genssa2_describe_simple(env, defs, e) {
+   vis = mkhash();
+   subst(r0) =
+      do loop(r = r0) {
+           if (ohashget(vis, r)) 'var'(r)
+           else {
+             ohashput(vis, r, r);
+             df = ohashget(defs, r);
+             if (df) {
+                   nop = visit:genssa2(iop: df) {
+                      deep iop {
+                         phi -> []
+                       | call ->
+                            if (genssa2_is_value_pure(env, node)) node
+                            else []
+                       | else -> node};
+                      deep expr {
+                         var -> loop(id)
+                       | else -> node}};
+                   if (nop) return 'op'(nop)
+                       else return 'var'(r)}
+                else 'var'(r)}};
+   visit:genssa2(expr: e) {
+      deep expr {
+           var -> subst(id)
+         | else -> node}}}}
+
+\section{Abstracted algebraic representation of expressions}
+
+Some of the passes may benefit from an abstract algebraic form of expressions, provided by the
+external language interface.
+
+The algebraic language is following:
+
+\pfcode{
+ast genssa2alg {
+   aexpr =
+         // Arithmetic or alike
+           add(srcop:op, aexpr:l, aexpr:r)
+         | mul(srcop:op, aexpr:l, aexpr:r)
+         | div(srcop:op, aexpr:l, aexpr:r)
+         | mod(srcop:op, aexpr:l, aexpr:r)
+         | neg(srcop:op, aexpr:l)
+         | sub(srcop:op, aexpr:l, aexpr:r)
+
+         // Ordering and comparison
+         | eq(srcop:op, aexpr:l, aexpr:r)
+         | neq(srcop:op, aexpr:l, aexpr:r)
+         | gr(srcop:op, aexpr:l, aexpr:r)
+         | ge(srcop:op, aexpr:l, aexpr:r)
+         | lt(srcop:op, aexpr:l, aexpr:r)
+         | le(srcop:op, aexpr:l, aexpr:r)
+
+         // Abstract
+         | additive(srcop:op, aexpr:l, aexpr:r)
+         | multiplicative(srcop:op, aexpr:l, aexpr:r)
+         | zero(any:c)
+         | one(any:c)
+         | true(any:c)
+         | false(any:c)
+
+         // Flow
+         | select(aexpr:c, aexpr:l, aexpr:r)
+
+         // Bail-out
+         | fail(expr:e)
+
+         // Atoms
+         | var(ident:id)
+         | const(any:c)
+         ;
+}}
+
+\pfcode{
+function genssa2_to_algebraic(env, v) {
+   visit:genssa2tree(expr: v) {
+      deep iop {
+         select -> 'select'(cnd, t, f)
+       | call -> {
+            cls = genssa2_classify(env, dst);
+            if (cls) {
+              return [cls; dst; @args]
+            } else 'fail'('op'(node))}
+       | else -> 'fail'('op'(node))};
+      deep expr {
+         op -> e
+       | var -> 'var'(id)
+       | const -> 'const'(node)
+       | else -> 'fail'(node)}}}}
+
+\pfcode{
+function genssa2_from_algebraic(env, av) {
+   visit:genssa2alg(aexpr: av) {
+      deep aexpr {
+         var -> 'var'(id)
+       | const -> c
+       | else -> [] //TODO!
+      }}}}
+
+%%%%%%%%%%%%

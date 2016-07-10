@@ -28,10 +28,10 @@
          (l3 (visitor-inject-listnodes l2))
          (l4 (visitor-refine-else (visitor-backend-prepare l3)))
          (l5 (visitor-backend-lowering l4))
-         (l6 (visitor-lower-further (visitor-populate-varids l5)))
          (opts (visitor-get-options l5))
          (lfsrc (ohashget opts 'listform_src))
          (lfdst (ohashget opts 'listform_dst))
+         (l6 (visitor-lower-further lfsrc (visitor-populate-varids l5)))
          (l7 (visitor-backend-mbase lfsrc lfdst l6)))
     (return l7)))
 

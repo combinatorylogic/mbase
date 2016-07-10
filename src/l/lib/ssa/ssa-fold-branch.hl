@@ -1,0 +1,134 @@
+% literate:
+
+\section{Constant--folding the branch constraints}
+
+If a conditional branch is taken, and a condition was a simple function of one register (with all other values
+   being constant, for now, later we can look at following other invariants), and the function is reversible,
+   the value of that register in all the basic blocks dominated by the branch target block can be folded to a
+   constant (or, later, a function of invariants).
+
+
+We have to solve an equation $A = C$, where $A$ is an arbitrary algebraic expression containing no failures
+and only one register, and $C$ is a constant. We can get there by iteratively rewriting an equation.
+
+\pfcode{
+function genssa2_is_reversible(env, alg) {
+   consteq(v, c, rev) =
+   do consteq(v=v,c=c,rev=rev) {
+      match v with
+         'var'(id) -> [id;c]
+       | 'add'(op, l, 'const'(c1)) ->
+            consteq(l, 'sub'([], c, 'const'(c1)), rev)
+       | 'add'(op, 'const'(c1), l) ->
+            consteq(l, 'sub'([], c, 'const'(c1)), rev)
+       | else -> []};
+   matcheq(a, rev) = {
+      match a with
+         'eq'(op, x, 'const'(c)) -> consteq(x, 'const'(c), rev)
+       | else -> []};
+   matchneq(a, rev) = {
+      match a with
+         'neq'(op, x, 'const'(c)) -> consteq(x, 'const'(c), rev)
+       | else -> []};
+   do rev(a = alg) {
+      match a with
+         'eq'(op, x, 'true'(@_)) -> matcheq(x, rev)
+       | 'eq'(op, x, 'false'(@_)) -> matchneq(x, rev)
+       | else -> []
+   }}}
+
+\pfcode{
+function genssa2_algebraic_eligible(env, alg)
+collector(vadd, varget) {
+   isok = mkref(true);
+   visit:genssa2alg(aexpr: alg) {
+      deep aexpr {
+         var -> vadd(id)
+       | fail -> {isok := []}
+       | else -> []}};
+   return ^isok && (length(varget())==1)}}
+
+\pfcode{
+function genssa2_analyse_conditions(env, src, chgp)
+collector(cndadd, cndget) {
+   // 0. Preparations
+  <[cfg;bbs]> = genssa2_cache_cfg(src);
+   defs = genssa2_cache_defs(src);
+   domtree = graph_dominators(cfg, 'entry');
+   domrev = mkhash();
+   hashiter(fun(k, vs) {
+        iter v in vs do
+            ohashput(domrev, v, unifiq(k:ohashget(domrev, v)))
+     }, domtree);
+
+   // 1. Collect potentially eligible conditional expressions
+   is_simple(e) =
+      visit:genssa2tree(expr: e) {
+         once expr {
+            op -> []
+          | else true}};
+   check_condition(bb, c, dsts) = {
+      // TODO:
+      e0 = genssa2_describe_simple(env, defs, c);
+      ae = genssa2_to_algebraic(env, e0);
+      if (genssa2_algebraic_eligible(env, ae))
+      iter [d;lb] in dsts do {
+         chk = genssa2_is_reversible(env, 'eq'([], ae, d));
+         if (chk) {
+           <[reg; avl]> = chk;
+            vl = genssa2_from_algebraic(env, avl);
+            if (vl) {
+              if(is_simple(vl)) {
+                cndadd('rewrite'(reg, [], lb, vl));
+              } else {
+                newnm = gensym(); // TODO: meaningful?
+                cndadd('rewrite'(reg, newnm, lb, vl))
+              }}}}};
+   mkconst(e) = visit:genssa2 (expr:e) {
+      once expr {
+         const -> 'const'(node)
+       | else ->
+          ccerror('SWITCH-CONDITION-NOT-CONSTANT'(node))}};
+   visit:genssa2 (top: src) {
+      deep term(bb) {
+         brc -> check_condition(bb, c, [['true'([]); tr]; ['false'([]); fl]])
+       | switch -> check_condition(bb, v, ns)
+       | else -> []};
+      deep switchdst: [mkconst(v); l];
+      deep bblock { b -> t(name) }};
+      
+   // 2. Rewrite condition register values in the dominated blocks
+   ndefs = mkhash(); rewrt = mkhash();
+   addrw(bb, nm, vl) = {
+      ht = {aif (chk  = ohashget(rewrt, bb)) chk
+            else {
+              ht = mkhash();
+              ohashput(rewrt, bb, ht);
+              return ht}};
+      ohashput(ht, nm, vl)};
+   addrewrite(bb, nm, vl) = {
+      dominated = ohashget(domrev, bb);
+      iter d in dominated do
+         addrw(d, nm, vl)};
+   iter rewrite(reg, newnm, bb, vl) in cndget() do
+      if (newnm) {
+         ohashput(ndefs, bb, [newnm; vl]:ohashget(ndefs, bb));
+         addrewrite(bb, reg, 'var'(newnm));
+      } else addrewrite(bb, reg, vl);
+   rewritebb(ht, bb) =
+      visit:genssa2(bblock: bb) {
+         deep expr {
+            var -> {chk = ohashget(ht, id);
+                    if(chk) { chgp := true; chk} else node}
+          | else -> node}};
+   return visit:genssa2 (top: src) {
+      deep bblock {
+        b -> {
+           nw = ohashget(ndefs, name);
+           rwht = ohashget(rewrt, name);
+           if (nw) chgp := true;
+           if (rwht) rewritebb(rwht, mk:node(ops = nw::ops))
+           else mk:node(ops = nw::ops)}}}}}
+
+
+%%%%%%%%%%%%%%

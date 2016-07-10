@@ -77,10 +77,15 @@
       (Car <expr:e>)
       (Cdr <expr:e>)
       (Cons <expr:a> <expr:b>)
+      (Cons1 <expr:a>)
+      (Cons0)
+      
       (NullP <expr:a>)
       (PairP <expr:a>)
       (Not <expr:a>)
       (Eqv <expr:a> <expr:b>)
+      (SetCar <expr:dst> <expr:e>)
+      (SetCdr <expr:dst> <expr:e>)
 
       (IfNull <expr:e> <expr:iftr> <expr:iffl>)
       (IfPair <expr:e> <expr:iftr> <expr:iffl>)

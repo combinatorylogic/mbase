@@ -1,0 +1,285 @@
+% literate:
+
+\section{$\varphi$ to select}
+
+Select can be easier to reason about than $\varphi$.
+
+We will temporarily convert $\varphi$ nodes to select if it is possible to infer a
+single simple logical expression that defines all the $\varphi$ paths. We'll use the
+following rules:
+
+
+\begin{itemize}
+\item $\varphi$ node in basic block $C$ have only two entries, from $A$ and $B$.
+\item There are only two paths (excluding reducible flow and escape routes) from $D$ to $C$ --- one
+via $A$ and another via $B$, where $D$ is the nearest common dominator for $A$, $B$ and $C$. This
+rule also means that the only possible common nodes on both paths are $D$ and $C$.
+\item $\varphi$ entries only refer to the values visible in $D$ (i.e., defined
+      in the basic blocks that dominate $D$).
+\end{itemize}
+
+In this case we can rewrite eligible $\varphi$ nodes in $C$ as $select(D_c, \ldots)$.
+
+\pfcode{
+%"Find a nearest common dominator for [lst],
+  return basic block id or []"
+function genssa2_find_nearest_dominator(domtree, lst) {
+   // 1. Find all the common dominators
+   ls = map k in lst do ohashget(domtree, k);
+   common = foldl(fun(l, r) 
+                     {filter r as memq(r, l)},
+                  car(ls), cdr(ls));
+   // 2. Eliminate those that dominate anything else in this list
+   inv = mkhash();
+   hashiter(fun (k, vs) {
+        iter v in vs do
+           if(not(v===k)) ohashput(inv, v, k:ohashget(inv, v))
+      }, domtree);
+   common2 = filter c in common as {
+       tmp = ohashget(inv, c);
+       not(foldl(fun(l,r) (l||r), [], map t in tmp do memq(t, common)))};
+   match common2 with
+     [one] -> one
+   | else -> []}}
+
+
+\pfcode{
+%"Return a path from f to t, excluding escape routs"
+function genssa2_mark_path(domtree, cfg, f, t, c) {
+  // Leave only the relevant part of a CFG:
+  //    - Only the nodes dominated by f
+  //    - Only the nodes from which t is reachable
+  //      (taint the CFG backwards)
+
+  // 1. Inverted CFG, inverted domtree
+  inv = mkhash();
+  hashiter(fun(k,vs)
+     { iter v in vs do ohashput(inv, v, k:ohashget(inv, v))}, cfg);
+
+  revdomtree = mkhash();
+  hashiter(
+    fun(k, vs)
+     { iter v in vs do
+        ohashput(revdomtree, v,
+                 unifiq(k:ohashget(revdomtree, v)))},
+    domtree);
+
+  // 2. Taint inverted CFG
+  vis = mkhash(); ohashput(vis, c, c);
+  do loop(front = [t]) {
+     next = map append ff in front do
+               {
+                  nxt = ohashget(inv, ff);
+                  ohashput(vis, ff, ff);
+                  map append n in nxt do
+                    if (ohashget(vis, n)) [] else [n]};
+     if (next) loop(next)};
+     
+  // 3. Leave only the dominated
+  dl = ohashget(revdomtree, f); dom = mkhash();
+  iter d in dl do ohashput(dom, d, d);
+  collector(add, get) {
+     hashiter(fun(k, v) if(ohashget(dom, k)) add(k), vis);
+     return get()}}}
+
+\pfcode{
+%"Check if there are two paths that do not overlap,
+  give a proper a-b order wrt. d exits order"
+function genssa2_find_paths(domtree, cfg, d, a, b, c) {
+   // 1. Get paths from D to A and D to B
+   p1 = genssa2_mark_path(domtree, cfg, d, a, c);
+   p2 = genssa2_mark_path(domtree, cfg, d, b, c);
+   // 2. Check if the paths have nothing in common besides D
+   m = map append x in p1 do if(x===d) []
+                        else if(x===c) []
+                        else if(memq(x,p2)) [x] else [];
+   if (m) return []
+   else {
+     // 3. Find which edge of D leads to A (there are only two, so the
+     //    other one goes to B)
+     dexits = ohashget(cfg, d);
+     a0 = car(dexits); // we'll look for this one
+     if (memq(a, p1)) return [true;p1;p2]
+                       else return [[];p1;p2]
+   }}}
+
+\pfcode{
+%"Get a branching condition for a given basic block"
+function genssa2_get_condition(bb)
+   visit:genssa2(bblock: bb) {
+      deep bblock { b -> t };
+      deep term {
+         brc -> c
+       | else -> []}}}
+
+\pfcode{
+%"Check if there is a potential phi to select pattern"
+function genssa2_detect_select_pattern(
+            env, domtree, cfg, defs, bbs, a, b, c)
+{
+   d = genssa2_find_nearest_dominator(domtree, [a;b;c]);
+   if (d) {
+     pths = genssa2_find_paths(domtree, cfg, d, a, b, c);
+     match pths with
+       [de;pa; pb] -> {
+          return [d; de; genssa2_get_condition(ohashget(bbs, d))]
+       }
+     | else -> [] // disqualified
+   }
+}}
+
+\pfcode{
+%"Check if code motion is possible"
+function genssa2_attempt_motion(
+            env, d, domtree, defs, defsh, src, varid,
+            dset, moveadd, vh)
+{  op = ohashget(defsh, varid);
+   chk = visit:genssa2(iop: op) {
+      deep expr {
+         var ->
+          if (not(ohashget(vh, id))) {
+            vsrc = ohashget(defs, id);
+            ohashput(vh, id, id);
+            ret = if (not(vsrc)) 'ok'
+                  else if (memq(vsrc, dset)) 'ok'
+                    else genssa2_attempt_motion(env, d, domtree,
+                              defs, defsh, src, id, dset, moveadd, vh);
+            ohashput(vh, %Sm<<(id, "-val"), ret);                 
+            ret}
+          else ohashget(vh, %Sm<<(id, "-val"))
+      |  else -> node};
+      deep iop {
+         phi -> [] // immediate disqualification
+      |  select -> cnd&&t&&f
+      |  call -> {
+           if (genssa2_is_pure(env, dst)
+                && foldl(fun(l,r) l&&r, true, args)) 'ok'
+           else []}
+      |  else -> []}};
+   if (chk) {
+     moveadd('move'(varid, d)); return 'ok'
+   } else []}}
+
+\pfcode{
+%"Try to apply suspected phi to select rewrites"
+function genssa2_try_phi_rewrites(env, domtree, src, rewrites, chgp)
+collector(moveadd, moveget) {
+   // 1. Cache the rewrite commands
+   rs = mkhash();
+   iter try_to_rewrite(bb, d, neg, cnd) in rewrites do {
+      ohashput(rs, bb, [d;neg;cnd]);
+   };
+   // 2. Cache the definition origins
+   defs = mkhash(); defsh = mkhash();
+   visit:genssa2(top: src) {
+      deep bblock { b -> iter o in ops do o(name) };
+      deep oppair:
+        fun(bb) {
+          ohashput(defs, name, bb);
+          ohashput(defsh, name, op)}};
+   // 3. For each bb to be rewritten, for each phi node,
+   //    check if source variables are defined in
+   //    the basic blocks that dominate D
+   
+   getarg(a) = visit:genssa2(phiarg:a) {
+      deep phiarg { a -> v }};
+      
+   checkarg(d, dset, a, rwadd) = visit:genssa2(phiarg:a) {
+      deep phiarg { a -> v };
+      deep expr {
+         var -> {
+            src = ohashget(defs, id);
+            // If the origin is not visible in D,
+            // we may still consider moving it there
+            if (not(src)) true else
+            if (memq(src, dset)) true
+               else genssa2_attempt_motion(env, d, domtree, defs, defsh,
+                        src, id, dset, rwadd, mkhash())}
+       | else -> true}};
+       
+   pass1 =  visit:genssa2(top: src) {
+      deep bblock { b -> mk:node(ops = map o in ops do o(name))};
+      deep oppair: fun(bb) mk:node(op=op(bb, name));
+      deep iop(bb, dst) {
+          phi ->
+            {match ohashget(rs, bb) with
+                [d;nneg;cnd] -> collector(rwadd, rwget) {
+                  <[a1;a2]> = args;
+                   dset = ohashget(domtree, d);
+                   if (checkarg(d, dset, a1, rwadd) &&
+                       checkarg(d, dset, a2, rwadd)) {
+                     // Confirmed, we can rewrite it.
+                     chgp := true;
+                     iter i in rwget() do moveadd(i);
+                     if (nneg)
+                        return 'select'(cnd, getarg(a1), getarg(a2))
+                     else
+                        return 'select'(cnd, getarg(a2), getarg(a1))
+                   } else node}
+             | else -> node}
+       |  else -> node
+      }};
+   moves = moveget();
+   if (moves) { // do the code motion pass
+     mh = mkhash(); revmh = mkhash();
+     iter move(id, dst) in moves do {
+          ohashput(mh, id, dst);
+          ohashput(revmh, dst,
+                    ohashget(revmh, dst)::
+                       [[id;ohashget(defsh, id)]])};
+     pass2 =
+      visit:genssa2(top: src) {
+        deep bblock {
+           b -> {
+              mv = ohashget(revmh, name);
+              mk:node(ops = (map append o in ops do o)::mv)}};
+        deep oppair: if (ohashget(mh, name)) [] else [node]};
+     return pass2
+   } else return pass1}}
+
+
+\pfcode{
+%"An interface function, detect and apply phi to select rewrites"
+function genssa2_detect_selects(env, src, chgp) {
+   // 0. Build a CFG, cache defs and basic blocks
+   cfg = mkhash(); bbs = mkhash();
+   visit:genssa2(top: src) {
+      once bblock {
+         b -> {ohashput(bbs, name, node);
+               ohashput(cfg, name, genssa2_get_exits(node))}}};
+
+   defs = genssa2_cache_defs(src);
+   
+   // 1. Buid domtree
+   domtree = graph_dominators(cfg, 'entry');
+   
+   // 2. For each potentially perspective phi node,
+   //    check for select pattern presence
+   candidates = mkhash();
+   visit:genssa2(top: src) {
+      deep bblock {
+         b -> iter o in ops do o(name)};
+      deep oppair: fun(bb) op(bb);
+      deep phiarg { a -> src };
+      deep iop(bb) {
+         phi ->
+            if(length(args)==2)
+              if (not(ohashget(candidates, bb))) {
+                 ohashput(candidates, bb, args)}
+       | else -> []}};
+   clist = hashmap(fun(k,v) k:v, candidates);
+
+   collector(add, get) {
+     iter [c;a;b] in clist do {
+        chk = genssa2_detect_select_pattern(env, domtree, cfg, defs,
+                                            bbs, a, b, c);
+        if (chk) {
+          <[d;neg;cnd]> = chk;
+           add('try_to_rewrite'(c, d, neg, cnd))
+        }};
+     rewrites = get();
+     if (rewrites)
+         return genssa2_try_phi_rewrites(env, domtree, src, rewrites, chgp)
+     else return src}}}
+
+%%%%%%%%%%%%%%

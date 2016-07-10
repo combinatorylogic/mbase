@@ -1,0 +1,243 @@
+% literate:
+
+
+\section{Dead code elimination steps}
+
+DCE can be combined with a constant folding iteratively. If a branch condition is becoming a constant,
+a conditional branch can be replaced with an unconditional one, potentially leaving dangling CFG nodes.
+
+Removing such basic blocks may also simplify remaining $\varphi$ nodes, either fully eliminating them (leaving
+only one entry edge) or opening them for further optimisations (select transformation, etc.).
+
+\pfcode{
+%"Find reachable basic blocks"
+function genssa2_reachable_bbs(src) {
+   live = mkhash(); bbhash = mkhash();
+   visit:genssa2 (top: src) {
+      deep bblock {
+         b -> ohashput(bbhash, name, node)}};
+   do loop(front = ['entry']) {
+      nexts = map append bb in front do {
+         if(not(ohashget(live, bb))) {
+            ohashput(live, bb, bb);
+            return genssa2_get_exits(ohashget(bbhash, bb))}};
+      if(nexts) loop(unifiq(nexts))};
+   return live}}
+
+\pfcode{
+%"Remove all the basic blocks not in the live list"
+function genssa2_remove_dead_bbs(src, live, chgref)
+  visit:genssa2(top: src) {
+     deep code: { map append b in bs do b };
+     deep bblock {
+        b -> if (ohashget(live, name)) [node] else {chgref := true; []}}}}
+
+\pfcode{
+%"Get number of uses for each register. 
+  Cyclic phi references are handled elsewhere."
+function genssa2_count_refs(src) {
+   cnt = mkhash();
+   inccnt(nm) = {
+     aif (chk = ohashget(cnt, nm)) ohashput(cnt, nm, chk+1)
+        else ohashput(cnt, nm, 1)};
+   visit:genssa2(top: src) {
+     deep expr {
+        var -> inccnt(id)
+      | else -> []}};
+   return cnt}}
+   
+\pfcode{
+%"Remove the unused instructions if they have no side effects"
+function genssa2_remove_dead_regs(env, src, reghash, chgref) {
+   isdead(reg) = {
+      not(ohashget(reghash, reg));
+   };
+   kill() = {chgref := true};
+   
+   visit:genssa2(top: src) {
+      deep bblock {
+         b -> mk:node( ops = map append op in ops do op )};
+      deep oppair: {
+        <k:v> = op(name);
+         if(not(k)) {kill(); []} else [mk:node(op = v)]};
+      deep iop(dstreg) {
+         phi -> if (isdead(dstreg)) []:node else true:node
+       | select -> if (isdead(dstreg)) []:node else true:node
+       | call -> if (isdead(dstreg) && genssa2_is_pure(env, dst)) []:node
+                 else true:node}}}}
+
+\pfcode{
+%"Perform a single DCE step: remove unreferenced BBs,
+  remove non-side-effect calls with zero uses"
+function genssa2_dce_step(env, src, chgref) {
+  live = genssa2_reachable_bbs(src);
+  src1 = genssa2_remove_dead_bbs(src, live, chgref);
+
+  reghash = genssa2_count_refs(src1);
+  return genssa2_remove_dead_regs(env, src1, reghash, chgref)}}
+
+\pfcode{
+%"Eliminate the redundant phi nodes"
+function genssa2_cull_phis(src, chgp) {
+   rewrites = mkhash();
+   rewrite(id0) =
+     do loop(v = id0) {
+        aif (chk = ohashget(rewrites, v)) {
+          chgp := true;
+          visit:genssa2(expr:chk) {
+            once expr{
+               var -> loop(id)
+             | else -> node}}}
+        else 'var'(v)};
+        
+   getphiarg(a) = visit:genssa2(phiarg:a) {
+     once phiarg { a -> v }};
+     
+   checkphi(dst, args) = {
+     match args with
+        [one] -> {ohashput(rewrites, dst, getphiarg(one)); true}
+      | else -> []};
+      
+   nxt=visit:genssa2(top: src) {
+     deep bblock {
+       b -> mk:node(ops = map append o in ops do o)};
+     deep oppair: {
+       v = op(name);
+       if(v) [mk:node(op = v)] else []};
+     deep iop(dst) {
+       phi -> if(checkphi(dst, args)) [] else node
+     | else -> node}};
+
+   return visit:genssa2(top:nxt) {
+     deep expr {
+       var -> rewrite(id)
+     | else -> node}}}}
+
+\subsection{Inner loop}
+
+This is an inner loop inside of the outer optimisation loop. It makes sense to short DCE with constant folding
+in order to avoid doing more costly passes (loop analysis, etc.) too often for any resulting changes to propagate.
+
+\pfcode{
+%"Interleave folding and DCE steps 
+  until fixed point is reached."
+function genssa2_fold_and_kill(env, src0, chg_g) {
+   do loop(src = src0) {
+      chgp = mkref([]);
+      dg = genssa2_make_depgraph(src, []);
+     <defs:ctab> = genssa2_tag_constants(env, src, dg);
+      
+      fsrc = genssa2_fold_constants(env, src, defs, ctab, chgp);
+      ssrc = genssa2_rewrite_constant_selects(env, defs, ctab, fsrc, chgp);
+      fssrc = genssa2_fold_selects(env, defs, ctab, ssrc, chgp);
+      collector(storyadd, storyget) {
+         genssa2_unroll_constant_flow_step(env, defs, ctab, fssrc, storyadd);
+         cmds = storyget();
+         if (cmds) chgp := true;
+         src1 = genssa2_rewrite_cfg(fssrc, cmds);
+         src2 = genssa2_cull_phis(src1, chgp);
+         
+         next = genssa2_dce_step(env, src2, chgp);
+         if (^chgp) { chg_g := true; loop(next) } else next}}}}
+
+\subsection{Those pesky circular $\varphi$ dependencies}
+
+Reducing constants and eliminating branches may lead to dead $\varphi$ nodes that are not used anywhere
+else but in their own definitions. Such cycles can be rather complex and involve multiple $\varphi$ nodes and
+multiple pure intrinsics.
+
+We're going to mark such chains using the following (naive and suboptimal) algorithm:
+
+\begin{itemize}
+\item Find loops in register dependencies:
+\begin{itemize}
+\item Node belongs to a loop iff there is a mutual dependency on all other nodes in this loop (i.e., loop is a strong--connected sub--graph, so we can use Tarjan algorithm to find them all).
+\end{itemize}
+\item Count the uses of each of the identified cyclic sub--graphs that do not belong to them
+\item Eliminate those that do not have any external uses and only contain pure nodes
+\end{itemize}
+
+\pfcode{
+%"Use Tarjan algorithm to identify dependency loops"
+function genssa2_dependency_loops(dgraph) {
+   igraph = graph2graph(dgraph);
+   
+   clusters = mkhash(); revht = mkhash();
+   addcluster(c) = { // Make sure each cluster is added only once
+      next = unifiq(map append i in c do {
+                       x = ohashget(revht, i);
+                       if (not(x)) ['new']
+                          else x});
+      newp = filter next as next==='new';
+      if (newp || (length(next)>1)) {
+         nm = gensym();
+         ohashput(clusters, nm, c);
+         iter i in c do ohashput(revht, i, nm:ohashget(revht, i))}};
+   getclusters() = hashmap(fun(k,v) v, clusters);
+   
+   iter i in unifiq(map append d in dgraph do d) do {
+      if (not(ohashget(revht, i))) {
+        clusters = tarjan(igraph, i);
+        iter c in clusters do
+           match c with
+              [one] -> []
+            | else -> addcluster(c)}};
+
+   return getclusters()}}
+
+\pfcode{
+function genssa2_dce_phi(env, src, chgref) {
+   // 1. Make the preparations
+   igraph = genssa2_make_depgraph(src, 'terms');
+   dgraph = hashmap(fun(k,v) k:v, igraph);
+
+   revgraph = mkhash();
+   iter (f:ts) in dgraph do iter t in ts do {
+      ohashput(revgraph, t, unifiq(f:ohashget(revgraph, t)))};
+
+   //TODO: kill this debugging output
+   // depgraph_todot(dgraph);
+   //////////////////////////////////
+
+   loops = genssa2_dependency_loops(dgraph);
+   dcache = genssa2_cache_defs(src);
+
+   // 2. Leave only the pure loops
+   pureloops = filter cs in loops as
+                   foldl(fun(l,r) l&&r, true,
+                      map c in cs do
+                          genssa2_is_value_pure(env, ohashget(dcache, c)));
+
+   // 3. Find the external uses for each loop
+   markloops = map cs in pureloops do {
+                   refs0 = map append c in cs do
+                               ohashget(revgraph, c);
+                   refs = unifiq(refs0);
+                   extrefs = filter r in refs as not(memq(r, cs));
+                   return [cs; extrefs]};
+   // 4. Iteratively eliminate loops with no external uses, removing the
+   //    eliminated loop contents from the other loops use lists.
+   dead = mkhash();
+   do loop(m = markloops) {
+      chg = mkref([]);
+      next = map append [cs;rfs] in m do {
+         rfs1 = filter r in rfs as not(ohashget(dead, r));
+         if(not(rfs1)) {
+            iter c in cs do ohashput(dead, c, c);
+            chg := true;
+            return []
+         }  else return [[cs; rfs1]]};
+      if(^chg) loop(next)};
+   tokill = hashmap(fun(k,v) k, dead);
+   if (tokill) chgref := true;
+   // 5. Execute the kill list
+   tokillh = mkhash();
+   iter k in tokill do ohashput(tokillh, k, k);
+   visit:genssa2(top: src) {
+      deep bblock {
+         b -> mk:node( ops = map append op in ops do op )};
+      deep oppair: {
+          if (ohashget(tokillh, name)) [] else [node]}}}}
+
+
+%%%%%%%%%%%%%%%%%%

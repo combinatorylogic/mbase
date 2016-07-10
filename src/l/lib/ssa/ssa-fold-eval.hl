@@ -1,0 +1,401 @@
+% literate:
+
+
+\section{Constant folding}
+
+
+Generic constant folding:
+
+\begin{itemize}
+\item Build a value dependency graph, annotated with the value properties
+\item Propagate properties, using the following rules
+  \begin{itemize}
+  \item A constant function applied to all constant arguments yields a constant value
+  \item A $\varphi$ loop with only constant inputs and a constant bound yields a constant
+        value (needs loop analysis data)
+  \item Side effect instructions are marked so
+  \item Loops not containing side effects are marked so
+  \end{itemize}
+\end{itemize}
+
+\subsection{Tagging constant values}
+
+\pfcode{
+function genssa2_make_depgraph(src, termp) {
+  depgraph = mkhash();
+  
+  addedges(f, ts) = {
+     x = ohashget(depgraph, f);
+     ohashput(depgraph, f, ts::x)};
+     
+  collect_refs(iop) = collector(add, get) {
+     visit:genssa2(iop:iop) {
+        deep expr {
+           var -> add(id) | else -> []}};
+     return get()};
+
+  collect_term_refs(term) = collector(add, get) {
+     visit:genssa2(term:term)  {
+        deep expr {
+           var -> add(id) | else -> []}};
+     return get()}; 
+     
+  visit:genssa2 (top: src) {
+     deep bblock {
+        b -> if(termp) {
+                refs = collect_term_refs(t);
+                addedges(%Sm<<(name, "__TERM"), refs)}};
+     deep oppair: op(name);
+     deep iop(dst) {
+        else -> {
+           refs = collect_refs(node);
+           addedges(dst, refs);
+           return node}}};
+           
+  depgraph1 = mkhash();
+  hashiter(fun (f, ts) {
+       ohashput(depgraph1, f, unifiq(ts))
+     }, depgraph);
+     
+  return depgraph1}}
+
+\pfcode{
+function genssa2_cache_defs(src) {
+  ht = mkhash();
+  visit:genssa2(top:src) {
+     deep oppair: ohashput(ht, name, op)
+  };
+  return ht}}
+
+\pfcode{
+function genssa2_is_const(env, ctab, op) {
+   getdst(id) = {
+       aif (chk = ohashget(env, id))
+          return chk('constantp')
+          else []};
+   checkarg(v) =
+      visit:genssa2(expr: v) {
+         deep expr {
+           const -> true
+         | var -> ohashget(ctab, id)
+         | else -> []}};
+   visit:genssa2(iop: op) {
+     deep attr {
+       constcall -> true
+     | else -> []};
+     deep iop {
+       phi -> [] // Must be reduced elswhere
+     | select -> []
+     | call -> {
+          d = getdst(dst);
+          const_a = foldl(fun(x, y) x||y, [], a);
+          if (d || const_a)
+             foldl(fun(x,y) x&&y, true,
+                   map(checkarg, args))
+          else []}}}}}
+
+\pfcode{
+function genssa2_tag_constants(env, src, depgraph) {
+   defs = genssa2_cache_defs(src);
+   ctab = mkhash();
+   
+   // Initial pass
+   visit:genssa2(top:src) {
+      deep oppair: {
+         if (genssa2_is_const(env, ctab, op))
+            ohashput(ctab, name, true)}};
+
+   // Invert the dependency graph
+   idep = mkhash();
+   hashiter(fun(k,vs) {
+        iter v in vs do
+           ohashput(idep, v, unifiq(k:ohashget(idep, v)))}, depgraph);
+           
+   // Follow the inverse dependency graph
+   seed = hashmap(fun(k,v) k, ctab);
+   vis = mkhash();
+   iter s in seed do ohashput(vis, s, s);
+   nextfront = unifiq(map append n in seed do ohashget(idep, n));
+   do loop(front = nextfront) {
+      nxt = map append n in front do {
+         vl = ohashget(defs, n);
+         if (genssa2_is_const(env, ctab, vl)) {
+           ohashput(vis, n, n);
+           return ohashget(idep, n)
+         } else []};
+      if(nxt) loop(nxt)};
+   return defs:ctab}}
+
+\subsection{Evaluating constants}
+
+\pfcode{
+function genssa2_eval_constant(env, defs, dst, cache, op) {
+  getdst(id) = {
+               aif (chk = ohashget(env, id)) {
+                  ret = chk('evalfun');
+                  if(ret) ret else fun(args) []
+               } else fun(args) []};
+  evalarg(e) =
+      visit:genssa2(expr: e) {
+         deep expr {
+            const -> node
+          | var -> {
+               v = ohashget(defs, id);
+               genssa2_eval_constant(env, defs, id, cache, v)}
+          | else -> ccerror('IMPOSSIBLE'())}};
+  aif (chk = ohashget(cache, dst)) return chk
+  else {
+    tmp = visit:genssa2(iop:op) {
+       deep iop {
+          phi -> ccerror('NOT-HERE-PLEASE'())
+        | select -> ccerror('NOT-HERE-PLEASE'())
+        | call -> {
+            ef = getdst(dst);
+            if (not(ef)) ccerror('NO-EVAL-FUNCTION'());
+            ret = ef(map a in args do evalarg(a));
+            if (ret) ret else []}}};
+    ohashput(cache, dst, tmp);
+    return tmp}}}
+
+If a conditional branch is dependent on a constant, it can be replaced with an unconditional branch, and if
+any parts of a CFG become unreachable, they may be safely eliminated, potentially making $\varphi$ nodes constant.
+
+
+\pfcode{
+function genssa2_is_const_value(env, defs, ctab, vl) {
+  visit:genssa2(expr: vl) {
+   once expr {
+     var -> {
+        aif (chk = ohashget(defs, id)) genssa2_is_const(env, ctab, chk)
+        else []}
+   | const -> true
+   | else -> []}}}}
+
+\pfcode{
+function genssa2_eval_constant_value(env, defs, dst, cache, vl) {
+ visit:genssa2(expr: vl) {
+   once expr {
+     var -> {
+        aif (chk = ohashget(defs, id)) {
+           aif (ret = genssa2_eval_constant(env, defs, dst, cache, chk))
+               ret
+           else node}
+        else node}
+   | else -> node}}}}
+
+\pfcode{
+%"Simulate the switch instruction behaviour for 
+  a given number, return a taken branch and a list
+  of dropped branches"
+function genssa2_eval_switch(env, vl, ns, d) {
+  // TODO!
+  ccerror('TODO'());
+  return d:[]
+  }}
+
+\pfcode{
+%"Do one pass of constant flow unrolling"
+function genssa2_unroll_constant_flow_step(env, defs, ctab, src, story) {
+  evalcache = mkhash();
+  istrue = ohashget(env, '*true?*');
+  getnumeric = ohashget(env, '*numeric-value*');
+  visit:genssa2(top:src) {
+     deep bblock {
+        b -> t(name)};
+     deep term(bbname) {
+        br  -> []
+     |  brc ->
+           if (genssa2_is_const_value(env, defs, ctab, c)) {
+              tname = %Sm<<(bbname, '-term');
+              vl = genssa2_eval_constant_value(env, defs,
+                      tname, evalcache, c);
+              if (istrue(vl)) {
+                story('constant_branch'(bbname, tr));
+                if (not(tr===fl))
+                    story('eliminate_branch'(bbname, fl));
+              } else {
+                story('constant_branch'(bbname, fl));
+                if (not(tr===fl))
+                   story('eliminate_branch'(bbname, tr))}}
+     |  switch ->
+           if (genssa2_is_const_value(env, defs, ctab, v)) {
+              tname = %Sm<<(bbname, '-term');
+              vl = genssa2_eval_constant_value(env, defs, tname,
+                      evalcache, v);
+             <taken:dropped> = genssa2_eval_switch(env, vl, ns, d);
+              story('constant_branch'(bbname, taken));
+              iter d in dropped do
+                story('eliminate_branch'(bbname, d))}}}}}
+
+\pfcode{
+%"Execute the eliminate_branch and constant_branch suggestions"
+function genssa2_rewrite_cfg(src, commands) {
+   constbrs = mkhash(); drops = mkhash();
+   {iter c in commands do
+       match c with
+         'constant_branch'(f, t) ->
+             ohashput(constbrs, f, t)
+       | 'eliminate_branch'(f, t) ->
+             hashput(drops, %S<<(f, "->", t), true)};
+
+   isconstbranch(bb) = ohashget(constbrs, bb);
+   dropedge(src, dst) = hashget(drops, %S<<(src, "->", dst));
+
+   visit:genssa2(top: src) {
+      deep bblock {
+         b -> mk:node(ops = map o in ops do o(name), t = t(name))};
+      deep oppair: fun(bb) [name; op(bb)];
+      deep iop(bb) {
+         // Phis that drop all or all but one of their arguments
+         // must be handled in another pass
+         phi -> mk:node(args = map append a in args do a(bb))
+       | else -> node};
+      deep term(bb) {
+         else -> {
+            aif(chk = isconstbranch(bb))
+              'br'(chk)
+            else node}};
+      deep phiarg(bb) {
+         a -> {
+            if (dropedge(src, bb)) []
+            else [node]}}}}}
+
+\pfcode{
+%"Fold the foldable constants"
+function genssa2_fold_constants(env, src, defs, ctab, chgp) {
+   evalcache = mkhash();
+   visit:genssa2(top: src) {
+      deep expr {
+         var -> if (genssa2_is_const_value(env, defs, ctab, node)) {
+                   ret = genssa2_eval_constant_value(env, defs,
+                              id, evalcache, node);
+                   if (ret) {
+                      chgp := true;
+                      return ret
+                   } else node
+                } else node
+       | else -> node}}}}
+
+
+\subsection{Handling calls with select arguments}
+
+There is a special case where calls are not entirely constant, but have
+a mixture of constant and select arguments, where select, in turn, have one of its
+branches constant. Such a call can fused inside a select instead, which may or may not
+lead to further optimisations.
+
+Ideally, this must be a backtracking point --- something to consider for the future.
+
+\pfcode{
+function genssa2_rewrite_constant_selects(env, defs, ctab, src, chgp) {
+  evalcache = mkhash();
+  istrue = ohashget(env, '*true?*');
+  rewht = mkhash();
+  rewrite(id) =
+     aif(chk = ohashget(rewht, id)) { chgp := true; chk}
+                               else { 'var'(id)};
+  visit:genssa2(top: src) {
+     deep oppair: op(name);
+     deep iop(dst) {
+        select ->
+         if (genssa2_is_const_value(env, defs, ctab, cnd)) {
+           vl = genssa2_eval_constant_value(env, defs, dst, evalcache, cnd);
+           nv = if (istrue(vl)) t else f;
+           ohashput(rewht, dst, nv)}
+      | else -> []}};
+  visit:genssa2(top: src) {
+    deep expr {
+      var -> rewrite(id)
+    | else -> node}}}}
+
+
+\pfcode{
+function genssa2_fold_selects_rewrite(defs, src, rewrites) {
+   // 1. Cache the rewrite commands
+   ht = mkhash();
+   iter rewrite(bb, dstreg, a, fn, args, cnd) in rewrites do
+      ohashput(ht, dstreg, [bb;a;fn;args;cnd]);
+   // 2. Apply the rewrites
+   doselect(br, op, srcvl) =
+      visit:genssa2(iop: op) {
+        deep iop {
+           select -> if (br) t else f
+         | else -> srcvl}};
+   makeargs(br, args) = {
+      map a in args do {
+         visit:genssa2(expr: a) {
+          deep expr {
+            var -> {
+               aif (chk = ohashget(defs, id))
+                     doselect(br, chk, node)
+                else node}
+          | else -> node}}}};
+   visit:genssa2(top: src) {
+      deep bblock {
+         b -> {
+                nops = map append o in ops do o(name);
+                mk:node(ops = nops)}};
+      deep oppair: fun(bb) collector(add, get) {
+         nop = op(add, bb, name);
+         nxt = get();
+         nxt :: [mk:node(op = nop)]};
+      deep iop(add, bb, dstreg) {
+         call -> {
+            match ohashget(ht, dstreg) with
+               [bb1;a1;fn1;args1;cnd] -> symbols(new_t, new_f) {
+                  add([new_t; 'call'(a1, fn1, @makeargs(true, args1))]);
+                  add([new_f; 'call'(a1, fn1, @makeargs([], args1))]);
+                  return 'select'(cnd, 'var'(new_t), 'var'(new_f));
+               }
+             | else -> node}
+       | else -> node}}}}
+
+\pfcode{
+%"Handle the case of a pure call of similar select arguments,
+  if one set of select branches is constant"
+function genssa2_fold_selects(env, defs, ctab, src, chgp) collector(add, get) {
+  get_select_shape(a, shp) = {
+     checkvar(id) = {
+        aif (chk = ohashget(defs, id))
+          visit:genssa2(iop:chk) {
+            deep iop {
+               select -> {
+                 nshp =[cnd; genssa2_is_const_value(env, defs, ctab, t);
+                             genssa2_is_const_value(env, defs, ctab, f)];
+                 if (shp) {
+                    if (iso(shp, nshp)) shp
+                    else []
+                 } else nshp}
+            | else -> []}}};
+     visit:genssa2(expr:a) {
+        deep expr {
+           var -> checkvar(id)
+         | const -> shp
+         | else -> []}}};
+  uniform_select_args(args) = 
+    do loop(as = args, shp = []) {
+       match as with
+          a:tl -> {
+             aif (chk = get_select_shape(a, shp))
+                   loop(tl, chk)
+              else []}
+       | else -> shp};
+  visit:genssa2(top:src) {
+     deep bblock { b -> iter o in ops do o(name) };
+     deep oppair: fun(bb) op(bb, name);
+     deep iop(bb, dstreg) {
+        call ->
+           // TODO: may want to use some cost model here
+           if (genssa2_is_pure(env, dst)) {
+              chk = uniform_select_args(args);
+              if (chk && {<[x;y;z]> = chk; y||z}) {
+                 add('rewrite'(bb, dstreg, a, dst, args, car(chk)))}}
+      | else -> []}};
+  rewrites = get();
+  if (rewrites) {
+       chgp := true;
+       return genssa2_fold_selects_rewrite(defs, src, rewrites)}
+  else return src
+}}
+
+%%%%%%%%%%%%

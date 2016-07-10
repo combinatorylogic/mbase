@@ -56,7 +56,7 @@ MBase includes the following micro-DSLs and libraries:
 * Compiler construction modules:
     - Generic register allocation
     - Generic SSA transform and loop analysis
-    - Trajan algorithm implementation
+    - Tarjan algorithm implementation
 * Embedded ML compiler
 
 The core Lisp-like language is not Scheme- or Common Lisp-compliant

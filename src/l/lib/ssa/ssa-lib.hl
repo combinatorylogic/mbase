@@ -5,6 +5,9 @@ include "ssa-ast.hl"
 include "domtree.hl"
 include "ssa-trans.hl"
 include "ssa-analysis.hl"
+
+litinclude ("./ssa-fold") "ssa-fold.hl"
+
 include "ssa-backend.hl"
 include "genlive.hl"
 

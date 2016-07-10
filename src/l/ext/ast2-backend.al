@@ -19,6 +19,12 @@
 (macro ast2:aget (a b)
   `(aget ,a ,b))
 
+(macro ast2:ageto (descr a b)
+  `(ageto ,a ,b))
+
+(macro ast2:aseto (descr a b c)
+  `(aseto ,a ,b ,c))
+
 ;; MBase-specific codegen
 (function visitor-backend-mbase (lfsrc? lfdst? src)
   (visitorbackend:visit expr src
@@ -60,7 +66,7 @@
           `(let ((,tplid ,t))
              ;; todo: don't even try it for the list collectors
              ;(writeline (list 'CURRENT: (ast2:print-test (thisnodesrc))))
-             (ast2:set_metadata ,tplid (ast-current-metadata))
+             ,@(if listnd () `((ast2:set_metadata ,tplid (ast-current-metadata))))
              (begin
                ,@(foreach-mappend (d deep)
                     (p:match d
@@ -86,7 +92,7 @@
      (set `(n.stloc! ,id ,v))
      (get_tagged_tuple `(ast2:get_tagged_tuple ,e ,f))
      (get_tuple `(ast2:get_tuple ,e ,f))
-     (get_metadata `(ast2:get_metadata ,src))
+     (get_metadata `(ast2:get_metadata_1 ,lfsrc? ,src))
 
      (allocate_tuple `(ast2:allocate_tuple ,fs))
      (allocate_tagged_tuple `(ast2:allocate_tagged_tuple ,tg ,tagid ,fs))
@@ -166,7 +172,7 @@
      ;; TODO: do something for listform mode
      (transform_listform (if lfsrc?
                              `(ast2:transform_listform ,v (ast-node-format) (ast-node-type))
-                             `(n.stloc! ,v (cons '(T) ,v))))
+                             `(begin )))
      (implicit_ctor      (if lfdst?
                              `(ast2:transform_to_listform (thisnode) ,p)
                              `(thisnode)))
@@ -178,9 +184,9 @@
                        `(straise (ast2:make_dyn_tags_map (quote ,ids)))
                        'nil))
 
-     (dummy `(cons '(T) (ast2:mkemptyvector 2)))
+     (dummy `(ast2:mkemptyvector 2))
      (dummyslot 0)
-     (getdummy `(ast2:aget (cdr ,d) 1))
+     (getdummy `(ast2:aget ,d 1))
 
      ;; TODO:
      (else node)
@@ -211,17 +217,20 @@
     (ast2stackrecord.scnt! rc (cons d d0))))
 
 (macro ast2:get_tagged_tuple (s n)
-  `(ast2:aget (cdr ,s) (+ 1 ,n)))
+  `(ast2:ageto tagged_tuple ,s (+ 1 ,n)))
 
 (macro ast2:get_tuple (s n)
-  `(ast2:aget (cdr ,s) ,n))
+  `(ast2:ageto tuple ,s (+ 1 ,n)))
 
 (macro ast2:get_metadata (s)
-  (with-syms (t)
-     `(let ((,t ,s)) (ast2:aget (if (list? ,t) (cdr ,t) ,t) 0))))
+  `(ast2:ageto metadata ,s 0))
+
+(macro ast2:get_metadata_1 (lfsrc? s)
+  (if lfsrc? 'nil
+      `(ast2:ageto metadata_1 ,s 0)))
 
 (macro ast2:set_metadata (dst v)
-  `(aset (cdr ,dst) 0 ,v))
+  `(ast2:aseto metadata ,dst 0 ,v))
 
 (macro ast2:mkemptyvector (len)
   `(not.neth ()
@@ -229,15 +238,11 @@
       (leave ((object)a))))
 
 (macro ast2:allocate_tuple (fs)
-  ;; TODO: optimise!!!
-  `(cons (quote (() ,@fs))
-         (ast2:mkemptyvector ,(+ 1 (length fs)))))
+  `(ast2:mkemptyvector ,(+ 2 (length fs))))
 
 (macro ast2:allocate_tagged_tuple (tg tagid fs)
-  ;; TODO: optimise!!!
-  `(cons (quote (T ,tg ,tagid ,@fs))
-         (ast2:set_tag (ast2:mkemptyvector ,(+ 2 (length fs)))
-                       ,tagid)))
+  `(ast2:set_tag (ast2:mkemptyvector ,(+ 2 (length fs)))
+                 ,tagid))
 
 (macro ast2:allocate_list_collector ()
   `(cons (quote (L))
@@ -248,13 +253,13 @@
   `(begin
      (return ,cl)))
 
-(function ast2:set_tag (t i) (begin (aset t 1 i) t))
+(function ast2:set_tag (t i) (begin (ast2:aseto tag t 1 i) t))
 
 (macro ast2:get_tag (lfsrc? v)
   (if lfsrc?
       `(inner-expand-first
         ast2:get_tag_listform (ast-source-tags-map) (quote ,v))
-      `(ast2:aget ,v 1)))
+      `(ast2:ageto tag ,v 1)))
 
 (macro ast2:get_tag_listform (vt v0)
   (let* ((v (cadr v0)))
@@ -268,44 +273,29 @@
     (  ((L) . $rest)
        (let* ((get (cdr (cdr d))))
          (get)))
-    (  ((M) . $rest) rest)
-    (  ((T . $x) . $rest) rest)
     (  else d)))
 
 (function ast2:set_target (d s v)
   ;; Differentiate between tagged and simple tuples dynamically
   (if d
-      (begin
-        (let* ((vl (ast2:thisnodeval v))
-               (tg (caar d)))
-          (if tg
-              (if (eqv? tg 'T)
-                  (aset (cdr d) (+ 1 s) vl)
-                  ;; list collector
-                  (if (eqv? tg 'L)
-                      (let* ((add (car (cdr d))))
-                        ;; ignore slot
-                        (add vl))
-                      ))
-              (aset (cdr d) s vl)))
-        )
-      ))
+      (let* ((vl (ast2:thisnodeval v)))
+        (if (not (list? d))
+            (ast2:aseto target d (+ 1 s) vl)
+            ;; list collector
+            (let* ((add (car (cdr d))))
+              ;; ignore slot
+              (add vl)))
+        )))
 
 (function ast2:set_target_simple (d s vl)
-  ;; Differentiate between tagged and simple tuples dynamically
   (if d
-      (begin
-        (let* ((tg (caar d)))
-          (if tg
-              (if (eqv? tg 'T)
-                  (aset (cdr d) (+ 1 s) vl)
-                  ;; list collector
-                  (let* ((add (car (cdr d))))
-                    ;; ignore slot
-                    (add vl))
-                  )
-              (aset (cdr d) s vl)))
-        )))
+      (if (not (list? d))
+          (ast2:aseto simple d (+ 1 s) vl)
+          ;; list collector
+          (let* ((add (car (cdr d))))
+            ;; ignore slot
+            (add vl)))
+      ))
 
 (macro ast2:make_continuation_record (d p s)
   `(ast2cntrecord.new 'C ,d ,s ,p))
@@ -400,13 +390,13 @@
            (begin
              ,@(foreach-map (f fd)
                  (format f (tp nm pos)
-                   `(ast2:set_target ,tmp ,pos (cons '(M) ,nm))
+                   `(ast2:set_target ,tmp ,pos ,nm)
                    ))
              )))
-        (n.stloc! ,dst ,tmp)))))
+        (n.stloc! ,dst ,tmp)
+        ))))
 
-(macro ast2:misc (v)
-  `(cons '(M) ,v))
+(macro ast2:misc (v) v)
 
 (macro ast2:make_listform (src frmt)
   `(inner-expand-first
@@ -475,8 +465,7 @@
      ,tag
      )))
 
-(macro ast2:wrap_misc (v)
-  `(cons '(M) ,v))
+(macro ast2:wrap_misc (v) v)
 
 
 (function ast2:make_dyn_tags_map (ids)
@@ -555,7 +544,7 @@
        ;; TODO: inherit metadata
        ,@(foreach-map (f fd)
            (format f (tp nm pos)
-                   `(ast2:set_target ,tpl ,pos (cons '(M) ,nm))))
+                   `(ast2:set_target ,tpl ,pos ,nm)))
        (ast2:set_metadata ,tpl
                           ,(if mtdarg
                                (cadr mtdarg)
@@ -563,8 +552,7 @@
        (inner-expand-first ast2:mknode-return (ast-node-is-top) (quote ,tpl)))))
 
 (macro ast2:mknode-return (cd tpl)
-  (if cd (cadr tpl) `(cdr ,(cadr tpl)))
-  )
+  (if cd (cadr tpl) (cadr tpl)))
 
 (macro ast-current-metadata () 'nil)
 

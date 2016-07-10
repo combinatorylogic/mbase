@@ -420,7 +420,7 @@
   (use-hash (tmp)
     (foreach (bl (map car graph))
      (when (not (res> bl))
-      (foreach (ku (trajan tmp bl))
+      (foreach (ku (tarjan tmp bl))
         (p:match ku
           (($one) (if (memq one (tmp> one)) (res! one one)))
           (else (foreach (k ku) (res! k k)))))))))

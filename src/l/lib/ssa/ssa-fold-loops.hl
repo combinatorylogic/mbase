@@ -1,0 +1,458 @@
+% literate:
+
+\section{Loop invariant motion}
+
+Here we're always moving loop invariants outside, without any cost considerations.
+If a register pressure is becoming an issue, another pass may always do a rematerialisation.
+
+
+\subsection{Utility functions}
+
+\pfcode{
+%"A more usable representation of the loop analysis results"
+function genssa2_cache_loops(ls) {
+  loops = mkhash();
+  add(nm, v) = ohashput(loops, nm, v:ohashget(loops, nm));
+  iter l in cadr(ls) do {
+     match l with
+       inaloop(bb, L) ->
+          {add(%Sm<<("body-",L), bb);
+           add(%Sm<<("rev-", bb), L)}
+     | entryedge(L,f,t) ->
+          {add(%Sm<<("entryedge-",L),[f;t]);
+           add(%Sm<<("entry-",L), t)}
+     | exitedge(L,f,t) ->
+          {add(%Sm<<("exitedge-",L),[f;t]);
+           add(%Sm<<("exit-",L), f)}
+     | backedge(L,f,t) ->
+          {add(%Sm<<("backedge-",L),[f;t])}
+     | subloop(L1, L2) ->
+          ohashput(loops, %Sm<<("innerloop-", L1, "--", L2), true)
+     | else -> []};
+  return loops}}
+
+\pfcode{
+function genssa2_get_loop_entry(loops, L) {
+   es = ohashget(loops, %Sm<<("entry-", L));
+   match es with
+      [one] -> one
+    | else -> []}}
+
+\pfcode{
+function genssa2_get_loop_entry_edge(loops, L) {
+   es = ohashget(loops, %Sm<<("entryedge-", L));
+   match es with
+      [one] -> one
+    | else -> []}}
+
+\pfcode{
+function genssa2_is_innerloop(loopsht, l, r) {
+   ohashget(loopsht, %Sm<<("innerloop-",l,"--",r))}}
+
+\pfcode{
+function genssa2_is_in_a_loop(loopsht, bb) {
+   loops = ohashget(loopsht, %Sm<<("rev-", bb));
+   if(loops) car(qsort(fun(l, r) genssa2_is_innerloop(loopsht, l, r), loops))}}
+
+
+\subsection{Invariant analysis}
+
+A register is a loop invariant iff its dependency sub--graph sitting inside a loop is {\sl pure} and
+  only depend on the external variables from the dominators of the loop entry block (excluding the loop entry
+  basic block itself).
+
+\pfcode{
+%"Assuming id is in the innermost loop L,
+  check if it is an invariant"
+function genssa2_is_a_loop_invariant(
+           domtree, deps, loops, L, oright, id, op)
+{  iddeps = ohashget(deps, id);
+   entry = genssa2_get_loop_entry(loops, L);
+   if (entry) { // if more than one entries, retreat
+      dset = filter d in ohashget(domtree, entry) as not(d===entry);
+      ret = foldl(fun(l,r) l&&r, true,
+                  map i in iddeps do
+                     aif(chk = ohashget(oright, i))
+                          memq(chk, dset)
+                     else true);
+      if(ret) return genssa2_get_loop_entry_edge(loops, L) else []}}}
+
+\pfcode{
+function genssa2_find_loop_invariants(env, src, loops) {
+   // 1. Preparations
+  <[cfg;bbs]> = genssa2_cache_cfg(src);
+   defs = genssa2_cache_defs(src);
+   domtree = graph_dominators(cfg, 'entry');
+   oright = genssa2_cache_origs(src);
+   deps = genssa2_make_depgraph(src, []);
+   loopsht = genssa2_cache_loops(loops);
+   
+   // 2. Find candidates
+   collector(addinvariant, getinvariants) {
+     visit:genssa2(top: src) {
+      deep bblock {
+        b -> {
+          // Find the innermost loop for this bb
+          loopnest = genssa2_is_in_a_loop(loopsht, name);
+          // Do not even bother if it's not in a loop
+          if (loopnest) iter o in ops do o(name, loopnest)}};
+       deep oppair: fun(bb, L) {
+          if (op) {
+             chk = genssa2_is_a_loop_invariant(domtree, deps, loopsht,
+                     L, oright, name, op);
+             if (chk) addinvariant([bb;name;op;L;chk])}};
+       deep iop {
+          phi -> [] // cannot be an invariant
+        | select -> node // maybe
+        | call -> if (genssa2_is_pure(env, dst)) node else []}};
+     inv = getinvariants();
+     if(inv) {
+       return inv
+     }}}}
+
+\pfcode{
+function genssa2_move_loop_invariants(src, invariants) {
+   // Prepare invariants
+   invariantsht = mkhash(); edges = mkhash();
+   iter [bb;name;op;L;ft] in invariants do {
+      ohashput(edges, bb, ft);
+      ohashput(invariantsht, bb, ohashget(invariantsht, bb)::[[name;op]])};
+
+   // Loop invariants are relocated into new intermediate basic blocks that
+   // are injected into the entry edges
+   newedges = mkhash();
+   killed = mkhash();
+
+   injected =
+     hashmap(fun(name, ops) {
+       <[f;t]> = ohashget(edges, name);
+        iter [dst;op] in ops do {
+           ohashput(killed, dst, dst)};
+        edg = gensym();
+        ohashput(newedges, %Sm<<(f,'--',t), edg);
+        return 'b'(edg, ops, 'br'(t))}, invariantsht);
+     
+
+   rewrite_edge(f, t) = ohashget(newedges, %Sm<<(f, '--', t));
+   delete_op(id) = ohashget(killed, id);
+   rewrite_phis(bb, ops) =
+      map o in ops do
+         visit:genssa2(oppair: o) {
+            deep phiarg {
+               a -> 
+                 aif (chk = rewrite_edge(src, bb))
+                       mk:node(src = chk)
+                  else node }};
+   rewrite_term(t, bb) =
+      visit:genssa2(term: t) {
+         deep labident:
+           aif(chk = rewrite_edge(bb, node)) chk
+               else node};
+   visit:genssa2(top: src) {
+      deep code: bs::injected;
+      deep bblock {
+         b -> { ops1 = map append ops do ops;
+                mk:node(ops = rewrite_phis(name, ops1),
+                        t = rewrite_term(t, name))}};
+      deep oppair: if (delete_op(name)) [] else [node]}}}
+
+
+\pfcode{
+function genssa2_loop_invariants(env, src, chgp) {
+  loops = genssa2_loops(src);
+  inv = genssa2_find_loop_invariants(env, src, loops);
+  if(inv) {
+    chgp := true;
+    return genssa2_move_loop_invariants(src, inv)
+  } else src}}
+
+
+\section{Induction variables}
+
+
+A variable is an induction variable of a loop L iff:
+
+\begin{itemize}
+\item It is a $\varphi$ node located in the loop entry node, with only two entries
+\item There is a circular dependency on itself
+\item All of the circular dependency path is within the loop L (it does not matter if there is another
+      circular dependency in an outer loop)
+\item All of the dependency path components are pure (otherwise no further analysis is useful) and
+      no $\varphi$s, with only the entry edge one being a $\varphi$. The only exception for this
+      rule is an inferior induction variable with computable bounds, but this case is a big fat TODO.
+\end{itemize}
+
+Once the determine that this is an induction variable we're recording it as follows:
+
+\verb|inductive(loop-id, reg, path, [loop-nodes], init, step)|.
+
+We should mark induction variables starting from the innermost loops.
+
+\pfcode{
+function genssa2_describe_induction_step(env, defs, reg,
+               depg, entry, revh)
+{ vis = mkhash();
+  subst(r0) =
+    do loop(r = r0) {
+     if ( r === reg ) return 'rec'()
+     else {
+       df = ohashget(defs, r);
+       if (not(df)) return 'var'(r)
+       else if (ohashget(vis, r)) return 'var'(r)
+       else {
+         ohashput(vis, r, r);
+         nop = visit:genssa2(iop: df) {
+                deep expr {
+                  var -> {aif (chk0 = ohashget(revh, id))
+                               'indvar'(id, chk0)
+                          else if (ohashget(depg, id)) loop(id)
+                          else node}
+                | else -> node}};
+         return 'op'(nop)}}};
+  visit:genssa2(iop: ohashget(defs, reg)) {
+     deep phiarg {
+        a -> if (src === entry) [] else v};
+     deep iop {
+        phi -> {match (filter a in args as a) with
+                  [one] -> one
+                | else -> ccerror('OOPS'(args))}
+      | else -> ccerror('IMPOSSIBLE'(node))};
+     deep expr { var -> if (ohashget(depg, id)) subst(id) else node
+               | else -> node}}}}
+
+\pfcode{
+function genssa2_maybe_induction(env, loops, defs, deps, origs, src)
+collector(add, get) {
+  //   In order to do so we'd have to postpone purity check and
+  //   do it in a loop, eliminating inner inductive variables one by one.
+
+   innerloop(bb) = {
+      // Return a name of the innermost loop for this node, or []
+      return genssa2_is_in_a_loop(loops, bb)};
+   
+   getloopnodes(L) = {
+      // Cache all the nodes of a loop L
+      l = ohashget(loops, %Sm<<("body-", L));
+      ht = mkhash();
+      iter l do ohashput(ht, l, l);
+      return ht};
+
+   isinaloop(lh, reg) =
+      aif (chk = ohashget(origs, reg))
+          ohashget(lh, chk);
+   
+   follow_deps(lh, entry) = {
+      // Only follow the register dependencies that lie in
+      // a given loop (lh is a hashtable).
+      
+      ht = mkhash();
+      do loop(e = entry) {
+         if (ohashget(ht, e)) []
+         else {
+            refs = ohashget(deps, e);
+            lrefs = filter r in refs as isinaloop(lh, r);
+            ohashput(ht, e, lrefs);
+            iter r in lrefs do loop(r)}};
+      return ht};
+
+   iscircular(ht, entry) = {
+      // Check if there are circular dependencies in a graph
+      vis = mkhash();
+      do loop(e = entry) {
+         if (ohashget(vis, e)) true
+         else {
+           ohashput(vis, e, e);
+           do iloop(r = ohashget(ht, e)) {
+              match r with
+                hd:tl -> if(loop(hd)) true else iloop(tl)
+              | else -> []}}}};
+
+   ispure(reg, r) = {
+      // Check if the register definition is pure and not a phi
+      if (r === reg) true
+      else {
+        chk = ohashget(defs, r);
+        visit:genssa2(iop: chk) {
+           deep iop {
+              phi -> []
+            | select -> true
+            | call -> genssa2_is_value_pure(env, chk)
+            | else -> []}}}};
+
+   isnpure(reg, k) = genssa2_is_value_pure(env, ohashget(defs, k));
+   isnnpure(rev, reg, k) = {
+      if (ohashget(rev, k)) true
+      else ispure(reg, k)};
+
+   loopdescr(L) = {
+      // TODO: may want more information here
+      ohashget(loops,%Sm<<("body-",L));
+   };
+
+   getloopentryedge(L) = {
+      chk = ohashget(loops, %Sm<<("entryedge-", L));
+      match chk with
+        [[f;t]] -> f
+        //TODO!
+      | else -> ccerror('NOENTRYEDGE'(L))};
+
+   initvalue(L, reg) = {
+      edge = getloopentryedge(L);
+      visit:genssa2(iop: ohashget(defs, reg)) {
+         deep phiarg {
+            a -> if (src===edge) v else []};
+         deep iop {
+            phi -> {r = filter a in args as a;
+                    match r with [one] -> one
+                               | else -> ccerror('NO-ENTRY'(reg))}
+         | else -> ccerror('IMPOSSIBLE'(node))}}};
+
+   makestep(L, reg, depg, revh) = {
+      // TODO
+      entry = getloopentryedge(L);
+      genssa2_describe_induction_step(env, defs, reg, depg, entry, revh)};
+      
+   tryinduct(L, reg) = {
+      // 1. Build a sub-graph of the reg dependency graph
+      //    which lies entirely within L.
+      Lnodes = getloopnodes(L);
+      depg = follow_deps(Lnodes, reg);
+      // 2. If it is still circular, check if all its elements
+      //    are pure.
+      if (iscircular(depg, reg)) {
+         depl = hashmap(fun(k,v) k, depg);
+         purep = foldl(fun(l,r) l&&r, true,
+                       map d in depl do ispure(reg, d));
+      //   3. Still here? Add an 'inductive' node.
+         if (purep) {
+            add('inductive'(L, reg, loopdescr(L), depl,
+                            'init'(initvalue(L, reg)),
+                            makestep(L, reg, depg, mkhash())))
+         } else {
+           npurep = foldl(fun(l,r) l&&r, true,
+                          map d in depl do isnpure(reg, d));
+           if(npurep) add('maybeinductive'(L, reg, depl))}}};
+
+   refineinduct(lst) =
+      do loop(l = lst) collector(iadd, iget) {
+         chgp = mkref([]); rev = mkhash();
+         todo = map append l in lst do {
+            match l with
+               'inductive'(LN, r, LPth, pth, @_) -> {
+                  iadd(l); ohashput(rev, r, LN); []}
+            |  'maybeinductive'(L, reg, nppth) -> [l]};
+         nxt = map append t in todo do {
+            match t with
+                'maybeinductive'(L, reg, nppth) -> {
+                   chk = foldl(fun(l, r) l&&r, true,
+                               map p in nppth do isnnpure(rev, reg, p));
+                   if(chk) {
+                      chgp := true;
+                      depg = mkhash();
+                      iter d in nppth do ohashput(depg, d, d);
+                      iadd('inductive'(L, reg, loopdescr(L), nppth,
+                                       'init'(initvalue(L, reg),
+                                       makestep(L, reg, depg, rev))));
+                      return []}
+                   else return [t]}};
+         if (nxt && ^chgp) loop(iget()::nxt) else iget()};
+           
+   visit:genssa2(top: src) {
+     deep iop(bb, dstreg) {
+       phi -> {
+          L = innerloop(bb);
+          if (L && length(args)==2) { // In da loop
+             tryinduct(L, dstreg)}}
+     | else -> []};
+     deep oppair: fun(bb) op(bb, name);
+     deep bblock {b -> iter o in ops do o(name)}};
+
+   candidates = get();
+   // Now, iterate over candidates until there are no more changes
+   return refineinduct(candidates)}}
+
+\pfcode{
+function genssa2_induction(env, src) {
+   loops = genssa2_loops(src);
+   defs = genssa2_cache_defs(src);
+   origs = genssa2_cache_origs(src);
+
+   deps = genssa2_make_depgraph(src, []);
+   loopsht = genssa2_cache_loops(loops);
+ 
+   l = genssa2_maybe_induction(env, loopsht, defs, deps, origs, src);
+   return [[loops; loopsht; defs; origs; deps]; l]
+}}
+
+\section{Loop exit conditions analysis}
+
+If a loop exit condition is a function of loop induction variables and loop invariants (or constants) only,
+we can check it for certain patterns:
+
+\begin{itemize}
+\item $cmp(L_{i}, I)$ --- gives a bound for a linear induction variable, which may later be used to fold
+   a $L_{ind}$ outside of the loop and be used to define value set inside the loop.
+\item $eq(X_{i}, I)$ --- folds to I outside of a loop, no matter how $X_{i}$ steps.
+\end{itemize}
+
+\pfcode{
+function genssa2_loop_exits(env, cache, ind, src)
+collector(addexit, getexits) {
+   // 1. Get loop exit conditions
+  <[[lx;loops]; loopsht; defs; origs; deps]> = cache;
+  
+   exits = mkhash();
+   iter l in loops do match l with
+      exitedge(L,f,t) -> { ohashput(exits, f, [L;t]); };
+
+   indht = mkhash();
+   iter i in ind do
+       match i with
+          inductive(L, reg, ld, depl, init, step) -> {
+             ohashput(indht, reg, L)};
+            
+   describe(L, c) = {
+      lbody = ohashget(loopsht, %Sm<<("body-", L));
+      vis = mkhash();
+      subst(r0) =
+        do loop(r = r0) {
+           chk1 = ohashget(indht, r);
+           if (ohashget(vis, r)) 'var'(r)
+           else if (chk1) {
+             return 'indvar'(r, chk1)
+           } else {
+             ohashput(vis, r, r);
+             df = ohashget(defs, r);
+             if (df) {
+                o = ohashget(origs, r);
+                if (memq(o, lbody)) {
+                   nop = visit:genssa2(iop: df) {
+                      deep iop {
+                         phi -> []
+                       | else -> node};
+                      deep expr {
+                         var -> loop(id)
+                       | else -> node}};
+                   if (nop) return 'op'(nop)
+                       else return 'var'(r)}
+                else 'var'(r)}
+             else 'var'(r)}};
+     visit:genssa2(expr:c) {
+        deep expr {
+           var -> subst(id)
+         | else -> node}}};
+         
+   visit:genssa2(top: src) {
+      deep bblock { b -> t(name) };
+      deep term(bb) {
+        brc -> {
+           chk = ohashget(exits, bb);
+           match chk with
+             [L;ex] ->
+               {neg = (fl === ex);
+                addexit('exit'(bb, ex, L, neg, describe(L, c)))}}
+      | else -> []}};
+   return src
+}}
+
+%%%%%%%

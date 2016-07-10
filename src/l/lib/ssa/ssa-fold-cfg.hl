@@ -1,0 +1,129 @@
+% literate:
+
+\section{Clean up CFG after all the constant folding and ADCE}
+
+Constant folding combined with a $\varphi$ to select conversion may leave lots of needless branches.
+
+
+Basic blocks are merged if there is an unconditional branch $A\to B$ and $B$ has only one predecessor.
+Conditional branches are eliminated if both paths are empty, leading to the same basic block and there
+are no $\varphi$ nodes in it.
+
+\pfcode{
+function genssa2_paths_converge(cfg, rev, bbs, f) {
+   // Back propagate from f to check if paths leading to it
+   // can be eliminated.
+   //
+   // This is only done for the nodes with multiple preds and no
+   // phis.
+   //
+   // Each pred. node on each edge is only followed iff it is empty
+   // and have only one exit.
+   vis = mkhash();
+   ret = do loop(front = [f], done = []) collector(add, get) {
+      nxs = map append f in front do if (not(ohashget(vis, f))) {
+         ls = ohashget(rev, f);
+         ohashput(vis, f, f);
+         map append l in ls do {
+            <[ops;t]> = ohashget(bbs, l);
+             if (not(ops) && length(ohashget(cfg, l))==1) {
+               [l]
+             } else {add(l); []}}};
+      if (nxs) loop(nxs, unifiq(get()::done))
+      else unifiq(get()::done)};
+   match ret with
+     [one] -> one
+   | else -> []}}
+
+\pfcode{
+function genssa2_merge_basic_blocks(src, chgp) {
+   // 1. Prepare.
+   cfg = mkhash(); cnt = mkhash(); bbs = mkhash(); rev = mkhash();
+   getcnt(t) = {
+      chk = ohashget(cnt, t);
+      if(chk) chk else 0};
+   addcnt(t) = ohashput(cnt, t, getcnt(t)+1);
+   visit:genssa2(top: src) {
+      once bblock {
+         b -> {
+            ohashput(bbs, name, [ops; t]);
+            nxs = genssa2_get_exits(node);
+            ohashput(cfg, name, nxs);
+            iter n in nxs do {
+               ohashput(rev, n, unifiq(name:ohashget(rev, n)))
+            };
+            iter n in nxs do addcnt(n)}}};
+
+   phis = mkhash();
+   visit:genssa2(top: src) {
+     deep bblock {
+        b -> iter o in ops do o(name)};
+     deep oppair: fun(bb) op(bb);
+     deep iop(bb) {
+        phi -> ohashput(phis, bb, bb)
+      | else -> []}};
+
+   getnode(nm) = ohashget(bbs, nm);
+   // 2. Merge basic blocks
+   collector(add, get) {
+     visit:genssa2(top: src) {
+       once bblock {
+         b -> {
+            if (not(ohashget(phis, name)) &&
+                length(ohashget(rev, name))>1) {
+               chk1 = genssa2_paths_converge(cfg, rev, bbs, name);
+               if (chk1) add('converge'(chk1, name))};
+            nxs = ohashget(cfg, name);
+            if (length(nxs)==1 &&
+                getcnt(car(nxs)) == 1) {
+              add('fuse'(name, car(nxs)))
+              }}}};
+     commands0 = get();
+     // We can only execute independend commands
+     ch = mkhash();
+     commands = filter [cmd;f;t] in commands0 as {
+        if (ohashget(ch,f) || ohashget(ch,t)) []
+        else {ohashput(ch, f, f); ohashput(ch, t, t); true}};
+
+     if (commands) {
+       kill = mkhash(); merge = mkhash();
+       iter [cmd; f; t] in commands do {
+          ohashput(merge, f, t);
+          ohashput(kill, t, f)};
+       chgp := true;
+       split_phis(bb) =
+         collector(add, get)
+         collector(phiadd, phiget) {
+            visit:genssa2(bblock:bb) {
+               deep oppair: op(name);
+               deep iop(dstreg) {
+                  phi -> phiadd([dstreg; node])
+                | else -> add([dstreg; node])}};
+            return [phiget();get()]};
+       
+       rewritebb(bb) =
+          visit:genssa2(bblock: bb) {
+            deep bblock {
+              b -> { // After merging, phis may need to be
+                     //   floated to the top
+                <[phiops;nops]> = split_phis(node);
+                 mk:node(ops = phiops :: nops)}};
+            deep phiarg {
+              a -> {
+                 chk = ohashget(kill, src);
+                 if (chk) mk:node(src = chk) else node}}};
+       return visit:genssa2(top: src) {
+          deep code: map append b in bs do b;
+          deep bblock {
+            b -> {
+               if (ohashget(kill, name)) []
+               else {
+                  chk = ohashget(merge, name);
+                  if (chk) {
+                    <[ops1;nx1]> = getnode(chk);
+                    [rewritebb(mk:node(ops = ops :: ops1, t = nx1))]
+                  } else [rewritebb(node)]}}}}
+     } else src}}}
+     
+
+%%%%%%%%%%%%%

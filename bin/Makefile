@@ -1,4 +1,4 @@
-CSC := dmcs
+CSC := mcs
 CSCOPTS :=  /optimize+ /debug- 
 CSCSOURCESPFX=../src/cs/dll/
 
@@ -96,12 +96,17 @@ MBaseFront.dll: MBasePackrat.dll
 MBaseLogic.dll: pfront.exe
 	$(MONO) ./pfront.exe $(LIB)/lib/wam/mbaselogic.hl
 
+-include MBaseBPP.dll.d
+MBaseBPP.dll: pfront.exe MBaseLogic.dll
+	$(MONO) ./pfront.exe ../misc/bpp/bpp2ext.hl
+
 -include MBaseExtra.dll.d
-MBaseExtra.dll: pfront.exe
+MBaseExtra.dll: pfront.exe MBaseLogic.dll
 	$(MONO) ./pfront.exe $(LIB)/lib/ssa/ssa-lib.hl
 
 pfront.exe: MBaseFront.dll $(LIB)/lib/pfront/pfront.al
 	$(MONO) ./repl.exe /b /emit $(LIB)/lib/pfront/pfront.al
+	./mbfixbin pfront.exe
 
 pfprint.exe: MBaseFront.dll $(LIB)/lib/pfront/pfprint.al
 	$(MONO) ./repl.exe /b /emit $(LIB)/lib/pfront/pfprint.al
@@ -111,6 +116,7 @@ pftexprint.exe: MBaseFront.dll $(LIB)/lib/pfront/pftexprint.al
 
 pfrepl.exe: MBaseFront.dll $(LIB)/lib/pfront/pfrepl.al
 	$(MONO) ./repl.exe /b /emit $(LIB)/lib/pfront/pfrepl.al
+	./mbfixbin pfrepl.exe
 
 MBaseML.dll: MBasePackrat.dll
 	$(MONO) ./repl.exe /b /emit $(LIB)/lib/ml/mldll.al
@@ -126,5 +132,6 @@ prologrepl.exe: MBaseLogic.dll
 
 pfhighlight.exe: repl.exe MBasePackrat.dll MBaseFront.dll pfront.exe
 	$(MONO) ./pfront.exe /dbg /c pfhighlight ../misc/emacs/pfhighlight.hl
+	./mbfixbin ./pfhighlight.exe
 
 

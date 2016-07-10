@@ -11,6 +11,8 @@
 (define t_ConstructorInfo (sdotnet "System.Reflection.ConstructorInfo"))
 (define mtd_MkSymbol (r_mtd t_Symbol "make" string))
 (define mtd_Cons (r_getconstructor t_Pair object object))
+(define mtd_Cons1 (r_getconstructor t_Pair object))
+(define mtd_Cons0 (r_getconstructor t_Pair))
 (net.types RuntimeMethodHandle RuntimeFieldHandle Precompiler Runtime)
 
 (define mtd_register_method (r_mtd t_runtime "_register_method" t_Symbol t_RuntimeMethodHandle int))

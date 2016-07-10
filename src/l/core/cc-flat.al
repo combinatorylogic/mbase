@@ -277,11 +277,27 @@
           (Car (Pop))
           ,@(cc:pop target)
           ))
+       
        (Cdr
         `(,@(tailloop e 'push nil)
           (Cdr (Pop))
           ,@(cc:pop target)
           ))
+       
+       (SetCar
+        `(,@(tailloop dst 'push nil)
+          (CastPair (Pop))
+          ,@(tailloop e   'push nil)
+          (SetCar (Pop) (Pop))
+          ,@(tailloop '(Nil) target nil)))
+       
+       (SetCdr
+        `(,@(tailloop dst 'push nil)
+          (CastPair (Pop))
+          ,@(tailloop e   'push nil)
+          (SetCdr (Pop) (Pop))
+          ,@(tailloop '(Nil) target nil)))
+       
        (Cons
         `(
           ,@(tailloop a 'push nil)
@@ -289,6 +305,20 @@
           (Cons (Pop) (Pop))
           ,@(cc:pop target)
           ))
+
+       (Cons1
+        `(
+          ,@(tailloop a 'push nil)
+          (Cons1 (Pop))
+          ,@(cc:pop target)
+          ))
+
+       (Cons0
+        `(
+          (Cons0)
+          ,@(cc:pop target)
+          ))
+
        (BinOp
         `(,@(tailloop left 'push nil)
           (IntUnbox (Pop))

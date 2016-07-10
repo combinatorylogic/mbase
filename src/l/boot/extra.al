@@ -14,7 +14,7 @@
 (include "../ext/rules.al")
 (include "../ext/collections.al")
 (include "../ext/threading.al")
-(include "../ext/trajan.al")
+(include "../ext/tarjan.al")
 (include "../ext/sexp.al")
 (include "../ext/xml.al")
 (include "../ext/nettypes.al")

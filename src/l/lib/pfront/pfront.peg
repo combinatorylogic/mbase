@@ -204,6 +204,7 @@ parser pfront extends minipeg (
   term mpattern "Match pattern" :=
      { impattern:a ':' mpattern:p=>cons(a,p)}
    / { impattern:a |'as'| ident:id |'when'| expr:e => guard(id, bindas(id, a), e) }
+   / { '?' ident:fn '(' ident:id ')' => guard(id, binding(id), call(var(fn), var(id))) }
    / { impattern:a |'as'| ident:id => bindas(id,a) }
    / impattern
    =>

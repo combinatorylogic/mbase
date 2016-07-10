@@ -80,6 +80,13 @@
                        ,(cc:arg->var fnargs body)))
                node))
           (else node)))
+       (Cons
+        (p:match (list a b)
+          (((Nil) (Nil))
+           `(Cons0))
+          (($a (Nil))
+           `(Cons1 ,a))
+          (else node)))
        (If
         (p:match e
           ((NullP $a) `(IfNull ,a ,iftr ,iffl))
