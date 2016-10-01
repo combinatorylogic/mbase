@@ -86,6 +86,8 @@
             `(extend ,id
                       ,@(foreach-map (v vars)
                           (p:match v
+                            ((- $tag)
+                             `(remove ,tag))
                             (($tag . $ptn)
                              `(add (v ,tag ,(translate-pattern ptn))))
                             (else (ccerror `(AST-FRONT-VARIANT-FORMAT ,v))))))))

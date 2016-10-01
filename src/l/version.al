@@ -7,7 +7,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(ctime (define *VERSION* "1.0.2.11"))
+(ctime (define *VERSION* "1.0.2.12"))
 (ctime `(#define version ,*VERSION*))
 (ctimex (define assembly-version *VERSION*))
 (ctimex (define assembly-keyfile "pubpriv"))

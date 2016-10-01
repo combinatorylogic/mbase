@@ -58,7 +58,9 @@
 
   (astalt
    (| (withargs <ident:nm> <*astbind:args>)
-      (single <ident:nm>)))
+      (single <ident:nm>)
+      (remove <ident:nm>)
+      ))
   (astbind
    (| (bindmany <ident:tp> <ident:nm>)
       (bindopt <ident:tp> <ident:nm>)
@@ -147,6 +149,7 @@
       (withmacros <*lmacrodef:ds> <expr:e>)
       (withmetadata <expr:m> <expr:e>)
       (mknode . <*llpair:args>)
+      (mksnode <ident:nd> . <*xllpair:args>)
       (mkvnode <ident:nd> <ident:tag> . <*xllpair:args>)
       (mkxnode <ident:tag> . <*xllpair:args>)
 

@@ -40,6 +40,13 @@ parser basics (
    define eslist<a> := {a:head eslist:tail => $cons(head,tail)}
                      / {!a => $nil() };
 
+   define plist<a,b> := {a b:head plist:tail => $cons(head, tail) }
+                     /  {a b:head => $wrap(head) };
+                     
+   define eplist<a,b> := {a b:head eplist:tail => $cons(head, tail) }
+                      /  {a b:head => $wrap(head) }
+                      /  {!(a b) => $nil() };
+
    basics := whitespace;
    token empty := ! ..;
 )

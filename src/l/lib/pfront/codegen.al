@@ -144,6 +144,7 @@
        (mknode `(ast:mknode ,@args))
        (mkvnode `(ast2:vctr ,nd ,tag ,@args))
        (mkxnode `(ast2:xctr ,tag ,@args))
+       (mksnode `(ast2:ctr  ,nd ,@args))
        (filter
           (p:match n
             ((var $vnm)
@@ -380,6 +381,7 @@
        (struct `(,nm ,(hlevel-ast-pattern s)))))
     (astalt DEEP
       ((withargs `(,nm ,@(hlevel-ast-pattern args)))
+       (remove `(- ,nm))
        (single `(,nm))))
     (astbind DEEP
       ((bindmany (Sm<< "<*" tp ":" nm ">"))

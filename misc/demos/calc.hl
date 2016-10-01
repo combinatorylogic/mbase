@@ -1,0 +1,76 @@
+// AST definition
+ast calc{
+   expr = plus(expr:a, expr:b)
+        | minus(expr:a, expr:b)
+        | mult(expr:a, expr:b)
+        | div(expr:a, expr:b)
+        | let(ident:nm, expr:val, expr:body)
+        | var(ident:nm)
+        | const(number:v);
+}
+
+// Interpreter
+function calc_eval(ex)
+   do loop(env=[], e=ex)
+      visit:calc (expr:e) {
+         once expr {
+           let -> loop([nm;loop(env, val)]:env, body)
+         | deep -> {
+             plus -> %f+(a,b)
+           | minus -> %f-(a,b)
+           | mult -> %f*(a,b)
+           | div -> %f/(a,b)
+           | const -> v
+           | var -> %lookup-env-car(env, nm)
+           | else -> []}}}
+
+// Compiler
+function calc_compile(ex)
+   visit:calc(expr: ex) {
+     deep expr {
+        const -> 'f#'(%->s(v))
+      | var -> nm
+      | let -> 'alet'(nm, val, body)
+      | plus -> 'f+'(a,b)
+      | minus -> 'f-'(a,b)
+      | mult -> 'f*'(a,b)
+      | div -> 'f/'(a,b)}}
+
+// PEG parser
+function %peg-function-fval (v)
+  %flt:parse(cdr(v))
+
+parser calc (pfront) {
+   !!Spaces;
+   calc := [calc0]:c [Spaces]* => c;
+   binary calc0 :=
+         (200) [calc0] "*" [calc0] => mult(L,R)
+       | (200) [calc0] "/" [calc0] => div(L,R)
+       | (100) [calc0] "+" [calc0] => plus(L,R)
+       | (100) [calc0] "-" [calc0] => minus(L,R)
+       | [atom]
+       ;
+   atom := { "(" [expr]:e ")" => e }
+        /  { let [ident]:nm "=" [calc]:v in [calc]:body
+                  => let(nm, v, body) }
+        /  { [ident]:nm => var(nm) }
+        /  { [double]:v => const(v) }
+        ;
+
+   double := [tkdouble]:v => $fval(v);
+   @tkdouble := ("-"/"+")? [Digit]+ 
+                   ("." [Digit]+)?;
+}
+
+// Interpreted version:
+writeline(calc_eval(parse "let x = 2 in 2*2+x*3" as calc))
+
+// Compiled version, wrapped into a syntax extension:
+syntax in expr, start (calc): ' "calc:" [calc]:c '
+{
+   return 'lisp'(calc_compile(c))
+}
+
+-------------
+
+writeline(calc: let x = 2 in 2*2+x*3)

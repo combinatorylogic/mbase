@@ -617,6 +617,15 @@
 (function peg-function-nil ()
   nil)
 
+(function peg-function-true ()
+  #t)
+
+(function peg-function-nullp (a)
+  (null? a))
+
+(function peg-function-not (a)
+  (not a))
+
 (function peg-function-charcode (s)
   (ascii (car (string->list s))))
 

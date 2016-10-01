@@ -87,6 +87,15 @@ parser pfcommon (
  define eslist<a> := {a:head eslist:tail => $cons(head,tail)}
                    / {!a => $nil() };
 
+
+ define plist<a,b> := {a b:head eplist:tail => $cons(head, tail) }
+                   /  {a b:head => $wrap(head) };
+                     
+ define eplist<a,b> := {a b:head eplist:tail => $cons(head, tail) }
+                    /  {a b:head => $wrap(head) }
+                    /  {!(a b) => $nil() };
+
+
  term ident := {Ident:i => {ctoken = ident} $sval(i)}
             /  {Ident1pfx Ident1:i Ident1tail => {ctoken = ident} $sval(i)}
             /  {Ident2:i => {ctoken = ident} $sccval(i)}

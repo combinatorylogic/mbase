@@ -50,7 +50,7 @@ collector(eqadd, eqsget) {
       | call -> genssa2_intrinsic_equations(lenv, env, eqadd, dstreg, dst, args)};
      deep term {
         brc -> aeq(c, booltp)
-      | switch -> iter n in ns do aeq(v, ns)
+      | switch -> iter n in ns do aeq(v, n)
       | else -> []};
      deep expr {
         var -> 'var'(id)

@@ -123,6 +123,8 @@ parser pfront extends minipeg (
   / { |'mk'| ':' |'node'| '(' %indent(push,firsttab) ecslist<mdargpair,','>:args %indent(pop,firsttab) ')' => mknode(@args) }
   / { |'mk'| ':' ident:nd ':' ident:vtag
          '(' %indent(push,firsttab) ecslist<xmdargpair,','>:args %indent(pop,firsttab) ')' => mkvnode(nd, vtag, @args) }
+  / { |'mk'| ':' ident:nd ':'
+         '(' %indent(push,firsttab) ecslist<xmdargpair,','>:args %indent(pop,firsttab) ')' => mksnode(nd, @args) }
   / { |'mk'| ':' ident:vtag
          '(' %indent(push,firsttab) ecslist<xmdargpair,','>:args %indent(pop,firsttab) ')' => mkxnode(vtag, @args) }
   / { |'if'| exprwrap:e |'then'|? %indent(push,tab) exprwrap:tr ';'? %indent(pop,tab) |'else'| %indent(push,tab) exprwrap:fl %indent(pop,tab)
@@ -337,6 +339,7 @@ parser pfront extends minipeg (
 
   term aststruct "<ast struct>" :=
       { ident:nm '(' ecslist<astsarg,','>:args ')' => withargs(nm,args) }
+    / { "-" ident:nm => remove(nm) }
     / { ident:nm => single(nm) };
 
   term aststrucx "<ast struct>" :=

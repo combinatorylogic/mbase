@@ -72,7 +72,8 @@ function genssa2_merge_basic_blocks(src, chgp) {
             if (not(ohashget(phis, name)) &&
                 length(ohashget(rev, name))>1) {
                chk1 = genssa2_paths_converge(cfg, rev, bbs, name);
-               if (chk1) add('converge'(chk1, name))};
+               if (chk1 && length(ohashget(cfg, chk1))<3)
+                  add('converge'(chk1, name))};
             nxs = ohashget(cfg, name);
             if (length(nxs)==1 &&
                 getcnt(car(nxs)) == 1) {
