@@ -32,11 +32,30 @@ function genssa2_cache_loops(ls) {
   return loops}}
 
 \pfcode{
+function genssa2_get_loop_body(loops, L) {
+   ohashget(loops, %Sm<<("body-", L))}}
+
+\pfcode{
 function genssa2_get_loop_entry(loops, L) {
    es = ohashget(loops, %Sm<<("entry-", L));
    match es with
       [one] -> one
     | else -> []}}
+
+\pfcode{
+function genssa2_get_loop_backedge(loops, L) {
+   es = ohashget(loops, %Sm<<("backedge-", L));
+   match es with
+      [one] -> one
+    | else -> []}}
+
+\pfcode{
+function genssa2_get_loop_exitedge(loops, L) {
+   es = ohashget(loops, %Sm<<("exitedge-", L));
+   match es with
+      [one] -> one
+    | else -> []}}
+
 
 \pfcode{
 function genssa2_get_loop_entry_edge(loops, L) {
@@ -326,8 +345,8 @@ collector(add, get) {
       //   3. Still here? Add an 'inductive' node.
          if (purep) {
             add('inductive'(L, reg, loopdescr(L), depl,
-                            'init'(initvalue(L, reg)),
-                            makestep(L, reg, depg, mkhash())))
+                            'init'(genssa2_to_algebraic(env, initvalue(L, reg))),
+                            genssa2_to_algebraic(env, makestep(L, reg, depg, mkhash()))))
          } else {
            npurep = foldl(fun(l,r) l&&r, true,
                           map d in depl do isnpure(reg, d));
@@ -351,8 +370,8 @@ collector(add, get) {
                       depg = mkhash();
                       iter d in nppth do ohashput(depg, d, d);
                       iadd('inductive'(L, reg, loopdescr(L), nppth,
-                                       'init'(initvalue(L, reg),
-                                       makestep(L, reg, depg, rev))));
+                                       'init'(genssa2_to_algebraic(env, initvalue(L, reg))),
+                                       genssa2_to_algebraic(env, makestep(L, reg, depg, rev))));
                       return []}
                    else return [t]}};
          if (nxt && ^chgp) loop(iget()::nxt) else iget()};
@@ -441,7 +460,8 @@ collector(addexit, getexits) {
         deep expr {
            var -> subst(id)
          | else -> node}}};
-         
+
+   describe_alg(L,c) = genssa2_to_algebraic(env, describe(L, c));
    visit:genssa2(top: src) {
       deep bblock { b -> t(name) };
       deep term(bb) {
@@ -450,9 +470,279 @@ collector(addexit, getexits) {
            match chk with
              [L;ex] ->
                {neg = (fl === ex);
-                addexit('exit'(bb, ex, L, neg, describe(L, c)))}}
+                addexit('exit'(bb, ex, L, neg, describe_alg(L, c)))}}
       | else -> []}};
-   return src
+   exits = getexits();
+   return exits
 }}
+
+Useful explanations for induction variables and exit conditions include the following patterns:
+
+\begin{itemize}
+  \item $i_0 = C_0, i \leftarrow i + C_1, [i < C_2]$ --- a constant bound loop, with value of $i$ known on a loop exit,
+        and a total number of iterations being a known constant (affecting the exit values of all the other induction variables).
+        There must be only one exit in such a loop.
+\end{itemize}
+
+\pfcode{
+function genssa2_loop_bounds(env, ind, exits)
+collector(addcandidate, getcandidates) {
+   // Select the loops with one exit only, which is matching a pattern
+   //      (compop (indvar X) (const ...))
+   //    or
+   //      (compop (const ...) (indvar X))
+   //
+   //    And indvar X definition is matching a pattern
+   //      ((init (const ...)) (step (arithmetic (rec) (const ...))))
+   //    or
+   //      ((init (const ...)) (step (arithmetic (const ...) (rec))))
+
+   // 1. Cache the candidate constant induction variables
+   indht = mkhash();
+   addind(id, ic, stepop, dir, sc) = ohashput(indht, id, [ic; stepop; dir; sc]);
+   iter i in ind do {
+      match i with
+         'inductive'(L, regnm, loopnodes, deps, 'init'('const'(ic)),
+                        [stepop; op1; opL; opR]) -> {
+             match [opL; opR] with
+                ['rec'();'const'(sc)] -> addind(regnm, 'const'(ic), stepop, 'lr', 'const'(sc))
+              | ['const'(sc);'rec'()] -> addind(regnm, 'const'(ic), stepop, 'rl', 'const'(sc))}};
+
+   // 2. Count the exits
+   exitsht = mkhash();
+   iter e in exits do {
+      match e with
+         'exit'(bb,ex, L, @_) -> ohashput(exitsht, L, bb:ohashget(exitsht, L))};
+ 
+   // 3. Check the candidate constant exit conditions
+   isconstind(V) = ohashget(indht, V);
+   iscmpop(op) =
+     case op { 'eq' | 'neq'| 'gr' | 'ge' | 'lt' | 'le' -> true | else -> []};
+
+   makeop(neg, dir, op, c) = {
+     <L:R> = if(dir==='lr') 'rec'():c else c:'rec'();
+      ret = [op; '_'; L; R];
+      if (not(neg)) return genssa2_compop_negate(ret) else ret};
+
+   makestepop(op, dir, c) = {
+     <L:R> = if(dir==='lr') 'rec'():c else c:'rec'();
+     return [op; '_'; L; R]};
+
+   makebounds(L, neg, dir, op, V, c) = {
+     <[ic;stepop;sdir;sc]> = ohashget(indht, V);
+      addcandidate('constloop'(L, V, 'init'(ic), 'step'(makestepop(stepop, sdir, sc)), 'bound'(makeop(neg, dir, op, c))))
+   };
+                   
+   check(L, neg, dir, op, V, c) =
+    if(length(ohashget(exitsht,L))==1) {
+       if(iscmpop(op) && isconstind(V)) {
+         makebounds(L, neg, dir, op, V, c)
+       }};
+   iter e in exits do {
+      match e with
+         'exit'(bb,ex, L, neg, [op;op1;'indvar'(V);'const'(c)]) ->
+             check(L, neg, 'lr', op, V, 'const'(c))
+      |  'exit'(bb,ex, L, neg, [op;op1;'const'(c);'indvar'(V)]) ->
+             check(L, neg, 'rl', op, V, 'const'(c))};
+   return getcandidates();
+}}
+
+\pfcode{
+function genssa2_loop_bounds_static(env, lb) {
+  // Further simplify the static loop bounds, infer the precise integer intervals possible
+  getinteger(c) = match c with const(c0) ->
+                    genssa2_env_getinteger(env, c0)
+                  | else -> ccerror('IMPOSSIBLE'(c));
+  normalise_step(op,L,R) = {
+    match [op;L;R] with
+       add(rec(),x) -> getinteger(x)
+     | add(x,rec()) -> getinteger(x)
+     | sub(rec(),x) -> 0-getinteger(x)
+     | else -> []};
+  max(a,b) = if(a>b) a else b;
+  min(a,b) = if(a<b) a else b;
+  abs(a) = if(a>0) a else 0-a;
+  normalise_limit(initc, step, op, L, R) = 
+  do loop(op=op, L=L, R=R) {
+    match [op;L;R] with
+       le(rec(),x) -> {
+          // TODO: check off intervals
+          c1 = getinteger(x);
+          d = c1 - initc;
+          n = d / step;
+          if (initc + d*n == c1) return (c1+1) else return c1}
+     | lt(rec(),x) -> {
+          c1 = getinteger(x);
+          return c1}
+     | gr(rec(),x) -> {
+          cl = getinteger(x);
+          return cl}
+     | ge(rec(),x) -> {
+          c1 = getinteger(x);
+          d = initc - c1;
+          n = d / abs(step);
+          if (initc - d*n == c1) return (c1+1) else return c1}
+     | le(x,rec()) -> loop('ge','rec'(),x)
+     | lt(x,rec()) -> loop('gr','rec'(),x)
+     | ge(x,rec()) -> loop('le','rec'(),x)
+     | gr(x,rec()) -> loop('lt','rec'(),x)
+       // TODO
+     | else -> []};
+  normalise_count(i,s,l) = {
+     nsteps = (max(i,l) - min(i, l)) / abs(s);
+     return nsteps
+  };
+  map append constloop(Lp,V,init(I),step([op;_;L; R]),bound([bop;_;bL;bR])) in lb do {
+    initc = getinteger(I);
+    istep = normalise_step(op,L,R);
+    if(istep) {
+      blimit = normalise_limit(initc, istep, bop, bL, bR);
+      if (blimit) {
+         count = normalise_count(initc, istep, blimit);
+        ['constloop'(Lp,V, initc, istep, blimit, count)]
+      }}}}}
+
+\section{Loop unrolling}
+
+Once again, we're not after any performance optimisations here, so we can do the simplest
+thing possible and rely on a number of consequent passes to clean up the mess.
+
+The simplest loop unrolling, especially if we know the static bounds, is to copy the loop basic blocks
+$N$ times (doing all the renaming required, of course), replacing the back edge with the next edge,
+and induction phi with only its back edge branch.
+
+%1. New names for all the basic blocks and regs. Entry bblock is getting a given name (see below)
+%2. Clone basic blocks, renaming everything
+%3. Back edge phi entries are getting the previous renames
+%4. Back edge conditional branch is replaced with an unconditional one, pointing
+%   to the newly generated name
+
+\pfcode{
+function genssa2_loop_unroll_inner(env, src, bbsh, loop, loopbackedge, loopexitedge, count, chgp) {
+
+    newnames(loopbbs, entrybb, newentrybb) = {
+      bht = mkhash();rht = mkhash();
+      addbbrename(a,b) = ohashput(bht, a, b);
+      addregrename(a,b) = ohashput(rht, a, b);
+      visit:genssa2 (code: loopbbs) {
+         deep bblock {
+            b ->
+               if (name === entrybb)
+                  addbbrename(name, newentrybb)
+               else addbbrename(name, gensym())};
+         deep oppair: addregrename(name, gensym())};
+      return bht:rht};
+
+    rewrite(loopbbs, names, prevnames, backedge, exitedge, firstp, lastp, nextname) = {
+     <bht:rht> = names;
+     <pbht:prht> = prevnames;
+      isloopbb(name)  = ohashget(bht, name);
+      renamebb(name)  = aif(r = ohashget(bht, name)) r else name;
+      renamereg(name) = aif(r = ohashget(rht, name)) r else name;
+      prevrenamebb(name) = ohashget(pbht, name);
+      prevrenamereg(name) = aif(r = ohashget(prht, name)) r else name;
+      isbackedge(f, t) = (%Sm<<(f, "->", t) === backedge);
+      isexitedge(f, t) = (%Sm<<(f, "->", t) === exitedge);
+      rewriteexpr(e) =
+        visit:genssa2 (expr: e) {
+        deep expr {
+           var -> mk:node(id = renamereg(id))
+         | else -> node}};
+      prevrewriteexpr(e) =
+        visit:genssa2 (expr: e) {
+        deep expr {
+           var -> mk:node(id = prevrenamereg(id))
+         | else -> node}};
+      rewriteterm(t) =
+        visit:genssa2 (term: t) {
+           deep labident: renamebb(node);
+           once expr { else -> rewriteexpr(node) }};
+      rewritephi(bbname, regname, args) = {
+        newargs = map append a in args do
+           visit:genssa2 (phiarg: a) {
+              deep phiarg {
+                a -> if (firstp && isbackedge(src, bbname)) []
+                     else if (isbackedge(src, bbname)) ['a'(prevrenamebb(src), prevrewriteexpr(v))]
+                     else if (not(firstp) && not(isloopbb(src))) []
+                     else if (firstp && not(isloopbb(src))) ['a'(src, v)]
+                     else ['a'(renamebb(src), rewriteexpr(v))]}};
+        return 'phi'(@newargs)};
+      visit:genssa2 (code: loopbbs) {
+          deep bblock {
+             b -> {newnm = renamebb(name);
+                   mk:node(name = newnm, ops = map o in ops do o(name), t = t(name))}};
+          deep oppair: fun(bbname) {
+             [renamereg(name); op(bbname, name)]};
+          once iop {
+             phi -> fun(bbname, regname) rewritephi(bbname, regname, args)
+          |  deep -> { else -> fun(bbname, regname) node }};
+          once term(bbname) {
+             brc -> if(isbackedge(bbname, tr)) 'br'(nextname)
+                    else if(isbackedge(bbname, fl)) 'br'(nextname)
+                    else if(isexitedge(bbname, fl) && lastp) rewriteterm('br'(fl))
+                    else if(isexitedge(bbname, tr) && lastp) rewriteterm('br'(tr))
+                    else if(isexitedge(bbname, fl)) rewriteterm('br'(tr))
+                    else if(isexitedge(bbname, tr)) rewriteterm('br'(fl))
+                    else rewriteterm(node)
+          |  br  -> if(isbackedge(bbname, dst)) 'br'(nextname)
+                    else rewriteterm(node)
+          |  else -> rewriteterm(node)};
+          once expr { else -> rewriteexpr(node) }}};
+
+   rewriteloop(loopbbs, entrybb, count, backedge, exitedge, exitname) = collector(addbb, getbbs) {
+     ret = do loop(prevnames = (mkhash():mkhash()),
+             prevnext = entrybb, nextname0 = gensym(),
+             counter = 0) {
+        nextname = if(counter==count) exitname else nextname0;
+        nnm = newnames(loopbbs, entrybb, prevnext);
+        newbbs = rewrite(loopbbs, nnm, prevnames, backedge, exitedge,
+                         counter==0, counter==count, nextname);
+        iter b in newbbs do addbb(b);
+        if (counter < count)
+           loop(nnm, nextname, gensym(), counter+1)
+        else nextname:nnm
+     };
+     return ret:getbbs()};
+
+    loopbbs = map l in loop do ohashget(bbsh, l);
+    loopht = mkhash(); iter l in loop do ohashput(loopht, l, l);
+   <[bf;entrybb]> = loopbackedge;
+    backedge = %Sm<<(bf, "->", entrybb);
+   <[ef;et]> = loopexitedge;
+    exitedge = %Sm<<(ef, "->", et);
+   <(nextname:(bht:rht)):newbbs> = rewriteloop(loopbbs, entrybb, count, backedge, exitedge, et);
+    renamereg(id) = aif(chk = ohashget(rht, id)) chk else id;
+    renamebb(id)  = aif(chk = ohashget(bht, id)) chk else id;
+    chgp := true; // TODO - there must be bail out conditions, right?    
+    (map append bb in src do
+      visit:genssa2(bblock: bb) {
+        deep bblock {
+           b -> if(ohashget(loopht, name)) []
+                else [node]};
+        deep expr {
+           var -> mk:node(id = renamereg(id))
+         | else -> node};
+        deep phiarg {
+           a -> if (ohashget(loopht, src)) mk:node(src = renamebb(src)) else node}}) :: newbbs}}
+
+
+\pfcode{
+function genssa2_loop_unroll(env, src, cache, lr, chgp) {
+ <[[_;_]; loops; @_]> = cache;
+ <constloop(Lp, V, initc, istep, blimit, count)> = lr;
+  if (count > 16) src else
+  {
+    loopbackedge = genssa2_get_loop_backedge(loops, Lp);
+    loopexitedge = genssa2_get_loop_exitedge(loops, Lp);
+    loop = genssa2_get_loop_body(loops, Lp);
+    bbsh = mkhash();
+    srcc = visit:genssa2 (top: src) {
+      once top { f -> body }};
+    visit:genssa2(code: srcc) {
+      once bblock { b -> ohashput(bbsh, name, node) }};
+  
+    nbody = genssa2_loop_unroll_inner(env, srcc, bbsh, loop, loopbackedge, loopexitedge, count, chgp);
+    genssa2_kill_dangling(visit:genssa2 (top:src) {
+      once top { f -> mk:node(body = nbody) }})}}}
 
 %%%%%%%

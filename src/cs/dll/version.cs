@@ -27,6 +27,6 @@ internal class AssemblyVersion
   public const System.String kProductName = "MBase";
   public const System.String kDescription = "MBase";
   public const System.String kCompanyName = "Meta Alternative Ltd.";
-  public const System.String kFileVersion = "0.2016.06.07";
+  public const System.String kFileVersion = "0.2016.12.28";
 }
 

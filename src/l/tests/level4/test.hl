@@ -129,7 +129,7 @@ etest({<[a;b;c]> = [1;2;3];
        'test'(c,b,a)}, ['test';3;2;1]);
 
 
-etest({try { abc = 0; cde = 1/abc; return cde} catch (t_Exception e) { return 10;}},10);
+etest({try { abc = fun() 0; cde = 1/abc(); return cde} catch (t_Exception e) { return 10;}},10);
 
 etest(match [1;2;3] with [a;@b] -> [b;a], [[2;3];1]);
 

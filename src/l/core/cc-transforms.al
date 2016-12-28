@@ -179,7 +179,7 @@
 (include "./cc-letsrec.al")
 
 (function cc:lift-lambdas ( ast )
-  (alet srec? (cons nil nil)
+  (alet srec? (mkref)
   (collector (add get)
 ;= This function returns the result as a list of transformed expression and all the
 ;= lifted definitions.

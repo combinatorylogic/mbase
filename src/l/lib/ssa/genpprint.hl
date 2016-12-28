@@ -86,7 +86,7 @@ function pprint(lst, pfun)
        }} else { //it's a proper string
          len = notnet(string l) {leave l.get_Length();};
          ipos = car(str);
-         if ((pos + len - ipos) > 78) splitthisstring(l)
+         if ((pos + len - ipos) > 120) splitthisstring(l)
          else cont(str::[l], pos + len, stk)
        }
     }

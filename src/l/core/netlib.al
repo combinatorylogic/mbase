@@ -70,31 +70,10 @@
 (define _car_fld (r_getField t_Pair "car"))
 (define _cdr_fld (r_getField t_Pair "cdr"))
 )
-(cli-only
- (function set-car! (p v)
-   "Destructively sets a pair's head value."
-   (ctime
-    `(n.asm (p v)
-            (expr p)
-            (Castclass ,t_Pair)
-            (expr v)
-            (Stfld ,_car_fld)
-            (Ldnull))))
- (function set-cdr! (p v)
-   "Destructively sets a pair's tail value."
-   (ctime
-    `(n.asm (p v)
-            (expr p)
-            (Castclass ,t_Pair)
-            (expr v)
-            (Stfld ,_cdr_fld)
-            (Ldnull))))
-)
-
 (topblock
 (function append (a b)
    (if (null? a) b
-      (let ((rslt (cons 1 nil)))
+      (let ((rslt (noconst (cons 1 nil))))
          (let loop ((r rslt) (aa a))
             (if (null? aa)
                 (set-cdr! r b)
@@ -107,14 +86,14 @@
 
 (function map (f l) ;; constant stack space map function
   (if (null? l) l
-    (let ((p0 (cons nil nil)))
+    (let ((p0 (mkref)))
       (let loop ((p p0)
                  (ll l))
          (if (null? ll) nil
             (begin
               (set-car! p (f (car ll)))
               (if (null? (cdr ll)) nil
-                (let ((np (cons nil nil)))
+                (let ((np (mkref)))
                   (set-cdr! p np)
                   (loop np (cdr ll)))))))
        p0))))

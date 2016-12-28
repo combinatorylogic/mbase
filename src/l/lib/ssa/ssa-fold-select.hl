@@ -122,8 +122,9 @@ function genssa2_detect_select_pattern(
      pths = genssa2_find_paths(domtree, cfg, d, a, b, c);
      match pths with
        [de;pa; pb] -> {
-          return [d; de; genssa2_get_condition(ohashget(bbs, d))]
-       }
+         aif(cnd = genssa2_get_condition(ohashget(bbs, d)))
+          return [d; de; cnd]
+         else []}
      | else -> [] // disqualified
    }
 }}

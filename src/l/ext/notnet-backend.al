@@ -537,7 +537,7 @@
       (($hd . $tl) (loop tl)))))
 
 (function lltnet-emit0 (src atts0)
-  (let ((basector (cons nil nil))
+  (let ((basector (noconst (cons nil nil)))
         (atts (if atts0 atts0 '(Public)))
         )
     (<> src

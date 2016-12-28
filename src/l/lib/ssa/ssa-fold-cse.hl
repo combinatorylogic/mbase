@@ -1,0 +1,152 @@
+% literate:
+
+\section{Generic CSE pass}
+
+\pfcode{
+function genssa2_normalise_const(env, t, v) {
+  //TODO!
+  return %S<<(v)}}
+
+
+\pfcode{
+function genssa2_normalise_other(env, t, v) {
+  //TODO!
+  return %S<<(v)}}
+
+\pfcode{
+function genssa2_cse(env, src, modp) {
+  // *. Utility
+  intersect(a, b) = collector(add, get) {
+     ht = mkhash();
+     iter a do ohashput(ht, a, a);
+     iter b do if(ohashget(ht, b)) add(b);
+     return get()};
+  mapintersect(l) = foldl(intersect, car(l), cdr(l));
+  // TODO: share with some other pass?
+ <[cfg;bbs]> = genssa2_cache_cfg(src);
+  domtree = graph_dominators(cfg, 'entry');
+  defs = genssa2_cache_defs(src);
+  defbbs = genssa2_cache_origs(src);
+  depgraph = genssa2_make_depgraph(src, true);
+  revdeps = mkhash();
+  hashiter(fun(k, vs) {
+       iter v in vs do ohashput(revdeps, v, unifiq(k:ohashget(revdeps, v)))
+    }, depgraph);
+
+  // 1. Collect equivalent assignments (i.e., same function or select applied to
+  //    exactly the same arguments, using the model to check for the constant equivalence).
+  normalise(e) =
+    visit:genssa2(expr:e) {
+     once expr {
+        var -> %S<<("var-", id)
+      | glob -> %S<<("glob-", id)
+      | const -> genssa2_normalise_const(env, t, v)
+      | other -> genssa2_normalise_other(env, t, v)}};
+  newgroup() = mkhash();
+  groups = mkhash();
+  getgroup(id) = {
+     aif(chk = ohashget(groups, id)) chk
+     else {
+        grp = newgroup();
+        ohashput(groups, id, grp);
+        return grp}};
+  getarggroup(group, args) = {
+     flat = strinterleave(args, " | ");
+     aif(chk = hashget(group, flat)) chk
+     else {
+        nw = mkref([]);
+        hashput(group, flat, nw);
+        return nw}};
+  addreg(group, reg) = {group := reg : (^group)};
+  collect_call(reg, fn, args) = {
+    fngroup = getgroup(fn);
+    nargs = map a in args do normalise(a);
+    group = getarggroup(fngroup, nargs);
+    addreg(group, reg)};
+  collect_select(reg, cnd, t, f) = {
+    fngroup = newgroup();
+    nargs = map a in [cnd; t; f] do normalise(a);
+    group = getarggroup(fngroup, nargs);
+    addreg(group, reg)};
+  visit:genssa2 (top: src) {
+    deep oppair: op(name);
+    deep iop(reg) {
+       phi -> []
+     | select -> collect_select(reg, cnd, t, f)
+     | call -> if (genssa2_is_pure(env, dst)) collect_call(reg, dst, args)}};
+
+  lgroups = collector(addg, getgs) {
+     hashiter(fun(k, ht) {
+          hashiter(fun(kk, v) {
+                      x = ^v; if (length(x)>1) addg(reverse(x))},
+                   ht)},
+          groups);
+     getgs();
+  };
+
+  // 2. For each group of equivalent assignments, replace them all with a single assignment located
+  //    at the nearest common dominator (see the same thing in the loop invariant code motion implementation).
+  //    Rename all the instances.
+  //    In order to avoid confusion, eliminate all the groups that are directly dependent on any of the
+  //    assignments that are being moved. We're not after any performance optimisations here. Those groups
+  //    will be taken care of at the next iteration anyway.
+  revtree = mkhash();
+  hashiter(fun(k,v) {
+      iter v do ohashput(revtree, v, k:ohashget(revtree, v))}, domtree);
+
+  removeht = mkhash(); renameht = mkhash(); newht = mkhash();
+  
+  addnew(bb, cg, v) = ohashput(newht, bb, [cg;v]:ohashget(newht, bb));
+  addremove(g) = ohashput(removeht, g, g);
+  addrename(f, t) = ohashput(renameht, f, t);
+
+  doremove(id) = ohashget(removeht, id);
+  dorename(id) = aif(chk = ohashget(renameht, id)) chk else id;
+  getnew(bb) = ohashget(newht, bb);
+
+  tainted = mkhash();
+  iter g in lgroups do {
+     // 0. Get the list of dependencies, bail out if they're tainted. Taint the entire group;
+     deps0 = ohashget(depgraph, car(g));
+     deps = map append d in deps0 do if(ohashget(defbbs, d)) [d] else [];
+     t = foldl(fun(x,y) (x||y), [], map d in deps do ohashget(tainted, d));
+     iter g do ohashput(tainted, g, g);
+     if (not(t)) {
+       // 1. List bblocks for all the uses and dependencies in this group
+       uses = unifiq(map append g do ohashget(revdeps, g));
+       usebbs = unifiq(map u in uses do ohashget(defbbs, u));
+       depbbs = unifiq('entry':map d in deps do ohashget(defbbs, d));
+       // 2. Find a basic block dominated by all the dependencies of this assignment,
+       //    and dominating all the blocks in the list.
+       dominated  = mapintersect(map d in depbbs do ohashget(revtree, d));
+       dominators = mapintersect(map d in usebbs do ohashget(domtree, d));
+       here = intersect(dominated, dominators);
+       if (here) {
+         modp := true;
+         targetbb = car(here);
+         // 3. Move an assignment there, preserving the name of the first assignment in this group;
+         //    Add all other assignments to a rename table.
+         //    Do not move a declaration if it is already in the target basic block (obviously).
+        <cg:rst> = g;
+         if (not(ohashget(defbbs, cg) === targetbb)) {
+            addnew(targetbb, cg, ohashget(defs, cg));
+            addremove(cg);
+         };
+         iter r in rst do {
+            addrename(r, cg);
+            addremove(r)};
+       }}};
+  // 3. Commit the changes
+  if(lgroups)
+    visit:genssa2 (top: src) {
+      deep bblock {
+        b ->
+           mk:node(ops = (map append o in ops do o)::getnew(name))};
+      deep oppair : {
+        if (doremove(name)) [] else [node]};
+      deep expr {
+        var -> mk:node(id = dorename(id))
+      | else -> node}}
+  else src}}
+
+%%%%%%%%%%%%%%%%%%

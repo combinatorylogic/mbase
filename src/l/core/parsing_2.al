@@ -49,7 +49,7 @@
 (function strsplit (pp str)
   "Splits a string using a given delimiter regular expression."
   (p-result ((<r> (((((! pp) *) -> ::) (_ pp)) *) (?? (((! pp) +*) -> ::)))
-              (string->list str))))
+             (string->list str))))
 
 (function strmatch* (pp str)
   "Returns a list of all matches of [pp] in [str]."
@@ -79,7 +79,7 @@
       ,@(map-over rest
           (fmt (str rep)
             `(<r> ,(any->string str) ->
-                  (fun (_) (list ,@(string->list (any->string rep))))))))))
+                  (fun (_) (noconst (list ,@(string->list (any->string rep)))))))))))
 
 (macro strreplacers*R rest
   ("Makes a prepared replacer for a given list of"

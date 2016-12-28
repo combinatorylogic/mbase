@@ -25,7 +25,7 @@
 (function read-stream (fi)
   ("Returns a list of strings from the input stream [fi]."
    "Use it with caution!")
-  (let* ((top (cons nil nil)))
+  (let* ((top (mkref)))
    (let loop ((cur top) (ns (readline fi)))
       (if (null? ns) nil
          (let ((nw (cons ns nil)))
@@ -59,7 +59,7 @@
 (define strNewline (list->string '(#\Newline)))
 
 (function read-stream-list-big (fi)
-  (let ((rrs (cons nil nil)))
+  (let ((rrs (mkref)))
        (let loop ((ns (readline fi)) (rs rrs))
           (if (null? ns) nil
               (let ((ll (string->list (string-append ns strNewline))))
@@ -72,7 +72,7 @@
   (r_tbind "Meta.Scripting.ExtendedReader" "Read"))
 
 (function xread-stream-list-big (xfi)
-  (let loop ((rs (cons nil nil)))
+  (let loop ((rs (mkref)))
     (let ((ns (xread xfi)))
       (if (< ns 0) (begin
                           (set-cdr! rs nil)
@@ -98,8 +98,8 @@
 (function read-file-list (fn)
   ("Reads a given file [fn] into a lazy list.")
   (let* ((fi (io-open-read fn))
-         (clsd (cons nil nil))
-         (rrs (cons 1 nil)))
+         (clsd (mkref))
+         (rrs (noconst (cons 1 nil))))
        (let loop ((ns (readline fi)) (rs rrs) (cnt 0))
           (if (> cnt 1000)
             (begin
@@ -118,7 +118,7 @@
 
 
 (function read-stream-big (fi final)
-  (let ((trrs (cons 1 nil)))
+  (let ((trrs (noconst (cons 1 nil))))
        (let loop ((ns (readline fi)) (rs trrs) (rrs trrs) (cnt 0))
           (if (> cnt 150)
             (begin

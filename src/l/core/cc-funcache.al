@@ -105,9 +105,9 @@
 ;-
 
 (function cc:estimate:top ( liftop )
-  (let ((res (cons 0 nil)))
+  (let ((res (mkref 0)))
     (cc:mbcoreast:iter liftop liftop
-       (expr DEEP (forall (set-car! res (+ (car res) 1)))))
+       (expr DEEP (forall (r! res (+ (deref res) 1)))))
     (car res)))
 
 ;= Current threshold: 400 ast nodes or 10000 characters.

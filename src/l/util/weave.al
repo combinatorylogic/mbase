@@ -73,8 +73,8 @@
    ((_ (empty-line +*)) -> (fun (_) (list '#\Newline)))))
 
 
-(define dtax (cons nil nil))
-(define plux (cons nil nil))
+(define dtax (noconst (cons nil nil)))
+(define plux (noconst (cons nil nil)))
 (define controllers (mkhash))
 
 (function add-some (tpe vlu)
@@ -206,7 +206,7 @@
 (function print-code-line (str)
   (add-some 'code (CodeString str)))
 
-(define lit-ref (cons nil nil))
+(define lit-ref (noconst (cons nil nil)))
 
 (function print-include-file (nm)
    (alet literate (car lit-ref)

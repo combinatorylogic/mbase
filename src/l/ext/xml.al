@@ -33,8 +33,8 @@
     (string->symbol (e_name t_XmlNodeType (_xmlNodeType rdr))))
 
   (function sxml-stacker ()
-    (let* ((top (cons '*TOP* nil))
-           (stk (cons nil (list top)))
+    (let* ((top (noconst (cons '*TOP* nil)))
+           (stk (noconst (cons nil (list top))))
            (poplevel
              (fun ()
                (set-cdr! stk (cddr stk))) )

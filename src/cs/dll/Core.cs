@@ -243,6 +243,13 @@ namespace Meta.Scripting
     }
   }
 
+  public class PairTrap : Pair {
+    public PairTrap(Object a, Object b)
+    {
+      car = a; cdr = b;
+    }
+  }
+
   public class ExtendedReader
   {
     private Object hint;

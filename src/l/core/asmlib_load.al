@@ -13,14 +13,14 @@
                               t_object_array t_object))
 
 (define ms_Call_Generics_00
-  (ctime `(list
+  (ctime `(noconst (list
            ,@(formap (i 0 SMAXARGS)
-                     `(r_mtd _t_call_generic ,(buildstring "call_generic__" i) ,@(formap (j 0 i) 't_object) t_object)))))
+                     `(r_mtd _t_call_generic ,(buildstring "call_generic__" i) ,@(formap (j 0 i) 't_object) t_object))))))
 
 (define ms_Call_RevGenerics_00
-  (ctime `(list
+  (ctime `(noconst (list
            ,@(formap (i 0 SMAXARGS)
-                     `(r_mtd _t_call_generic ,(buildstring "call_r_generic__" i) ,@(formap (j 0 i) 't_object) t_object)))))
+                     `(r_mtd _t_call_generic ,(buildstring "call_r_generic__" i) ,@(formap (j 0 i) 't_object) t_object))))))
 
 ;;; now register the delegate callback:
 (let ((register (r_sbind _t_call_generic "register")))

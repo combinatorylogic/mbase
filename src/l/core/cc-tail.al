@@ -26,7 +26,7 @@
 
 ;= Convert a simple tail recursive function into a loop, if it is possible.
 (function cc:convert-tail ( recname arglist expr )
-  (let* ((yesitis (cons nil nil))
+  (let* ((yesitis (mkref))
          (res
           (let loop ((e0 expr))
             (cc:mbcoreast:visit expr e0

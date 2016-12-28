@@ -66,10 +66,10 @@
 (test (fccase '(a 1 2) ((a) (x y) (+ x y)) (else 0))
       3)
 
-(test (let ((a (cons 0 1))) (for (i 0 100) (set-cdr! a (+ (cdr a) i))) (cdr a))
+(test (let ((a (noconst (cons 0 1)))) (for (i 0 100) (set-cdr! a (+ (cdr a) i))) (cdr a))
       4951)
 
-(test (let ((a (cons 0 1))) (set-cdr! a a) (first 5 a))
+(test (let ((a (noconst (cons 0 1)))) (set-cdr! a a) (first 5 a))
       (0 0 0 0 0))
 
 (test (postcompile nil '((lambda (x) (lambda (y) (+ x y))) 2))
@@ -82,7 +82,8 @@
 
 (test (/-> '(1 . 2) "cdr") 2)
 (test (let ((a '(1 . 2))) (<-: a "car" 'x) (car a)) x)
-(test (let ((x 0)) (try (/ 1 x) t_exception (fun (x) 'exception))) exception)
+(function Zero () 0)
+(test (try (/ 1 (Zero)) t_exception (fun (x) 'exception)) exception)
 (test (new t_Pair (t_object "1") (t_object "2")) ("1" . "2"))
 (test (map-over (fromto 1 12)
                 (fun (x) (foldl (cut * <> <>) 1 (fromto 1 (+ 1 x)))))

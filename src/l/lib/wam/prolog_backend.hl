@@ -122,11 +122,11 @@ function prolog_remember_cell(env, cell) {
        vars := cell : ^vars;
    }
 }
-function prolog_alloc_cell(env) cons('var',[])
+function prolog_alloc_cell(env) noconst(cons('var',[]))
 function prolog_alloc_struct(env, id, args) { return ['str';id;@args] }
 function prolog_const(c) cons('const',c)
 function prolog_weak(v) cons('weak',[v])
-function prolog_empty_weak() cons('weak',[])
+function prolog_empty_weak() noconst(cons('weak',[]))
 function prolog_save_chpoint(env, c) { %set-cdr!(env, c)}
 function prolog_last_chpoint(env) { cdr(env) }
 function prolog_deref(v) // Fall through constraint
@@ -456,7 +456,7 @@ function prolog_backend_driver_generic(parsed, exec, getexec, failure, outp) {
       qargs = deref(qstat);
       venv = mkhash();
       vars = map q in qargs do {
-         v = 'var':[];
+         v = noconst('var':[]);
          ohashput(venv, v, q);
          return v};
       qnamescreen = %Sm<<("_prolog_function_",qname);

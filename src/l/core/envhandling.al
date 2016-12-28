@@ -84,7 +84,7 @@
   (with-syms (e pth)
     `(let* ((,e (env:unroll_: ,@env))
             (,pth (env:makepath_: ,path)))
-       (env:setpath_: ,e ,pth (cons ,val (env:getpath_: ,e ,pth))))))
+       (env:setpath_: ,e ,pth (noconst (cons ,val (env:getpath_: ,e ,pth)))))))
 
 (macro env:inc: (env name)
   (with-syms (s1 s2)

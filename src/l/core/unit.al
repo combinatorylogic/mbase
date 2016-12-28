@@ -31,7 +31,7 @@
 
 
 (macro unit-tests-use ()
-  (shashput (getfuncenv) 'unit-tests-destination (cons nil nil))
+  (shashput (getfuncenv) 'unit-tests-destination (noconst (cons nil nil)))
   `(begin ))
 
 (macro unit-tests-dump outs

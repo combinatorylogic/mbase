@@ -15,7 +15,7 @@
 
 (define *cmhash* (mkshash))
 
-(define *comp?* (cons nil nil))
+(define *comp?* (mkref))
 (function cc:is-compiling? () (cdr *comp?*))
 
 (function enter-compilation-environment ()

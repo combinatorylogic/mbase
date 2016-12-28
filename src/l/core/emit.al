@@ -57,7 +57,7 @@
    )
   ;;;
 
-  (define _pinvoke_maker_hook (cons nil nil))
+  (define _pinvoke_maker_hook (mkref))
 
   (function _pinvoke_maker (cls dll name rtype artyps)
     ((car _pinvoke_maker_hook) cls dll name rtype artyps))
@@ -218,7 +218,7 @@
         (_mark_sequence_point m doc ln1 cf ln2 ct))))
 
   (function emit-instructions (m mtdhash fldhash clshash body cls path mdl)
-    (let ((labels (mkhash)) (locals (mkhash)) (prevdbgline (cons 0 nil)))
+    (let ((labels (mkhash)) (locals (mkhash)) (prevdbgline (noconst (cons 0 nil))))
       (foreach (inst body)
           (if (symbol? inst) (hashput labels inst (_define_label m))
             (if (eqv? (car inst) 'label)
@@ -405,7 +405,7 @@
          (ifaces (map (@ r_typerx cadr)
                    (filter (fmt (x) (eqv? x 'implements)) (cddr e))))
          (body (cddr e))
-         (lbody (cons nil nil))
+         (lbody (mkref))
          (cls (if (null? parent)
                   (make-class mod nm flas basety ifaces)
                   (add-class (caddr parent) nm flas basety ifaces)))
@@ -414,7 +414,7 @@
          (env (list nm flas basety ifaces body
                     lbody cls mtds itypes flds)))
     (let pass1loop ((bo body))
-      (let ((cuattrs (cons nil nil)))
+      (let ((cuattrs (mkref)))
       (foreach (x bo)
         (try
          (fccase x
@@ -511,7 +511,7 @@
            )
          ))))
     (let pass11loop ((bo body))
-      (let ((cuattrs (cons nil nil)))
+      (let ((cuattrs (mkref)))
       (foreach (x bo)
         (try
          (fccase x

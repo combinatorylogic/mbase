@@ -92,6 +92,8 @@
       (IfEqv <expr:a> <expr:b> <expr:iftr> <expr:iffl>)
 
       (BinOp <arith:op> <expr:left> <expr:right>)
+      ;TODO: break constant folding
+      (NoConst <expr:a>)
 
 ;= Imperative looping hints:
       (While <ident:escapename> <expr:cnd> <expr:body>)

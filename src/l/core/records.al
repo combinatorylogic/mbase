@@ -43,8 +43,8 @@
 ;;;;;;
 
 (function mkcollector ()
-   (let* ((col (cons nil nil))
-          (sli (cons nil col))
+   (let* ((col (noconst (cons nil nil)))
+          (sli (noconst (cons nil col)))
           (get (fun () (cdr col)))
           (add (fun (x)
                  (set-cdr! (cdr sli) (cons x nil))
@@ -69,7 +69,9 @@
      `(collector ,(car defs) (collectors ,(cdr defs) ,@body))))
 
 (macro mkref rest
-  `(cons ,(if (null? rest) 'nil (car rest)) nil))
+  `(noconst (cons ,(if (null? rest) 'nil (car rest)) nil)))
+
+(macro noconst (x) x)
 
 (macro r! (tgt src)
   `(set-car! ,tgt ,src))

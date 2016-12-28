@@ -60,7 +60,8 @@
               (docstrings (docplugin rest)))
           (docfile channel docstrings))))
     nil
-    ))
+    )
+  )
 
 
 ; *documentation-file*: function performing the output of the
@@ -129,7 +130,7 @@
             ""))))
 
 (function doc.mkstor ()
-   (let* ((lst (cons nil nil))
+   (let* ((lst (mkref))
           (add (fun (v) (set-cdr! lst (cons v (cdr lst)))))
           (fetch (fun (f)
                     (let ((ll (tailsplit f (cdr lst))))

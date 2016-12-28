@@ -88,6 +88,9 @@
       ((inner.ghost $x)
        `(GhostValue ,x))
 
+      ((inner.noconst $x)
+       `(NoConst ,(loop x)))
+
 ;= Use with caution
       ((inner.verbatimcore ($_ $x)) x)
 

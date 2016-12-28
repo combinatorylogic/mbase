@@ -48,12 +48,12 @@
   "           - regular expression tokens (constant literals, etc.)"
   "]]"
   )
-  (let* ((ident (cons nil 'p.ident)) ; default
-         (ident-name (cons nil 'var)) ; default
-         (keywords (cons nil nil))
-         (keyexs (cons nil nil))
-         (ignore (cons nil nil))
-         (regexps (cons nil nil)))
+  (let* ((ident (noconst (cons nil 'p.ident))) ; default
+         (ident-name (noconst (cons nil 'var))) ; default
+         (keywords (mkref))
+         (keyexs (mkref))
+         (ignore (mkref))
+         (regexps (mkref)))
     (foreach (c code)
         (fccase c
            ((ident-or-keyword) (rgxp name)

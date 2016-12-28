@@ -9,8 +9,10 @@
 
 ;{{
 (define t_ConstructorInfo (sdotnet "System.Reflection.ConstructorInfo"))
+(define t_PairTrap (sdotnet "Meta.Scripting.PairTrap"))
 (define mtd_MkSymbol (r_mtd t_Symbol "make" string))
 (define mtd_Cons (r_getconstructor t_Pair object object))
+(define mtd_ConsTrap (r_getconstructor t_PairTrap object object))
 (define mtd_Cons1 (r_getconstructor t_Pair object))
 (define mtd_Cons0 (r_getconstructor t_Pair))
 (net.types RuntimeMethodHandle RuntimeFieldHandle Precompiler Runtime)

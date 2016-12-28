@@ -233,7 +233,7 @@
         (using threads)
 
 (let* ((pl (thr:mkpool nil))
-       (cntr (cons nil 0))
+       (cntr (noconst (cons nil 0)))
        (mtx (thr:mkmutex))
        (cfun (fun (env)
                (thr:mutex_wait mtx) (set-cdr! cntr (+ (cdr cntr) 1))

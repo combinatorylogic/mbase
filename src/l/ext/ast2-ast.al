@@ -113,7 +113,7 @@
       (update_thisnode <visitorcode:c> <visitorcode:e>)
       (delayed_update <any:id> <any:tag> <visitorcode:e>)
       (nil)
-      (vdelse <any:e>)
+      (vdelse <any:e>) ;; relic
       ))
   )
 

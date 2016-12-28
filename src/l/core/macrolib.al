@@ -124,7 +124,7 @@
 
 (function -do-counter-formap- (f from to step) ;; constant stack space formap function
   (if (>= from to) nil
-    (let ((p0 (cons nil nil)))
+    (let ((p0 (mkref)))
       (let loop ((p p0)
                  (i from))
          (if (>= i to) nil
@@ -132,7 +132,7 @@
               (set-car! p (f i))
               (let ((nxt (+ i step)))
                 (if (>= nxt to) nil
-                  (let ((np (cons nil nil)))
+                  (let ((np (mkref)))
                     (set-cdr! p np)
                     (loop np nxt)))))))
        p0)))
@@ -310,10 +310,10 @@
 
 (function tailsplit (fn lst)
   "Same as [split], tail recursive version."
-   (let* ((a (cons 1 nil))
-          (b (cons 1 nil))
-          (ar (cons 1 a))
-          (br (cons 1 b)))
+   (let* ((a (noconst (cons 1 nil)))
+          (b (noconst (cons 1 nil)))
+          (ar (noconst (cons 1 a)))
+          (br (noconst (cons 1 b))))
      (foreach (e lst)
          (if (fn e)
            (begin
@@ -331,10 +331,10 @@
 (macro mtailsplit2 (fn a1 lst)
   (with-syms (lst1)
   `(let* ((,lst1 ,lst)
-          (a (cons 1 nil))
-          (b (cons 1 nil))
-          (ar (cons 1 a))
-          (br (cons 1 b)))
+          (a (noconst (cons 1 nil)))
+          (b (noconst (cons 1 nil)))
+          (ar (noconst (cons 1 a)))
+          (br (noconst (cons 1 b))))
      (foreach (e ,lst1)
          (if (,fn ,a1 e)
            (begin
@@ -432,28 +432,28 @@
 (macro whiledo (exp . body)
 ;  ""
    (with-syms (loop arg exit)
-      `(let* ((,exit (cons #t nil))
+      `(let* ((,exit (noconst (cons #t nil)))
               (break (fun () (set-car! ,exit nil) nil)))
           (let ,loop ((,arg ,exp)) (if (and (car ,exit) ,arg) (begin ,@body (,loop ,exp)) nil)))))
 
 (macro dowhile (body exp)
 ;  ""
    (with-syms (loop arg exit)
-      `(let* ((,exit (cons #t nil))
+      `(let* ((,exit (noconst (cons #t nil)))
               (break (fun () (set-car! ,exit nil) nil)))
           (let ,loop ((,arg nil)) (if (and (car ,exit) ,arg) (begin ,@body (,loop ,exp)) nil)))))
 
 (macro whilemap (exp . body)
 ;  ""
    (with-syms (loop arg exit)
-      `(let* ((,exit (cons #t nil))
+      `(let* ((,exit (noconst (cons #t nil)))
               (break (fun () (set-car! ,exit nil) nil)))
           (let ,loop ((,arg ,exp)) (if (and (car ,exit) ,arg) (cons (begin ,@body) (,loop ,exp)) nil)))))
 
 (macro mapwhile (body exp)
 ;  ""
    (with-syms (loop arg exit)
-      `(let* ((,exit (cons #t nil))
+      `(let* ((,exit (noconst (cons #t nil)))
               (break (fun () (set-car! ,exit nil) nil)))
           (let ,loop ((,arg nil)) (if (and (car ,exit) ,arg) (cons (begin ,@body) (,loop ,exp)) nil)))))
 
@@ -561,3 +561,4 @@
                (bootlib:pop-module-namespace)
                (bootlib:pop-module-env)))
      ))
+

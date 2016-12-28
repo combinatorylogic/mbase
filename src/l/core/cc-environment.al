@@ -267,7 +267,7 @@
 
 (force-class-flush)
 
-(define cc:emit-symbol-stub (cons nil nil))
+(define cc:emit-symbol-stub (mkref))
 
 (function cc:env:fcall-helper-mi (env lenv mi nm nargs tail?)
   (p:match mi

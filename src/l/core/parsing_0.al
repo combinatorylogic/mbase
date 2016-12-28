@@ -70,7 +70,7 @@
 (function p<*> (p)
    "Parse none-or-many combinator."
   (fun (l)
-    (let* ((res (cons 1 nil))
+    (let* ((res (noconst (cons 1 nil)))
            (ll l)
            (rs res))
        (n.label LBL)

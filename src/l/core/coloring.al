@@ -81,7 +81,7 @@
 
 (function alltogether ( ghash colrs seq fixs )
   (let* ((precolor (map (fun (a) (list a a)) (append colrs fixs)))
-         (colx (cons nil colrs))
+         (colx (noconst (cons nil colrs)))
          (gencolor (fun (f)
                      (if f (cdr colx)
                          (let* ((nw (seq)))

@@ -89,6 +89,27 @@ Please note that alloca, load and store are missing. They are supposed to be int
 
 In order to do the loop analysis, we may need to lower genssa2 to genssa.
 
+
+\pfcode{
+function depgraph_todot(g) {
+   println("digraph X { node [shape=record];");
+   iter (f:ts) in g do {
+     iter t in ts do
+        println(%S<<(t," -> ",f,";"));
+   };
+   println("}");println("");}
+
+function printgenssa2(g) {
+   visit:genssa2(top:g) {
+     deep top {
+        f -> { println(%S<<("FUN: ", nm, " ", ret, "[", args, "]"));
+               iter b in body do println(b) }};
+     deep oppair: %S<<(name, " = ", op);
+     deep bblock {
+        b -> %S<<(name, ":",
+                  foldl( fun(l,r) %S<<(l,"\n   ", r), "", ops),
+                  "\n\n   ", t)}}}}
+
 \pfcode{
 function genssa2_to_genssa(src) {
    egetvar(e) = visit:genssa2(expr:e) {
@@ -96,6 +117,7 @@ function genssa2_to_genssa(src) {
    getvars(op) = collector(add, get) {visit:genssa2(iop:op) {
       deep expr { else -> add(egetvar(node)) }};
       return get()};
+
    visit:genssa2(top: src) {
       deep top {
          f -> body};
@@ -123,26 +145,6 @@ function genssa2_loops(src) {
    return loops}}
 
 \pfcode{
-function depgraph_todot(g) {
-   println("digraph X { node [shape=record];");
-   iter (f:ts) in g do {
-     iter t in ts do
-        println(%S<<(t," -> ",f,";"));
-   };
-   println("}");println("");}
-
-function printgenssa2(g) {
-   visit:genssa2(top:g) {
-     deep top {
-        f -> { println(%S<<("FUN: ", nm, " ", ret, "[", args, "]"));
-               iter b in body do println(b) }};
-     deep oppair: %S<<(name, " = ", op);
-     deep bblock {
-        b -> %S<<(name, ":",
-                  foldl( fun(l,r) %S<<(l,"\n   ", r), "", ops),
-                  "\n\n   ", t)}}}}
-
-\pfcode{
 %"Check if intrinsic is pure"
 function genssa2_is_pure(env, id) {
    if(id) {
@@ -155,6 +157,13 @@ function genssa2_is_pure(env, id) {
 function genssa2_classify(env, id) {
    if (id) {
       aif(chk = ohashget(env, id)) return chk('classify') else []}}}
+
+\pfcode{
+function genssa2_env_getinteger(env, c) {
+   aif(chk = ohashget(env, '*get-integer-constant*')) {
+      <const(tp, vl)> = c;
+       return chk(tp, vl)
+   } else []}}
 
 \pfcode{
 %"Check if value is phi or pure"
@@ -172,7 +181,8 @@ function genssa2_cache_origs(src) {
   oright = mkhash();
   visit:genssa2(top: src) {
       deep bblock {
-        b -> iter o in ops do o(name)};
+        b -> {ohashput(oright, %Sm<<(name, "__TERM"), name);
+              iter o in ops do o(name)}};
       deep oppair:
         fun(bb) ohashput(oright, name, bb)};
   return oright}}
@@ -242,6 +252,9 @@ It would make more sense to define a DSL for populating such an environment.
 \phcode{litinclude ("./ssa-fold-loops") "./ssa-fold-loops.hl"}
 \input{\docpath/ssa-fold-loops}
 
+\phcode{litinclude ("./ssa-fold-cse") "./ssa-fold-cse.hl"}
+\input{\docpath/ssa-fold-cse}
+
 \phcode{litinclude ("./ssa-fold-typing") "./ssa-fold-typing.hl"}
 \input{\docpath/ssa-fold-typing}
 
@@ -253,7 +266,7 @@ It would make more sense to define a DSL for populating such an environment.
 function genssa2_process_iter(modenv, src0) {
    do loop(src = src0) {
       chgp = mkref([]);
-      
+
       // 1. Iterative fold and kill.
       src1 = genssa2_fold_and_kill(modenv, src, chgp);
       // 2. Handle the loose phi loops
@@ -267,16 +280,26 @@ function genssa2_process_iter(modenv, src0) {
       src5 = genssa2_loop_invariants(modenv, src4, chgp);
 
      <[cache;inds]> = genssa2_induction(modenv, src5);
-      if (inds) {
-         tmp1 = genssa2_loop_exits(modenv, cache, inds, src5);
-      };
+      src5x = if (inds) {
+         exits = genssa2_loop_exits(modenv, cache, inds, src5);
+         cnds = genssa2_loop_bounds(modenv, inds, exits);
+         cnds = genssa2_loop_bounds_static(modenv, cnds);
+         if(cnds) {
+                    // TODO: only unroll if hinted
+                    return genssa2_loop_unroll(modenv, src5, cache,
+                                               car(cnds), chgp)
+                  }
+         else return src5
+      } else src5;
+      src6 = genssa2_analyse_conditions(modenv, src5x, chgp);
 
-      src6 = genssa2_analyse_conditions(modenv, src5, chgp);
+      // 6. CSE
+      src7 = genssa2_cse(modenv, src6, chgp);
 
       // TODO:
       //
       // - Branch constraint folding
-      // - CSE and GVN
+      // - GVN (do we need it? CSE is there already)
       // - Loop unswitching
       // - Value sinking
       // - Loop induction variable analysis:
@@ -289,8 +312,8 @@ function genssa2_process_iter(modenv, src0) {
       // - Instcombine
       // 
 
-      // 6. Rince and repeat
-      if (^chgp) loop(src6) else src6}}}
+      // 7. Rince and repeat
+      if (^chgp) loop(src7) else src7}}}
 
 
 \pfcode{

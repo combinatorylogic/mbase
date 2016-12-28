@@ -39,13 +39,13 @@
               (else node)))))))
 
 (function cc:estimate ( expr )
-  (let ((res (cons 0 nil)))
+  (let ((res (noconst (cons 0 nil))))
     (cc:mbcoreast:iter expr expr
        (expr DEEP (forall (set-car! res (+ (car res) 1)))))
     (car res)))
 
 (function cc:notreferenced ( expr varn )
-  (let ((res (cons nil nil)))
+  (let ((res (mkref)))
     (cc:mbcoreast:iter expr expr
        (expr DEEP
           ((Recref (if (eqv? varn id) (set-car! res #t)))

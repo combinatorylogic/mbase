@@ -13,7 +13,7 @@
    (read-int-eval '(n.module Default))
    nil)
 
-(define *toplevel-module-initp?* (cons nil nil))
+(define *toplevel-module-initp?* (mkref))
 
 (function read-compile-eval (lst)
   ("Redefinition of [(read-compile-eval ...)], now it is a compiler's frontend."

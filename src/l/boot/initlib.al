@@ -166,7 +166,7 @@
                                 (cons (car l) (loop (cdr l)))))))
 
 (topblock
-  (define *current-module-env* (cons nil nil))
+  (define *current-module-env* (noconst (cons nil nil)))
   (function bootlib:name-in-a-module-path (path nm)
     (string->symbol
      (let loop ((p path) (s (symbol->string nm)))
@@ -187,7 +187,7 @@
           nm)))
   (function bootlib:push-module-namespace (nm)
     (set-car! *current-module-env* (append (car *current-module-env*) (cons nm nil)))
-    (set-cdr! *current-module-env* (append (cons nil nil)
+    (set-cdr! *current-module-env* (append (noconst (cons nil nil))
                                            (cdr *current-module-env*))))
   (function bootlib:pop-module-namespace ()
     (set-car! *current-module-env* (cuttail (car *current-module-env*)))
@@ -417,11 +417,12 @@
 ;; gensym with a counter.
 
 (define *gensym-counter-storage*
-  (cons nil
+  (noconst
+   (cons nil
         (ctime
          (let* ((tst
                 (shashget (getfuncenv) '*gensym-counter-storage*)))
-           (if tst (+ 100 (cdr tst)) 10000)))))
+           (if tst (+ 100 (cdr tst)) 10000))))))
 
 (function gensym-counter-set (n)
   (let ((st (shashget (getfuncenv) '*gensym-counter-storage*)))

@@ -7,6 +7,8 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(cmacro noconst (x) `(inner.noconst ,x))
+
 (cmacro late-ctime rest
    `(inner.late-ctime (quote ,rest)))
 
@@ -252,7 +254,7 @@
 
 (cmacro collector ((add get) . body)
  (with-syms (clec cren v v1)
-   `(let* ((,cren (cons nil nil))
+   `(let* ((,cren (noconst (cons nil nil)))
            (,clec (mkref ,cren))
            (,add (fun (,v) (alet ,v1 (cons ,v nil)
                             (set-cdr! (deref ,clec) ,v1)
@@ -272,11 +274,11 @@
 
 )
 
-(cmacro set-car! (xp xv)
-  `(inner.set-car! ,xp ,xv))
+;(cmacro set-car! (xp xv)
+;  `(inner.set-car! ,xp ,xv))
 
-(cmacro set-cdr! (xp xv)
-  `(inner.set-cdr! ,xp ,xv))
+;(cmacro set-cdr! (xp xv)
+;  `(inner.set-cdr! ,xp ,xv))
 
 (cmacro ageto (ar id)
   (with-syms (a i)
@@ -381,7 +383,3 @@
 )
 
 (include "./pmatchcomp.al")
-
-
-
-

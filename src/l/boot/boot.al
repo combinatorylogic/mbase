@@ -314,6 +314,8 @@
 
 (defmacro 'macro (lambda (arg) (cons 'core.macro (cdr arg))))
 
+(macro noconst (x) x)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; A complimentary 'let0' macro on top of lambda:
 (macro let0 (bindings . body)
@@ -641,7 +643,7 @@
         (inner.map (lambda (x) (bootlib:postcompile env x)) l)))))
    (else l)))
 
-(define *current-macro-env-holder* (cons nil nil))
+(define *current-macro-env-holder* (noconst (cons nil nil)))
 (function set-macro-env (env)
   (corelib:set-car! *current-macro-env-holder* env))
 
@@ -665,7 +667,7 @@
 
 (function bootlib:expand (l) (expand0 compile (getcurmacroenv) l))
 
-(define screen-symbol-stub (cons nil nil))
+(define screen-symbol-stub (noconst (cons nil nil)))
 
 (function screen-symbol (s)
   (let ((st (car screen-symbol-stub)))
@@ -776,3 +778,4 @@
 ;; Dummies, to be replaced later
 (macro unit-test body `(begin ))
 (macro unit-test-defn body `(begin ))
+(macro mkref rest (if rest `(cons ,(car rest) nil) `(cons nil nil)))

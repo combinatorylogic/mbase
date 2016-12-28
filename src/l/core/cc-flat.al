@@ -329,6 +329,8 @@
           ,@(cc:pop target)
           ))
 
+       (NoConst (tailloop a target escs))
+
        (Eqv
         (with-syms (l1 l2)
           `(,@(tailloop a 'push nil)

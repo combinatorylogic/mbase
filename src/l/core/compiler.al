@@ -35,6 +35,7 @@
 (force-class-flush)
 (include "./cc-transforms.al");-I
 (include "./cc-optimise.al");-I
+(include "./cc-cons.al");-I
 (force-class-flush)
 (include "./cc-ast-flat.al");-I
 (include "./cc-flat.al");-I
@@ -59,7 +60,7 @@
      (fun (e)
        (ctime
         (if (shashget (getfuncenv) 'compiler-final)
-            '(cc:optimise e)
+            '(cc:constant-fold (cc:optimise e))
             'e)))
      ;;TODO
      ;(fun (e)

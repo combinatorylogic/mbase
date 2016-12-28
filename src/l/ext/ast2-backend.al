@@ -206,7 +206,7 @@
    `(let* ((,rc (ast2:make_stack_record ,n ,t ,c ,target ,targetslot)))
       ,@(foreach-map (d (reverse deep))
           `(ast2:add_stack_cnt ,rc ,d))
-      (n.stloc! ,stk (cons ,rc ,stk)) ;; really push
+      (n.stloc! ,stk (noconst (cons ,rc ,stk))) ;; really push
       )))
 
 (function ast2:make_stack_record (n t c tg ts)
@@ -214,7 +214,7 @@
 
 (function ast2:add_stack_cnt (rc d)
   (let* ((d0 (ast2stackrecord.scnt rc)))
-    (ast2stackrecord.scnt! rc (cons d d0))))
+    (ast2stackrecord.scnt! rc (noconst (cons d d0)))))
 
 (macro ast2:get_tagged_tuple (s n)
   `(ast2:ageto tagged_tuple ,s (+ 1 ,n)))
@@ -245,9 +245,10 @@
                  ,tagid))
 
 (macro ast2:allocate_list_collector ()
-  `(cons (quote (L))
+  `(noconst
+    (cons (quote (L))
          (collector (add get)
-                    (cons add get))))
+                    (cons add get)))))
 
 (macro ast2:listnode_complete (cl)
   `(begin

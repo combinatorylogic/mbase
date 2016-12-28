@@ -78,6 +78,8 @@ ast genssa2alg {
 
          // Atoms
          | var(ident:id)
+         | indvar(ident:id)
+         | rec()
          | const(any:c)
          ;
 }}
@@ -96,8 +98,25 @@ function genssa2_to_algebraic(env, v) {
       deep expr {
          op -> e
        | var -> 'var'(id)
+       | indvar -> 'indvar'(id)
+       | rec -> 'rec'()
        | const -> 'const'(node)
        | else -> 'fail'(node)}}}}
+
+\pfcode{
+function genssa2_compop_negate(e) {
+   visit:genssa2alg (aexpr: e) {
+      once aexpr {
+           gr -> // !(a>b) = a<=b
+               'le'(l,r)
+         | ge -> // !(a>=b) = a<b
+               'lt'(l,r)
+         // ... TODO!
+             
+         | else -> node
+      }
+   }
+}}
 
 \pfcode{
 function genssa2_from_algebraic(env, av) {

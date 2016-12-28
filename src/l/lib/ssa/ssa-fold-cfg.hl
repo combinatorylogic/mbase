@@ -10,6 +10,22 @@ Conditional branches are eliminated if both paths are empty, leading to the same
 are no $\varphi$ nodes in it.
 
 \pfcode{
+function genssa2_kill_dangling(src) {
+   exits = mkhash();
+   ohashput(exits, 'entry', 'entry');
+   addexits(t) = visit:genssa2(term: t) { deep labident: ohashput(exits, node, node) };
+   visit:genssa2(top: src) { once term { else -> addexits(node) }};
+   visit:genssa2(top: src) {
+     deep top {
+        f -> mk:node(body = map append b in body do b)};
+     deep phiarg {
+        a -> if(ohashget(exits, src)) [node] else []};
+     deep iop { phi -> mk:node(args = map append a in args do a)
+              | else -> node};
+     deep bblock {
+        b -> if(ohashget(exits, name)) [node] else []}}}}
+
+\pfcode{
 function genssa2_paths_converge(cfg, rev, bbs, f) {
    // Back propagate from f to check if paths leading to it
    // can be eliminated.
@@ -113,7 +129,9 @@ function genssa2_merge_basic_blocks(src, chgp) {
               a -> {
                  chk = ohashget(kill, src);
                  if (chk) mk:node(src = chk) else node}}};
-       return visit:genssa2(top: src) {
+       return
+       genssa2_kill_dangling(
+         visit:genssa2(top: src) {
           deep code: map append b in bs do b;
           deep bblock {
             b -> {
@@ -123,7 +141,7 @@ function genssa2_merge_basic_blocks(src, chgp) {
                   if (chk) {
                     <[ops1;nx1]> = getnode(chk);
                     [rewritebb(mk:node(ops = ops :: ops1, t = nx1))]
-                  } else [rewritebb(node)]}}}}
+                  } else [rewritebb(node)]}}}})
      } else src}}}
      
 

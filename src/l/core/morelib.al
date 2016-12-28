@@ -14,7 +14,7 @@
 ;;;
 (function read-some-streams (fl)
    "Performs a parallel stream reading, [fl] is a list of input streams."
-   (let* ((tops (map (fun (x) (cons nil nil)) fl)))
+   (let* ((tops (map (fun (x) (mkref)) fl)))
      (let loop ((curs tops) (nss (map readline fl)))
        (if (null? (filter (fun (x) (not (null? x))) nss))
            nil
@@ -72,12 +72,12 @@
 
 
 (function cons-cdr! (l v)
-   (set-cdr! l (cons v (cdr l))))
+   (set-cdr! l (noconst (cons v (cdr l)))))
 
 (macro <..> (a b) `(fromto ,a (+ 1 ,b)))
 
 (function partition (f lst)
-  (let* ((rst (cons nil nil))
+  (let* ((rst (mkref))
          (r (let loop ((l lst))
               (cond
                ((null? l) l)
@@ -106,7 +106,7 @@
 (macro lazy (ex)
   "Makes a lazy value of an expression. Evaluation can be forced later with [(lazyref ...)]."
   (let ((v (gensym)))
-    `(let ((,v (cons nil 'lazy:not-instantiated)))
+    `(let ((,v (noconst (cons nil 'lazy:not-instantiated))))
        (fun ()
          (if (eqv? (cdr ,v) 'lazy:not-instantiated) (set-cdr! ,v ,ex))
          (cdr ,v)

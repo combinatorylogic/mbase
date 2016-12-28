@@ -7,11 +7,11 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define cc:core-plugins-list (cons nil nil))
-(define cc:pre-lift-plugins-list (cons nil nil))
-(define cc:after-lift-plugins-list (cons nil nil))
-(define cc:flat-plugins-list (cons nil nil))
-(define cc:dotnet-plugins-list (cons nil nil))
+(define cc:core-plugins-list (mkref))
+(define cc:pre-lift-plugins-list (mkref))
+(define cc:after-lift-plugins-list (mkref))
+(define cc:flat-plugins-list (mkref))
+(define cc:dotnet-plugins-list (mkref))
 
 (function cc:apply-plugins (lst0 e0)
   (let loop ((lst (cdr lst0)) (e e0))

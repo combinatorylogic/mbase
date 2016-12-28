@@ -42,7 +42,7 @@
         (($hd . $tl)
          `(,@(loop hd)
            ,@(loop tl)
-           (Newobj ,mtd_Cons)))
+           (Newobj ,mtd_ConsTrap)))
         (else (atom lenv v))
         ))
 ;= Emitting it, substituting the whole constant expression with a reference to

@@ -519,13 +519,23 @@ namespace Meta.Scripting
     }
 
     static Object setcar(Object[] f)
-    {
+    { 
+#if PAIRTRAP      
+      if(f[0] is PairTrap) {
+          Console.WriteLine("setcar PairTrap: " + f[0].ToString());
+      }
+#endif
       ((Pair)(f[0])).car = f[1];
       return null;
     }
 
     static Object setcdr(Object[] f)
     {
+#if PAIRTRAP      
+      if(f[0] is PairTrap) {
+          Console.WriteLine("setcdr PairTrap: " + f[0].ToString());
+      }
+#endif
       ((Pair)(f[0])).cdr = f[1];
       return null;
     }

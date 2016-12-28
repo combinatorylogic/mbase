@@ -46,7 +46,7 @@
            ,ox (cons ,na ,nb)))))
 
 (macro __ast:check_cons_fake (a b oa ob ox)
-  `(cons ,a ,b))
+  `(noconst (cons ,a ,b)))
 
 (function _ast_one_pattern (buld? pmask srcmask)
   (with-syms (arg)
@@ -162,7 +162,7 @@
 
 ;; Get a list of nodes affected by a given list of modified nodes.
 (function _ast_build_corelist (depgraph mnodes)
-  (let ((cl (cons 1 nil)) (g (cdr depgraph)))
+  (let ((cl (noconst (cons 1 nil))) (g (cdr depgraph)))
     (foreach (m mnodes)
       (let ((n (hashget g m)))
         (set-cdr! cl (append (cons m n) (cdr cl)))))

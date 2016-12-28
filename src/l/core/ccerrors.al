@@ -21,7 +21,7 @@
        )
      (mkexcp arg)))
 
-(define *WARNINGS* (cons nil nil))
+(define *WARNINGS* (mkref))
 
 (function ccwarning (arg)
   "Adds a warning to the global list of warnings."
