@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -364,6 +364,17 @@
     ((winexe) 'WindowApplication)
     (else 'ConsoleApplication)))
 
+(function cc:emit-docstring (d)
+  (let* ((dp (doc.getpair (cadr d))))
+    (p:match dp
+      (($tp $id $txt)
+       `((Ldstr ,id)
+         (Ldstr ,txt)
+         ,(if (eqv? tp 'macro)
+              `(Call ,mtd_reg_docstring_macro)
+              `(Call ,mtd_reg_docstring_function))))
+      (else nil))))
+
 (function cc:emit-runner (env an0 asm mdl rnl deps dlltyp)
   (let* ((c `(class (,(S<< an0 ".InitDLL")  Public BeforeFieldInit Sealed)
                     (extends "System.ValueType")
@@ -391,6 +402,14 @@
                                    (Ret)
                                    ))
                          nil)
+
+                    (method ("initdocs" (Public Static) (Standard) ,t_void ())
+                            ;; TODO: emit docstrings
+                            ,@(foreach-mappend (d (reverse (hashget *documentation* 'D)))
+                                (cc:emit-docstring d))
+                            (Ret)
+                            )
+                    
                     (method ("initdeps" (Public Static) (Standard) ,t_void ())
                             ,@(foreach-map (d deps)
                                 `(Call ,d))
@@ -405,21 +424,6 @@
                             (Ldc_I4 142284)
                             (Stsfld (field "initp"))
                             (Call (method "initdeps"))
-
-;                            (Ldsfld ,f_Assmblys)
-;                            ;; load this assembly name + value:
-;                            (Ldtoken (this))
-;                            (Call ,m_typefromhandle)
-;                            (Callvirt ,m_getassembly)
-;                            (Dup)
-;                            (Castclass ,t_object)
-;                            (Stloc (var thisasm))
-;                            (Callvirt ,m_getassemblyname)
-;                            (Callvirt ,m_getassemblyshortname)
-;                            (Castclass ,t_object)
-;                            (Ldloc (var thisasm))
-;                            (Callvirt ,m_hashAdd)
-;                            ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
                             ,@(foreach-mappend (r rnl)
                                  `((Call ,r)
@@ -441,6 +445,8 @@
                                     ;; Register into the list of dependencies
                                     (Ldtoken (method "init"))
                                     (Call ,mtd_Add_Dependency)))
+
+                            (Call (method "initdocs"))
                             (label nay)
                             (Ret)))))
     (let* ((cls

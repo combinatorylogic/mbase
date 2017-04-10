@@ -119,7 +119,7 @@ writeline("---------------?99");
   res = prolog_backend_driver_generic(parse src1 as prolog, fun(v) { writeline(v); %_prolog_minicps(env, v)}, fun(nm) {writeline('NM'(nm, ohashget(env,nm))); ohashget(env, nm)}, prolog_failure_f, true);
 writeline("---------------?991");
 }
-
+/*
 function test10()
 {
    s1 = ['from'(10)]; s2 = ['to'(20)];
@@ -134,16 +134,59 @@ function test10()
    writeline(%prolog_merge_sets(s1, s2));
 
 }
-
+*/
 .prolog: {
    dynamic dyntest(X,Y).
-   testdyn(A,B) :- dyntest(X,Y).
+   testdyn(A,B) :- print("XXX"), dyntest(X,Y).
+}
+
+function %_prolog_dynamic_toplevl_function(args0) {
+  <[_;nm;args;@rest]> = args0;
+  println('DYN'(@args0));
+  ret =  #`(letrec ((,nm (fun ,args (begin (println "BOO") ,@rest))))
+        (ohashput (deref PROLOG_GLOBENV) (quote ,nm) ,nm));
+  println('RET'(ret));
+  return ret}
+
+function prolog_dynamic(code) {
+   writeline('DC'(code));
+   ret=%read-compile-eval(#`(with-macros ((_prolog_toplevl_function _prolog_dynamic_toplevl_function))
+                                ,code));
+   println('CRET'(ret));
+   return ret}
+
+.prolog: {
+  dynamic lost(X).
+  ptest2(x1,x3) :- print("popopo").
 }
 
 function test11()
-{
-   dtest <-? testdyn(1,2).;
+try {
+   PROLOG_GLOBENV := mkhash();
+   src = "lost(x1).
+          lost(x2).
+          dyntest(A,b1) :- print(\"Poop\"), lost(A), print(\"Hoop\").";
+   code = parse src as prolog;
+   println('CODE'(code));
+   println("================0");
+   prolog_backend_driver(code,
+                         prolog_dynamic , []);
+   println("------------------01");
+   res <-? print("--0"), ptest2(A, B), print("--1"), dyntest(A,Y).;
+//   res <-? A=x1, B=x2, testdyn(A,Y).;
+//   res <-? A=x1, B=x2, Y=B.;
+   println("-----------------1");
+   writeline('RES'(res));
+   if (res) {
+     writeline('A='(prolog_decode_result(cdar(res),A, fun(k,v)[])));
+     writeline('B='(prolog_decode_result(cdar(res),B, fun(k,v)[])));
+     writeline('Y='(prolog_decode_result(cdar(res),Y, fun(k,v)[])));
+   }
+} catch (t_MBaseException e) {
+  println(mbaseerror(e));
+  #(println (->s e))
 }
 
 
-test()
+//test()
+test11()

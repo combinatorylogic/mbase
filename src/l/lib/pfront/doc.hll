@@ -16,7 +16,7 @@ describe its core and some of the default extensions.
 
  PFront functional core is mostly expression--based. It means that constructions
 like ``{\tt if} something {\tt then} something'', which are dedicated ``statements'' in a majority of modern programming
-languages, are of the same sort as constructions like ``\pfqode{a + b}''.
+languages, are of the same sort as constructions like ``\pfiqode{a + b}''.
 Expressions always yields a value, while statement performs an action.
 
  There are several groups of expressions in PFront:
@@ -24,43 +24,43 @@ Expressions always yields a value, while statement performs an action.
 \item {\sl Constants}: symbols, numbers, strings, characters, etc.
 
  \begin{itemize}
- \item Symbols: \pfqode{'a'}, \pfqode{'a-b-c'}, \pfqode{'+'}, \pfqode{'a123-456'}
- \item Numbers: \pfqode{123}, \pfqode{-600}
- \item Strings: \pfqode{"Hello, World"}
- \item Characters: \pfqode{'A'c}, \pfqode{7c}, \pfqode{' 'c}
- \item Nil: \pfqode{[]}
- \item Logical: \pfqode{true}, \pfqode{false}
+ \item Symbols: \pfiqode{'a'}, \pfiqode{'a-b-c'}, \pfiqode{'+'}, \pfiqode{'a123-456'}
+ \item Numbers: \pfiqode{123}, \pfiqode{-600}
+ \item Strings: \pfiqode{"Hello, World"}
+ \item Characters: \pfiqode{'A'c}, \pfiqode{7c}, \pfiqode{' 'c}
+ \item Nil: \pfiqode{[]}
+ \item Logical: \pfiqode{true}, \pfiqode{false}
  \end{itemize}
 
-\item {\sl Variables}: \pfqode{abc}, \pfqode{ACamelCaseVariable}, \pfqode{%L[;-mbase-*-variable-;]}
+\item {\sl Variables}: \pfiqode{abc}, \pfiqode{ACamelCaseVariable}, \pfiqode{%L[;-mbase-*-variable-;]}
 
 \item {\sl Constructors}:
   \begin{itemize}
-  \item list constructor: \pfqode{[1;2;3]}
-  \item single cons: \pfqode{1 : []}
-  \item lists concatenation: \pfqode{[1;2;3] :: [4;5;6]}
-  \item integer range: \pfqode{[1 .. n]}
+  \item list constructor: \pfiqode{[1;2;3]}
+  \item single cons: \pfiqode{1 : []}
+  \item lists concatenation: \pfiqode{[1;2;3] :: [4;5;6]}
+  \item integer range: \pfiqode{[1 .. n]}
   \end{itemize}
 
-\item {\sl Binary operators} with precedence: \pfqode{1 + 2}, \pfqode{a*b+c*d}, \pfqode{1 < 2}
+\item {\sl Binary operators} with precedence: \pfiqode{1 + 2}, \pfiqode{a*b+c*d}, \pfiqode{1 < 2}
 
-\item {\sl Explicit precedence}: \pfqode{(2+2)*2}
+\item {\sl Explicit precedence}: \pfiqode{(2+2)*2}
 
-\item {\sl Function application}: \pfqode{print("Hello, World!")}, \pfqode{nth(2,[1;2;3;4])}, \pfqode{quit()}
+\item {\sl Function application}: \pfiqode{print("Hello, World!")}, \pfiqode{nth(2,[1;2;3;4])}, \pfiqode{quit()}
 
-\item {\sl Return expression}: \pfqode{return x}
+\item {\sl Return expression}: \pfiqode{return x}
 
  {\it Please note that it is for a better source code formatting only. Return expression yields a value of its argument, and it does not break the execution of the current code block --- it is different from the behaviour of {\tt return} in languages like C\#}
 
-\item {\sl Binding} (makes sense within a sequence only): \pfqode{str = "Hello, World!"}
+\item {\sl Binding} (makes sense within a sequence only): \pfiqode{str = "Hello, World!"}
 
-\item {\sl Sequence}: \pfqode{{a = 2; b = 2; return a*b}}
+\item {\sl Sequence}: \pfiqode{{a = 2; b = 2; return a*b}}
 
-\item {\sl Functional abstraction}: \pfqode{fun(a,b) {a*a+b*b}}
+\item {\sl Functional abstraction}: \pfiqode{fun(a,b) {a*a+b*b}}
 
-\item {\sl Selection}: \pfqode{if(a>b) print("A!") else print("B!")}
+\item {\sl Selection}: \pfiqode{if(a>b) print("A!") else print("B!")}
 
-\item {\sl Local recursive function}\footnote{This is the same concept as the Scheme ``named let'' construction}: \pfqode{do fact(n = 5) {if (n>0) n*fact(n-1) else 1}}
+\item {\sl Local recursive function}\footnote{This is the same concept as the Scheme ``named let'' construction}: \pfiqode{do fact(n = 5) {if (n>0) n*fact(n-1) else 1}}
 
 \end{itemize}
 
@@ -123,19 +123,19 @@ standard S--expressions\footnote{But of course it is possible to use the
 S--expressions syntax as well}.
 
  ``Lists'' in PFront are trees made of binary cons cells, or ``pairs''. The most
-basic operation is constructing a pair: \pfqode{head : tail}. Head is the left
+basic operation is constructing a pair: \pfiqode{head : tail}. Head is the left
 element of a pair, and tail is the right element of a pair. By convention, a
 ``flat'' list is made of a sequence of tail--attached pairs with list elements
-attached to pairs heads. For example, a list \pfqode{[1;2;3]} can be generated
-as \pfqode{ 1 : ( 2 : ( 3 : [])) }. Here, \pfqode{[]} denotes a null pointer,
+attached to pairs heads. For example, a list \pfiqode{[1;2;3]} can be generated
+as \pfiqode{ 1 : ( 2 : ( 3 : [])) }. Here, \pfiqode{[]} denotes a null pointer,
 or ``nil'' in a Lisp terminology.
 
  Special case list constructor for lists starting with a symbol has the
-following syntax: \pfqode{'tag'(1,2,@rest)}. Values of special case
+following syntax: \pfiqode{'tag'(1,2,@rest)}. Values of special case
 constructor arguments are substituted
 as flat list elements. If a value is prefixed with \verb#@#, the value is
 appended. For example,
-\pfqode{{l = [1;2;3]; 'abc'(0,@l,4)}} will give the list \pfqode{['abc';0;1;2;3;4]}.
+\pfiqode{{l = [1;2;3]; 'abc'(0,@l,4)}} will give the list \pfiqode{['abc';0;1;2;3;4]}.
 
  Lists are very flexible, so most data structures used by PFront are actually
 represented as lists. Most important use of lists in PFront is representing
@@ -150,13 +150,13 @@ an easy and efficient way.
 \section{Pattern matching}
 
  One form of list deconstruction is pattern matching. For example, for
-a list \pfqode{l = ['add';2;2]} we can get second and third elements using the
+a list \pfiqode{l = ['add';2;2]} we can get second and third elements using the
 following construction:
 
 \pfqode{match l with ['add';a;b] -> a + b}
 
-Here values of second and third elements of a list was bound to variables \pfqode{a}
-and \pfqode{b} and used within expression \pfqode{a + b}.
+Here values of second and third elements of a list was bound to variables \pfiqode{a}
+and \pfiqode{b} and used within expression \pfiqode{a + b}.
 
 For this special kind of lists, where the first element is a symbol, there is
 a somewhat shorter form of patterns available:
@@ -165,7 +165,7 @@ a somewhat shorter form of patterns available:
 
  It is possible to match against a number of patterns. For example, the
 following code iterates over a flat list elements and performs some action with
-each of them, and stops once it meets a symbol \pfqode{'stop'}:
+each of them, and stops once it meets a symbol \pfiqode{'stop'}:
 
 \pfqode{
 do my_iter ( l = lst )
@@ -339,8 +339,8 @@ In PFront most ASTs ends up in a generated PFront or lower level
 MBase code. To simplify the generation of PFront (and all the derived
 languages) ASTs, there is a special syntax for quasiquotation.
 
-For example, the expression \pfqode{`a + b`} has a value
-\pfqode{['binop';'+';['var';'a'];['var';'b']]}. This is a PFront core AST,
+For example, the expression \pfiqode{`a + b`} has a value
+\pfiqode{['binop';'+';['var';'a'];['var';'b']]}. This is a PFront core AST,
 which is consequently translated into an underlying MBase representation.
 
 It is possible to substitute a value of a variable at certain placeholders
@@ -396,7 +396,7 @@ syntax in expr, bin2: ' [basicexpr]:a "++" [eterm]:b '
  Here we can see another benefit of not having a separate lexing pass:
  a new operator ``++'' can co--exist with the previously defined
  operator ``+''. Now we can use expressions like
-\pfqode{"Hello, world" ++ "!"}.
+\pfiqode{"Hello, world" ++ "!"}.
 
  An obligatory factorial example:
 
@@ -413,7 +413,7 @@ syntax in expr, bin2: ' [basicexpr]:e "!" '
 }
 }
 
-Now we can use expressions like \pfqode{x!} or \pfqode{10!}. The
+Now we can use expressions like \pfiqode{x!} or \pfiqode{10!}. The
 latter would be evaluated in compilation time.
 
 
@@ -652,9 +652,9 @@ generate pretty--printers automatically out of parsers. That's why not all the
 MBase and PFront functions are available.
 
 \begin{itemize}
-\item \verb|$cons(a,b)| --- same as \pfqode{a : b}
-\item \verb|$wrap(a)| --- same as \pfqode{[a]}
-\item \verb|$nil()| --- same as \pfqode{[]}
+\item \verb|$cons(a,b)| --- same as \pfiqode{a : b}
+\item \verb|$wrap(a)| --- same as \pfiqode{[a]}
+\item \verb|$nil()| --- same as \pfiqode{[]}
 \item \verb|$list(a1, a2, ...)| --- same as \verb|[a1;a2;...]|
 \item \verb|$symbol(str)| --- convert a string to a symbol
 \item \verb|$val(a)| --- detach a value from a tagged token, convert it into
@@ -686,7 +686,7 @@ parser helloworld  ( ) {
 }
 }
 
-And then, an expression \pfqode{parse "Hello, world!" as helloworld}
+And then, an expression \pfiqode{parse "Hello, world!" as helloworld}
 will return a value \verb|(tkname . "world")|.
 
 \subsubsection{Left recursion}
@@ -767,9 +767,9 @@ The code is mostly declarative and self--documented. The most important entry po
 
  There are two main techniques which should help in understanding the AST structure and code
 generation. First is to use the quasiquotation to obtain a genuine AST for a given expression.
-For example, \pfqode{`map a in [1..10] do a*a`} will give {\tt (map a (range (number 1) (number 10)) (binop * (var a) (var a)))}. Second technique is to apply the appropriate code generation
-function to see the actual MBase code: \pfqode{pfront_expr(`map a in [1..10] do a*a`)} will give
-\pfqode{#(foreach-map (a (fromto 1 10)) (* a a))}.
+For example, \pfiqode{`map a in [1..10] do a*a`} will give {\tt (map a (range (number 1) (number 10)) (binop * (var a) (var a)))}. Second technique is to apply the appropriate code generation
+function to see the actual MBase code: \pfiqode{pfront_expr(`map a in [1..10] do a*a`)} will give
+\pfiqode{#(foreach-map (a (fromto 1 10)) (* a a))}.
 
  Any combination of a PFront AST, a verbatim MBase code and an explicit compilation of an AST into MBase can be used within syntax extensions. For a  better performance and cleaner code, it is
 recommended to separate any complicated processing from the parsing pass, which means construction
@@ -862,7 +862,7 @@ smaller syntax overhead.
  All the variables passed into Not.NET code are considered to be of a System.Object type, unless the exact
 type is given. If it is a value type, a variable value is unboxed prior to casting.
 
- For example: \pfqode{notnet(int x, double y) { leave (double)x + Math.Sin(y);}}
+ For example: \pfiqode{notnet(int x, double y) { leave (double)x + Math.Sin(y);}}
 
 
  One of the obvious uses for Not.NET language is a performance optimisation.

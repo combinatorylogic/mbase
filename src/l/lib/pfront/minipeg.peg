@@ -2,7 +2,7 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+// Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 //
 //
 //////////////////////////////////////////////////////////////////////////////
@@ -31,9 +31,9 @@ parser minipeg extends pfcommon (
    term hexnumber := tkhexnumber:n => {ctoken=const} $hexval(n);
 
 
-   token mTO := '=>' => {ctoken = doubleto};
+   token mTO := '=>' => {cctoken = doubleto};
 
-   token mLEFT := ':=' => {ctoken = leftset};
+   token mLEFT := ':=' => {cctoken = leftset};
 
    term singlechar := tsinglechar:c => $stripval(c);
    term charrange := '[' singlone:a '-' singlone:b ']' =>

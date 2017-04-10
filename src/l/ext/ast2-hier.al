@@ -1,11 +1,40 @@
 
+(function ast0-apply-hints (hints nd)
+  (astlang:visit astnode nd
+     (astnode DEEP
+       ((simple node)
+        (varnode (let* ((nodehints (ohashget hints id)))
+                   (ast:mknode (vs (foreach-map (v vs)
+                                     (v id nodehints))))))
+        (else node)))
+     (variant DEEP
+       ((v (fun (nodeid nodehints)
+             (let* ((varianthints (ohashget hints (Sm<< nodeid ":" tag))))
+               (ast:mknode (hs (append varianthints (append nodehints hs)))))))))))
+
+(function ast-ns-cleanup (lst)
+  (let ((ht (mkhash)))
+    (foreach-mappend (l lst)
+       (let* ((nm (cadr l))) ;; Expect id to always be a cadr
+         (if (ohashget ht nm) nil
+             (begin
+               (ohashput ht nm nm)
+               (wrap l)))))))
+              
 ;; Lower an AST definition, merging all the inherited ASTs.
 ;; (ifun <id>) is used to fetch a definition for the current context.
 (function ast-merge-inherited (ifun src)
   "Merge the inherited AST bodies, use ifun to fetch the referenced ASTs"
   (collector (add get)
   (collector (tagsadd tagsget)
-  (let* ((rewriters (mkhash)))
+  (let* ((rewriters (mkhash))
+         (hints (mkhash))
+         (addvarhint (fun (nd vr hs)
+                       (alet nm (Sm<< nd ":" vr)
+                             (ohashput hints nm (append hs (ohashget hints nm))))))
+         (addnodehint (fun (nd hs)
+                        (ohashput hints nd (append hs (ohashget hints nd))))))
+         
     (astlang:visit topdef src
       (extvariant DEEP
         ((remove `(R ,tag)) (add v)))
@@ -31,6 +60,8 @@
                            (if t nil (wrap node))))))))
                )
               node))
+          (extendvarhint (addvarhint id tg hints))
+          (extendnodehint (addnodehint id hints))
           (else node))))
 
     (astlang:visit topdef src
@@ -89,6 +120,8 @@
      (astlang:visit topdef src
       (astnode DEEP
         ((extend nil)
+         (extendvarhint nil)
+         (extendnodehint nil)
          (else (wrap node))))
       (topdef DEEP
               ((defast
@@ -96,10 +129,16 @@
                              (taglist mergetags)
                              (options (append nopts options))
                              (ns
-                              (append (get)
-                                      (foreach-mappend (n ns) n)
-                                      )))))))
-    )))))
+                              (reverse
+                              (ast-ns-cleanup
+                              (reverse  
+                              (foreach-map (n 
+                                            (append (get)
+                                                    (foreach-mappend (n ns) n)
+                                                    ))
+                                (ast0-apply-hints hints n))))))
+                              ))))))))))
+
 
 
 

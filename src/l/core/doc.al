@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -103,6 +103,18 @@
   (doc.texnic str)
   )
 
+(function doc.gettext (txt)
+  (if (list? txt) (strinterleave txt "\n") txt))
+
+(function doc.getpair (d)
+  (p:match d
+    ((function $name $args . $text)
+     `(function ,(S<< name) ,(S<< "function " name " " (strinterleave (foreach-map (a args) (S<< a)) ", ") ": \n"
+                                  (doc.gettext text))))
+    ((macro $name $args . $text)
+     `(macro ,(S<< name) ,(S<< "macro " name " " args ": \n" (doc.gettext text))))
+    (else nil)))
+
 (function doc.mkdefplugin ( stor )
   (fun (l)
    (p:match l
@@ -174,7 +186,7 @@
   `(ctimex (begin
               (foreach (i (reverse (hashget *documentation* 'D)))
                   (doc.write (car i) (cadr i)))
-              (hashput *documentation* 'D nil)
+              ;;(hashput *documentation* 'D nil)
               (doc.write 'def '(index.functions ""))
               (doc.write 'def '(index.macros ""))
               (doc.write 'def '(index.defines ""))

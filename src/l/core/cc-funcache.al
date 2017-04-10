@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -85,13 +85,17 @@
            (Clenv (ast:mknode (id (rname id))))
            (XSet  (ast:mknode (nm (rname nm))))
            (PatchClosure (ast:mknode (nm (rname nm))))
-           (Fun (ast:mknode (recname 'self) (args (map rname args))))
+           (MDAnnot body)
+           (Fun (ast:mknode (recname 'self)
+                            (args (foreach-map (a (bootlib:filter-args args))
+                                    `(var ,(rname a))))))
            (BackendAsm (ast:mknode (body (cc:fc:handleasm body rname))))
            (else node)))
-        (letarg DEEP (ast:mknode (nm (rname nm))))
+        (letarg DEEP (ast:mknode (nm (rname nm)) (md nil)))
         (captcharg DEEP (ast:mknode (ref (rname ref))))
         (liftop DEEP
-          ((Closure (ast:mknode (name '*) (usename '*) (args (map rname args))))
+          ((Closure (ast:mknode (name '*) (usename '*)
+                                (args (map rname args))))
            (Simple (ast:mknode (name '*) (usename '*)))
            (else node)))
         )))))

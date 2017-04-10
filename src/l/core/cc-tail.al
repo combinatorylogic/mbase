@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -72,5 +72,5 @@
 (function cc:convert-tail-helper ( name expr )
   (p:match expr
     ((Fun $rn $args $body)
-     `(Fun ,rn ,args ,(cc:convert-tail name args body)))
+     `(Fun ,rn ,args ,(cc:convert-tail name (bootlib:filter-args args) body)))
     (else expr)))

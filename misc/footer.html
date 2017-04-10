@@ -1,0 +1,35 @@
+
+<div class='none'>
+  <span id='dummy_to'><span id='too'>&nbsp;</span></span>
+  <span id='dummy_from'><span id='frm'>&nbsp;</span></span>
+</div>
+
+
+
+    <svg>
+      <defs>
+        <marker id="m1" markerWidth="8" markerHeight="8" refx="5" refy="5">
+          <circle cx="5" cy="5" r="1.5"></circle>
+        </marker>
+        <marker id="m2" 
+                markerWidth="5" markerHeight="5" viewBox="-6 -6 12 12" 
+                refX="-2" refY="0" 
+                markerUnits="strokeWidth" 
+                orient="auto">
+          <polygon points="-2,0 -5,5 5,0 -5,-5" fill="grey" stroke="black" stroke-width="1px"/>
+        </marker>
+      </defs>
+      <g data-source="frm" data-target="too">
+        <line marker-start="url(#m1)" marker-end="url(#m2)"></line>
+      </g>
+    </svg>
+    
+</div>
+
+
+</body>
+
+</html>
+
+
+

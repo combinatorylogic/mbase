@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -38,9 +38,20 @@
 
 ;= A helper function: check if a lambda arguments list contains only symbols.
 (function cc:check-args (lst)
-  (if (filter (M@ not symbol?) lst)
+  (if (filter (fun (v)
+                (p:match v
+                  ((var $id . $md) nil)
+                  ($$M nil)
+                  (else #t))) lst)
       (cc:comperror `(CC01:ARGS ,lst)))
   lst)
+
+(function cc:core-args (lst)
+  (foreach-map (l lst)
+    (p:match l
+      ((var $id . $md) l)
+      ($$M `(var ,l))
+      (else (ccerror `(CC01:ARG ,l))))))
 
 ;- core $\to${} AST transformation is split into several parts, otherwise the
 ;- function grows too big (and an interpreted mode compiler is simply unable to
@@ -96,6 +107,11 @@
 
       ((inner.localvar $x) `(Var ,x))
 
+;= IDE/Literate feedback
+      ((inner.identmetadata $id . $md)
+       (if (eqv? id 'nil) '(Nil)
+           `(Var ,id ,@md)))
+
 ;= Function application syntax:
       (($expr . $rest)
        `(App ,(loop expr) ,@(map loop rest)))
@@ -103,8 +119,7 @@
       ($$S `(Str ,s))
       ($$N `(Num ,s))
       (nil '(Nil))
-      ($$M (if (memq s env) `(Var ,s)
-               `(Var ,s)))
+      ($$M `(Var ,s))
       (()  '(Nil))
       (else
        (cond
@@ -133,6 +148,16 @@
                   (fmt (nm vl)
                     `(,(cc:check-sym nm) ,(lloop vl))))
              (Begin ,@(map lloop body)))))
+      ((inner.let-metadata $args . $body)
+       (let ((lloop (mklloop (map caar args))))
+       `(SLet ,(map-over args
+                   (fmt ((nm . md) vl)
+                        `(,(cc:check-sym nm) ,(lloop vl) ,@md)))
+              (Begin ,@(map lloop body))
+              )))
+      ((inner.with-added-metadata $mds . $body)
+       `(MDAnnot ,mds (Begin ,@(map loop body))))
+      
       ((inner.letrec $args . $body)
        (let ((lloop (mklloop (map car args))))
        `(SLetRec ,(map-over args
@@ -177,12 +202,12 @@
     (p:match s
 ;= Lambda, if, quote, set and let:
       ((inner.lambda $args . $body)
-       (let ((lloop (mklloop args)))
-       `(Fun () ,(cc:check-args args)
+       (let ((lloop (mklloop (bootlib:filter-args args))))
+       `(Fun () ,(cc:core-args args)
             (Begin ,@(map lloop body)))))
       ((inner.reclambda $name $args . $body)
-       (let ((lloop (mklloop args)))
-       `(Fun ,(cc:check-sym name) ,(cc:check-args args)
+       (let ((lloop (mklloop (bootlib:filter-args args))))
+       `(Fun ,(cc:check-sym name) ,(cc:core-args args)
             (Begin ,@(map lloop body)))))
       ((inner.if $cnd $tr $fl)
        `(If ,(loop cnd) ,(loop tr) ,(loop fl)))

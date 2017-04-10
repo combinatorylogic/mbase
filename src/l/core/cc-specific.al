@@ -2,10 +2,15 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(function getrawident (id)
+  (p:match id
+    ((inner.identmetadata $i0 . $_) i0)
+    (else id)))
 
 (cmacro noconst (x) `(inner.noconst ,x))
 
@@ -15,6 +20,13 @@
 (cmacro late-ctimex rest
    `(inner.late-ctimex.nf (quote ,rest))
 )
+
+(cmacro let-metadata rest
+  `(inner.let-metadata ,(car rest)
+     (begin ,@(cdr rest))))
+
+(cmacro with-added-metadata (md . rest)
+  `(inner.with-added-metadata ,md ,@rest))
 
 (cmacro let rest
   (if (list? (car rest))
@@ -68,6 +80,23 @@
 (cmacro n.goto (lbl)
   `(inner.goto ,lbl))
 
+(cmacro do-while (body)
+  (with-syms (lbl tmp dummy)
+     `(let ((,dummy 1))
+        (n.label ,lbl)
+        (let* ((,tmp ,body))
+          (if ,tmp
+              (n.goto ,lbl))))))
+
+(define *loc-metadata* (mkhash))
+
+(macro  definition-metadata (nm loc)
+  `(begin ))
+(cmacro definition-metadata (nm loc)
+    (ohashput *loc-metadata* nm loc)
+   `(top-begin ))
+
+   
 (expand-if (shashget (getfuncenv) 'compiler-final)
 
   (cmacro not (a)
@@ -226,14 +255,15 @@
         (n.label ,lbl)
         (if (null? ,lx) ,ly
             (begin
-               (let ((,lf (cons (let ((,id (car ,lx))) ,@body) nil)))
-                  (if (null? ,ly) (begin (n.stloc! ,ly ,lf) (n.stloc! ,lz ,lf))
-                                  (begin (set-cdr! ,lz ,lf) (n.stloc! ,lz ,lf)))
-                  )
-               (n.stloc! ,lx (cdr ,lx))
-               (n.goto ,lbl)
-               nil
-               ))))))
+              (let ((,lf (cons
+                          (let-metadata ((,(bootlib:metadataident id) (car ,lx))) ,@body) nil)))
+                (if (null? ,ly) (begin (n.stloc! ,ly ,lf) (n.stloc! ,lz ,lf))
+                    (begin (set-cdr! ,lz ,lf) (n.stloc! ,lz ,lf)))
+                )
+              (n.stloc! ,lx (cdr ,lx))
+              (n.goto ,lbl)
+              nil
+              ))))))
 
 (cmacro foreach ((id lst) . body)
    (with-syms (lx lbl)
@@ -245,7 +275,7 @@
         (n.label ,lbl)
         (if (null? ,lx) nil
             (begin
-               (let ((,id (car ,lx)))
+               (let-metadata ((,(bootlib:metadataident id) (car ,lx)))
                   ,@body)
                (n.stloc! ,lx (cdr ,lx))
                (n.goto ,lbl)

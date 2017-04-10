@@ -31,10 +31,19 @@ clean:
 ../doc/doc.pdf: repl.exe ../doc/doc.tex 
 	(cd ../doc; pdflatex doc; pdflatex doc)
 
-doc: ../doc/pfdoc.pdf ../doc/doc.pdf
+../doc/ssa-fold.pdf: MBaseExtra.dll
+	(cd ../src/l/lib/ssa; pdflatex ssa-fold; pdflatex ssa-fold)
+	cp ../src/l/lib/ssa/ssa-fold.pdf ../doc/
+
+../doc/prologdoc.pdf: MBaseLogic.dll
+	(cd ../src/l/lib/wam; pdflatex prologdoc; pdflatex prologdoc)
+	cp ../src/l/lib/wam/prologdoc.pdf ../doc
+
+doc: ../doc/pfdoc.pdf ../doc/doc.pdf ../doc/ssa-fold.pdf ../doc/prologdoc.pdf
 
 MBaseCore.dll: $(CSCSOURCES)
 	$(CSC) $(CSCOPTS) /target:library /out:MBaseCore.dll $(CSCWINSOURCES)
+	sn -R MBaseCore.dll pubpriv
 
 mb0.exe: MBaseCore.dll ../src/cs/cl/CommandLine.cs
 	$(CSC) $(CSCOPTS) /out:mb0.exe /r:MBaseCore.dll $(COMMANDLINEWIN)

@@ -1,5 +1,17 @@
 % literate:
 
+
+\newcommand*{\docpath}{./}%
+\input{\docpath/../../../../misc/header}
+
+\begin{document}
+\setlength{\parindent}{0pt}
+
+\tableofcontents
+
+\newpage
+
+
 \section{Rationale}
 
 Many DSLs expose the same core semantics --- there is a control flow, possibly with loops, and there is either
@@ -77,7 +89,7 @@ ast genssa2 {
        | other(type:t, any:v)
        ;
   phiarg = a(labident:src, expr:v);
-  attr = constcall() | sideeffects() | intrinsic() | external();
+  attr = constcall() | sideeffects() | intrinsic() | external() | other(.*any:as);
   varident is id:v;
   labident is id:v;
 }}
@@ -274,7 +286,8 @@ function genssa2_process_iter(modenv, src0) {
       // 3. Rewrite eligible phis as selects
       src3 = genssa2_detect_selects(modenv, src2, chgp);
       // 4. Clean up CFG
-      src4 = genssa2_merge_basic_blocks(src3, chgp);
+      src4x = genssa2_merge_basic_blocks(src3, chgp);
+      src4  = genssa2_merge_basic_blocks_backwards(src4x, chgp);
 
       // 5. Move loop invariants
       src5 = genssa2_loop_invariants(modenv, src4, chgp);
@@ -326,3 +339,7 @@ function genssa2_process(modenv, env, src) {
 
 
 %%%%%%%%%
+
+
+\input{\docpath/../../../../misc/footer}
+

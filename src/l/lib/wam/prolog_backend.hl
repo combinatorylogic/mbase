@@ -3,10 +3,11 @@
 
 \section{A reference (inefficient) backend implementation}
 \pfcode{
-function prolog_backend_dynamic_wrapper(id)
+function prolog_backend_dynamic_wrapper(id, args)
 {
-   return '_prolog_get_dynamic_function'('prolog_environment','prolog_continuation',
-       'quote'(%Sm<<("_prolog_function_",id)))
+   return ['_prolog_get_dynamic_function'(
+                   'quote'(%Sm<<("_prolog_function_",id)));
+           'prolog_environment';'prolog_continuation';@args]
 }
 
 function prolog_codegen(b)
@@ -60,7 +61,7 @@ function prolog_codegen(b)
           '_prolog_toplevl_function'(%Sm<<("_prolog_function_",id),
                          ['prolog_environment';
                           'prolog_continuation';@args],
-                   prolog_backend_dynamic_wrapper(id))
+                   prolog_backend_dynamic_wrapper(id,args))
       }}}
 
 \subsection{Backend functions implementation}
@@ -76,11 +77,18 @@ function %_prolog_call_function_cps(v)
 
 define PROLOG_GLOBENV = mkref(mkhash())
 
-function %_prolog_get_dynamic_function(env, cnt, id)
-{
-   fn = ohashget(^PROLOG_GLOBENV, id);
-   return fn
-}
+function %_prolog_get_dynamic_function(id)
+   ohashget(^PROLOG_GLOBENV, id)
+
+function %_prolog_dynamic_toplevl_function(args0) {
+  <[_;nm;args;@rest]> = args0;
+  #`(letrec ((,nm (fun ,args (begin ,@rest))))
+        (ohashput (deref PROLOG_GLOBENV) (quote ,nm) ,nm))}
+
+function prolog_dynamic(code)
+  %read-compile-eval(
+     #`(with-macros ((_prolog_toplevl_function _prolog_dynamic_toplevl_function))
+          ,code))
 
 function %_prolog_toplevl_function_cps(v)
   match v with
@@ -117,7 +125,7 @@ function %_prolog_call_wrapper_cps(v)
 \pfcode{
 function prolog_remember_cell(env, cell) {
    chp = prolog_last_chpoint(env);
-   if(chp) {
+   if(chp && ^chp) {
       <[env;prev;cont;cnts;vars]> = ^chp;
        vars := cell : ^vars;
    }
@@ -145,13 +153,13 @@ function prolog_failure_f(env) {
     failguard = prolog_fail_guard(env);
     if (failguard) failguard(env);
     chp =  deref(prolog_last_chpoint(env));
-    if(chp) {
+    if(chp && ^chp) {
       <[env;prev;cont;cnts;vars]> = chp;
        iter v in ^vars do {
           %set-car!(v,'var');%set-cdr!(v,[]);
        }; vars := [];
-    };
-    prolog_next_choice_point(prolog_last_chpoint(env))
+       prolog_next_choice_point(prolog_last_chpoint(env))
+    }
 }
 function prolog_query_wrapper(v) {
    match v with
@@ -546,12 +554,12 @@ syntax in expr, start (prolog):
    env0 = gensym();
    lcode =
       ['flatbegin-inside-begin-with-defs';
-             ['inblock-def';qname;'fun'(args,body)];
-             ['inblock-def';env0;'cons'('quote'('env'),'nil')];
+             ['inblock-def';'var'(qname);'fun'(args,body)];
+             ['inblock-def';'var'(env0);'noconst'('cons'('mkhash'(),'mkref'('nil')))];
             @map v in newvars do {
-               ['inblock-def';v;'cons'('quote'('var'),'nil')]
+               ['inblock-def';'var'(v);'noconst'('cons'('quote'('var'),'nil'))]
              };
-             ['inblock-def';nm;
+             ['inblock-def';'var'(nm);
                 ['prolog_loop_results';
                     [qname;env0; 'prolog_default_continuation';@(^qstat)];
                     ^qstat]]];
@@ -562,7 +570,7 @@ function prolog_loop_results_fun(res,qargs,venv)
   do loop(r = res, i = 0) {
     if (r) {
       nargs = map [nv;@v] in qargs do {
-         [nv; prolog_decode_result(venv, v)]};
+         [nv; prolog_decode_result(venv, v, fun(k,v)[])]};
       return (i:venv):nargs:fun() {
          loop(prolog_failure(res), i+1)}
     } else []}}

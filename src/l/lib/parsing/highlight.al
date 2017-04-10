@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -90,24 +90,31 @@
   (fun (tag first last signal)
     nil))
 
-(function begin-new-state (file colour  stlist)
+(function begin-new-state (file colour  stlist state-begin state-begin-close)
   (let* ((stcoll (map ___mkheader stlist))
          (lll
           (foreach-mappend (x stcoll)
            (alet t (hashget colour x)
                  (if t (list t) nil)))))
-    (if lll (fprint file "{"))
+    (if lll (fprint file state-begin))
     (if lll
         (begin
           (foreach (i lll) (fprint file i))
           (fprint file " ")))
-    (if lll (fprint file "{"))
+    (if lll (fprint file state-begin-close))
     (return (if lll nil #t))
     ))
 
 (function flush-code (file tabs ch xs rlist)
   (let* ((str (list->string (reverse rlist)))
          (tabsfun (mkref tabs))
+         (xfun (foreach-mappend (x xs)
+                 (p:match x
+                   ((deftoken $tk) (list ((hashget ch "deftoken") tk)))
+                   ((reftoken $tk) (list ((hashget ch "reftoken") tk)))
+                   (else
+                    (alet t (hashget ch (S<< "xf:" (car x) "=" (cadr x)))
+                          (if t (list t) nil))))))
          (xvs (foreach-mappend (x xs)
                  (p:match x
                    ((screen none) (r! tabsfun I) nil)
@@ -118,12 +125,17 @@
          (tr (if xvs
                  (foldl (fun (x v)
                           (v x)) str xvs)
-                 ((deref tabsfun) str)
+                 (foldl (fun (x v) (v x))
+                        ((deref tabsfun) str)
+                        xfun)
                  )))
     (fprint file tr)))
 
 
-(function print-rle-stream (file tabs colour henv stream endstream)
+(function print-rle-stream (file tabs colour henv stream endstream orn)
+  (let* ((state-begin (car orn))
+         (state-begin-close (cadr orn))
+         (state-end (caddr orn)))
   (let loop ((p stream) (state "")
              (clean? #t)
              (clect nil) (xstate nil)
@@ -133,7 +145,7 @@
         (begin
           (flush-code file tabs colour xstate clect)
           (if (not clean?)
-              (fprint file "}}")))
+              (fprint file state-end)))
         (let* ((ch (StreamEntry.char p))
                (i (StreamEntry.idx p))
                (n (StreamEntry.chknext p))
@@ -152,8 +164,8 @@
                  (st
                   (begin
                     (flush-code file tabs colour xstate clect)
-                    (if (not clean?) (fprint file "}}"))
-                    (alet nclean (begin-new-state file colour st)
+                    (if (not clean?) (fprint file state-end))
+                    (alet nclean (begin-new-state file colour st state-begin state-begin-close)
                           (list
                            cv
                            nclean
@@ -162,8 +174,8 @@
                  (else
                   (begin
                     (flush-code file tabs colour xstate clect)
-                    (if (not clean?) (fprint file "}}"))
-                    (alet nclean (begin-new-state file colour nil)
+                    (if (not clean?) (fprint file state-end))
+                    (alet nclean (begin-new-state file colour nil state-begin state-begin-close)
                           (list cv
                                 nclean
                                 st

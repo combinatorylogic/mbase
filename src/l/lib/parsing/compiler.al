@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -683,7 +683,7 @@
           (astdef (packrat-find-target-ast src))
           (astv (if astdef (ast2:default-ifun astdef))))
      (if astv
-         (let* ((astc (ast-make-cache astv))
+         (let* ((astc (ast-make-cache astv nil))
                 (astm (packrat-ast-match astc tgs nbsrc eqns)))
            (packrat:visit ntexprs src
              (ntexpr _

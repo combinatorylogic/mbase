@@ -36,8 +36,10 @@
     (return l7)))
 
 
-(macro ast2:from-listform (srcid entry val)
-  (let* ((src (ast2:default-ifun srcid))
+(macro ast2:from-listform (srcid0 entry0 val)
+  (let* ((srcid (_get_md_id srcid0))
+         (entry (_get_md_id entry0))
+         (src (ast2:default-ifun srcid))
          (nodes (astlang:visit topdef src
                   (topdef DEEP ((defast ns)))
                   (astnode DEEP
@@ -56,9 +58,10 @@
         ,val
         ,@body)))
 
-
-(macro ast2:to-listform (srcid entry val)
-  (let* ((src (ast2:default-ifun srcid))
+(macro ast2:to-listform (srcid0 entry0 val)
+  (let* ((srcid (_get_md_id srcid0))
+         (entry (_get_md_id entry0))
+         (src (ast2:default-ifun srcid))
          (nodes (astlang:visit topdef src
                   (topdef DEEP ((defast ns)))
                   (astnode DEEP
@@ -76,7 +79,6 @@
                     ,entry
                     ,val
                     ,@body)))
-
 
 (macro ast2:visit-all (srcid entry val fn)
   (let* ((src (ast2:default-ifun srcid))
@@ -100,7 +102,7 @@
 ;; TODO: error checks
 (macro ast2:ctr-inner (args nd dsttags astdst)
   (let* ((ast (ast2:default-ifun astdst))
-         (h (ast-make-cache ast))
+         (h (ast-make-cache ast nil))
          (nf (ast-get-simple-node-pattern h nd))
          )
     `(ast2:mknode-inner ,args
@@ -121,13 +123,16 @@
     (ast-visitor-to)
     ))
 
-(macro ast2:vctr-inner (args nd vrnt dsttags astdst)
+
+
+(macro ast2:vctr-inner (args nd vrnt dsttags astdst . qmdata)
   (let* ((ast (ast2:default-ifun astdst))
          (_ (if (not ast)
                 (ccerror `(CANNOT-FIND-AST ,astdst))))
-         (h (ast-make-cache ast))
+         (h (ast-make-cache ast nil))
          (nf (ast-get-variant-pattern h nd vrnt))
          )
+    
     `(ast2:mknode-inner ,args
                         ,nd
                         variant
@@ -135,15 +140,17 @@
                         ,vrnt
                         ,dsttags
                         ,astdst
+                        ,@qmdata
                         )))
 
 (macro ast2:vctr (nd vrnt . args)
   `(inner-expand-first
     ast2:vctr-inner
     (quote ,args)
-    ,nd ,vrnt
+    ,nd ,(_get_md_id vrnt)
     (ast-dst-tags)
     (ast-visitor-to)
+    (quote ,(_get_md_rest vrnt))
     ))
 
 (macro ast2:xctr (vrnt . args)
@@ -151,9 +158,10 @@
     ast2:vctr-inner
     (quote ,args)
     (ast-node)
-    ,vrnt
+    ,(_get_md_id vrnt)
     (ast-dst-tags)
     (ast-visitor-to)
+    (quote ,(_get_md_rest vrnt))
     ))
 
 
@@ -190,7 +198,7 @@
          (dsttags (astlang:visit topdef ast (topdef _ ((defast taglist)))))
          (_ (if (not ast)
                 (ccerror `(CANNOT-FIND-AST ,astnm))))
-         (h (ast-make-cache ast))
+         (h (ast-make-cache ast nil))
          (nf (ast-get-variant-pattern h nodenm tag))
          (nf1 (ast-pattern-entries nf))
          (newargs (foreach-map (x (zip args nf1))

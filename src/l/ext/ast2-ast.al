@@ -13,13 +13,15 @@
             (simple <nodedefident:id> <pattern:p>)
             (varnode <nodedefident:id> . <*variant:vs>)
             (extend <nodedefident:id> . <*extvariant:vs>)
+            (extendvarhint <nodedefident:id> <tagident:tg> <*ident:hints>)
+            (extendnodehint <nodedefident:id> <*ident:hints>)
             ))
-  (variant (| (v <tagident:tag> <pattern:p>)))
+  (variant (| (v <tagident:tag> <pattern:p> . <*pphint:hs>)))
   (extvariant (| (remove <tagident:tag>)
                  (add <variant:v>)))
   (pattern (| (tuple . <*pattern:vs>)
               (append <pattern:p>)
-              (entry <nodeident:ref> <ident:name> <etype:tp>)
+              (entry <nodeident:ref> <ident:name> <etype:tp> . <*pphint:hs>)
               (nil) ;; for empty variants
               ))
   (etype (| (single)
@@ -58,7 +60,7 @@
                        <*visitorvar:ds>
                        <visitorelse:e>
                        )))
-  (visitorvar (| (v <tagident:id> <any:e>)))
+  (visitorvar (| (v <tagident:id> <tagmetadata:md> <any:e>)))
   (visitorelse (| (none)
                   (velse <any:e>)
                   (vdelse <any:e>) ;; deep else
@@ -103,7 +105,7 @@
               <visitorcode:e>)
       ))
   (visitorvar
-   (| (v <tagident:id> <norder:o> <pattern:ps> <pattern:pd> <visitorcode:e>)))
+   (| (v <tagident:id> <norder:o> <pattern:ps> <pattern:pd> <visitorcode:e> . <metadata:md>)))
   (variants <*visitorvar:vs>)
   (visitorcode
    (| (code <any:e>)
@@ -181,6 +183,7 @@
                   (implicit_ctor_tag . <any:v>)
                   (update_thisnode <visitorcode:c> <visitorcode:e>)
                   (transform_listform <visitorcode:src>)
+                  (with_added_metadata <*metadatapair:ps> <visitorcode:c>)
                   (begin . <*visitorcode:es>)
                   ))
   )
@@ -253,6 +256,7 @@
     (make_popper <label:runner> <label:retlabel> <ident:stackid>)
 
     (setup_macros <*macropair:ps> . <*expr:e>)
+    (with_added_metadata <*mdpair:ps> . <*expr:c>)
     (debugmessage <any:c>)
 
     ;; maybe

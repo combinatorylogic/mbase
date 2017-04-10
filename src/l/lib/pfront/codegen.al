@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -13,7 +13,7 @@
 ; (leftass (- a (leftass (- b (leftass (- c (leftass (- d e))))))))
 ;   =>
 ; (- (- (- (- a b) c) d) e)
-(function fixleft (n)
+(function fixleft (leftass n)
   (hlevel:visit expr n
     (expr _
       ((leftass (leftass node))
@@ -25,13 +25,13 @@
   (p:match node
     ((unleft (leftass $x)) x)
     ((leftass (binop $op $a (leftass (binop $opr $b $c))))
-     (leftass `(leftass (binop ,opr (stopfix (binop ,op ,(fixleft a) ,(fixleft b)))
+     (leftass `(leftass (binop ,opr (stopfix (binop ,op ,(fixleft leftass a) ,(fixleft leftass b)))
                                ,c))))
     ((leftass $x) x)
     (else node)))
 
 (function fixleft_outer (n)
-  (let* ((res (fixleft n))
+  (let* ((res (fixleft leftass n))
          (res1 (hlevel:visit expr res
                   (expr DEEP
                     ((leftass a)
@@ -41,7 +41,7 @@
     (return res1)))
 
 
-(function vtp (node tp)
+(recfunction vtp (node tp)
   (p:match tp
     ((id once) `(,node _))
     ((id deep) `(,node DEEP))
@@ -139,25 +139,26 @@
        (if3 `(if ,e ,tr ,fl))
        (if2 `(if ,e ,tr))
        (lambda `(fun ,args ,body))
-       (letloop `(let ,nm ,args ,b))
+       (letloop `(let ,(_get_md_id nm) ,args
+                      (with-added-metadata (,(cdr nm)) ,b)))
        (withast `(ast2:with-ast ,nm ,e))
-       (mknode `(ast:mknode ,@args))
+       (mknode `(ast:mknode (@md (,md)) ,@args))
        (mkvnode `(ast2:vctr ,nd ,tag ,@args))
        (mkxnode `(ast2:xctr ,tag ,@args))
        (mksnode `(ast2:ctr  ,nd ,@args))
        (filter
           (p:match n
-            ((var $vnm)
+            ((var $vnm . $_)
              `(foreach-map-filter (,vnm ,e) ,b ,vnm))
             ((ptn $ptn)
              (alet vnm (gensym)
              `(foreach-map-filter (,vnm ,e) (pfront.with-format ,vnm ,ptn ,b) ,vnm)))))
        (mappend
           (p:match n
-            ((var $vnm)
+            ((var $vnm . $_)
              (if cn
-                    `(foreach-mappend-count (,vnm ,e ,(car cn)) ,b)
-                    `(foreach-mappend (,vnm ,e) ,b)))
+                    `(foreach-mappend-count (,n ,e ,(car cn)) ,b)
+                    `(foreach-mappend (,n ,e) ,b)))
             ((ptn $ptn)
              (alet vnm (gensym)
                (if cn
@@ -168,9 +169,9 @@
 
        (map
            (p:match n
-             ((var $vnm)
-              (if cn `(foreach-map-count (,vnm ,e ,(car cn)) ,b)
-                     `(foreach-map (,vnm ,e) ,b)))
+             ((var $vnm . $md)
+              (if cn `(foreach-map-count (,n ,e ,(car cn)) ,b)
+                     `(foreach-map (,n ,e) ,b)))
              ((ptn $ptn)
               (alet vnm (gensym)
               (if cn `(foreach-map-count (,vnm ,e ,(car cn))
@@ -179,16 +180,16 @@
              ))
        (iter
         (p:match n
-          ((var $vnm)
-           (if cn `(foreach-count (,vnm ,e ,(car cn)) ,b)
-               `(foreach (,vnm ,e) ,b)))
+          ((var $vnm . $md)
+           (if cn `(foreach-count (,n ,e ,(car cn)) ,b)
+               `(foreach (,n ,e) ,b)))
           ((ptn $ptn)
            (alet vnm (gensym)
                  (if cn `(foreach-count (,vnm ,e ,(car cn))
                                         (pfront.with-format ,vnm ,ptn ,b))
                      `(foreach (,vnm ,e) (pfront.with-format ,vnm ,ptn ,b)))))))
 
-       (collector `(collector (,addname ,getname) ,body))
+       (collector `(pfront-collector (,addname ,getname) ,body))
        (withmacros `(with-macros ,ds ,e))
        (withmetadata `(ast-with-metadata ,m ,e))
        (vquote (list 'quote e))
@@ -197,7 +198,7 @@
        (def `(inblock-def ,v ,e))
        (defformat `(inblock-def-format ,f ,e))
        (let `(let ((,v ,e)) ,@rest))
-       (var v)
+       (var (if md `(inner.identmetadata ,v ,@md) v))
        (number v)
        (char ch)
        (string v)
@@ -219,8 +220,8 @@
 
     (mpattern DEEP
        ((cons (cons a b))
-        (bindas `(,(Sm<< "$$AS:" id) ,p))
-        (guard `(,(Sm<< "$$FFF") ,a (fun (,id) ,b)))
+        (bindas `(,(Sm<< "$$AS:" (cadr id)) ,p ,@(cddr id)))
+        (guard `(,(Sm<< "$$FFF") ,a (fun (,(cadr id)) ,b)))
         (list (normal-or-append
                (fun (a b) (cons a b))
                (fun (a b)
@@ -236,18 +237,27 @@
                         nil
                         args)))
         (binding (Sm<< "$" id))
+        (mdbinding `(,(Sm<< "$$AAS:" (cadr id)) ,@(cddr id)))
         (eq (Sm<< "=" id))
         (any '$_)
         (number n)
         (string s)))
 
+    (visitp DEEP ;; TODO
+      (list v e))
+    
     (visitptn DEEP
        ((many `(,@(vtp node t) (,@ps ,@el)))
-        (manyfun `(,@(vtp node t)
-                   (,@(foreach-map (p ps)
-                        (format p (nm ex)
-                                `(,nm (fun ,args ,ex))))
-                    ,@el)))
+        (manyfun (alet addargs (fun (ps)
+                                 (foreach-map (p ps)
+                                   (format p (nm ex)
+                                           `(,nm (fun ,args ,ex)))))
+                  `(,@(vtp node t)
+                   (,@(addargs ps)
+                    ,@(foreach-map (e el)
+                        (p:match e
+                          ((else $code) `(else (fun ,args ,code)))
+                          ((else-deep $ps) `(else-deep ,(addargs ps)))))))))
         (forall `(,@(vtp node t) (forall ,e)))
         (single `(,@(vtp node t) ,e))))
     (visitelse DEEP
@@ -290,6 +300,12 @@
        ((import $nm) (imadd nm))))
    (cons (exget) (imget)))))
 
+(function _mkpattern (x)
+  (p:match x
+    ((var $id) (Sm<< "$" id))
+    ((var $id . $md) `(,(Sm<< "$$AAS:" id) ,@md))
+    (else (ccerror `(PATTERN ,x)))))
+
 (function hlevel-compile (c)
   (hlevel:visit topexpr c
     (topexpr DEEP
@@ -318,15 +334,22 @@
            (ctimex (bootlib:pop-module-env))))
 
        (topfunction
-        `(recfunction ,nm ,args ,body))
+        `(top-begin
+           (definition-metadata ,nm ,loc)
+           (recfunction ,nm ,args ,body)
+           ))
        (lispmacro
         (alet argslist
           (let loop ((a args))
             (p:match a
               (() nil)
-              (((a $x) . $_) x)
-              (((i $x) . $rest) (cons x (loop rest)))))
-          `(macro ,nm ,argslist ,body)))
+              (((a $x) . $_) (_mkpattern x))
+              (((i $x) . $rest) (cons (_mkpattern x) (loop rest)))))
+          (with-syms (rnam)
+           `(macro ,nm ,rnam
+              (p:match ,rnam
+                (,argslist ,body)
+                (else (ccerror (list 'MACRO-FORMAT-ERROR))))))))
        (topdefine
         `(define ,nm ,val))
        (ast3
@@ -364,6 +387,7 @@
                                )))))
        (hlinclude `(hlevl-file ,s))
        (litinclude `(hlevl-lfile ,texnm ,s))
+       (htmlinclude `(hlevl-lfile-html ,texnm ,s))
        (lispinclude `(include ,s))
        (topparser
         `(packrat-ast ,name ,bor ,@nodes))
@@ -378,7 +402,10 @@
     (astbody DEEP
       ((alt `(,nm (| ,@alts)))
        (addalt `(,(Sm<< "::" nm) (| ,@alts)))
-       (struct `(,nm ,(hlevel-ast-pattern s)))))
+       (struct `(,nm ,(hlevel-ast-pattern s)))
+       (pphintvar `(varhint ,nd ,var ,hints))
+       (pphintnd `(hint ,nd ,hints))
+       ))
     (astalt DEEP
       ((withargs `(,nm ,@(hlevel-ast-pattern args)))
        (remove `(- ,nm))

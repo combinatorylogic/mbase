@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -15,6 +15,13 @@
 (define mtd_ConsTrap (r_getconstructor t_PairTrap object object))
 (define mtd_Cons1 (r_getconstructor t_Pair object))
 (define mtd_Cons0 (r_getconstructor t_Pair))
+(define mtd_reg_docstring_macro (r_mtd t_runtime "_doc_register_macro"
+                                       t_string
+                                       t_string))
+(define mtd_reg_docstring_function (r_mtd t_runtime "_doc_register_function"
+                                          t_string
+                                          t_string))
+
 (net.types RuntimeMethodHandle RuntimeFieldHandle Precompiler Runtime)
 
 (define mtd_register_method (r_mtd t_runtime "_register_method" t_Symbol t_RuntimeMethodHandle int))
@@ -26,6 +33,9 @@
 
 (define fld_True (r_getField t_runtime "_true"))
 (define fld_False (r_getField t_runtime "_false"))
+
+(define fld_funcdocs (r_getField t_runtime "_function_docs"))
+(define fld_macrodocs (r_getField t_runtime "_macro_docs"))
 
 (define f_Assmblys (r_getField t_runtime "assmblys"))
 

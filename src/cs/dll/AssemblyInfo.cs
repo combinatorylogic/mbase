@@ -2,7 +2,7 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+// Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 //
 //
 //////////////////////////////////////////////////////////////////////////////
@@ -23,7 +23,7 @@ using System.Security;
 [assembly: AssemblyVersion(AssemblyVersion.kFileVersion)]
 
 
-//[assembly: AssemblyDelaySign(true)]
+[assembly: AssemblyDelaySign(true)]
 //[assembly: AssemblyKeyFile("")]
 //[assembly: AssemblyKeyName("")]
 [assembly:AssemblyKeyFile("pubpriv")]

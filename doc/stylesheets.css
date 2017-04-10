@@ -1,0 +1,45 @@
+#source {
+  left: 60%;
+  top: 60%;
+}
+#target {
+  left: 120%;
+  top: 120%;
+}
+svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+line {
+    stroke: grey;
+    stroke-width: 2;
+    stroke-opacity: 0.5;
+}
+
+
+.ident { color: #000099; }
+.keyword { color: blue; }
+.comment { color: green; }
+.lexic { color:  #0099ff; }
+.pattern {  text-shadow: 1px 1px 2px rgba(190, 190, 190, 1); }
+.code { font-family: monospace; border-style: dotted; border-width: 1px; font-size: 100%; }
+.democode { font-family: monospace; border-style: solid; border-width: 1px; font-size: 80%; }
+.const { color: #0099ff; }
+.symbol { color: #0099ff; }
+.column { width: 800px; text-align: justify; }
+
+.withhint { position: relative; }
+.hint { display: none; }
+
+.withhint:hover .hint {
+    display: block;
+    position: absolute;
+    bottom: 1em;
+    padding: 0.5em;
+    color: #000000;
+    background: #ebf4fb;
+    border: 0.1em solid #b7ddf2;
+    border-radius: 0.5em;
+}

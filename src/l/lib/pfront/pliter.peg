@@ -2,7 +2,7 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+// Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 //
 //
 //////////////////////////////////////////////////////////////////////////////
@@ -16,13 +16,19 @@ parser pliter extends pfront (
  token bslash := '\' => { state = empty };
  token pltbeg1 := 'pfcode' TSpace* '{' TSpace* => { state = empty};
  token pltbeg2 := 'pfqode' TSpace* '{' TSpace* => { state = empty};
+ token pltbeg2a := 'pfiqode' TSpace* '{' TSpace* => { state = empty};
  token pltbeg3 := 'ppcode' TSpace* '{' TSpace* => { state = empty};
  token pltbeg1x := 'phcode' TSpace* '{' TSpace* => { state = empty};
  token pltdll := 'pfdllref' TSpace* '{' TSpace* => { state = empty};
  token pltsysdll := 'pfsysdllref' TSpace* '{' TSpace* => { state = empty};
+ token plinclude := 'pfinclude' TSpace* '{' TSpace* => { state = empty };
  token pltend := Space* '}' => {state = empty};
 
  term pltbeg4 := 'parse' '[' ident:p ':' ident:e ']' TSpace* '{' TSpace* => {state = empty} [[parser]](p,e) ;
+
+ term pltmetabegin := 'pfdemo' '{' expr:v '}' '[' ident:p ':' ident:e ']'
+     => {uberstate = empty} [[pfdemo]](v,p,e);
+                      
 
  term pliter := texexpr /  pltopexpr0 ;
 
@@ -32,15 +38,19 @@ parser pliter extends pfront (
 
  term pltopexpr "Embedded code" :=
                    {pltbeg1 slist<atopexpr>:e pltend => pltopexpr(e)}
+                /  {plinclude string:s pltend => plinclude(s)}
+                /  {pltbeg2a slist<atopexpr>:e pltend => pliqexpr(e)}
                 /  {pltbeg2 slist<atopexpr>:e pltend => plqexpr(e)}
                 /  {pltbeg3 slist<plminipeg>:e pltend => plqexpr(e)}
                 /  {pltbeg1x slist<atopexpr>:e pltend => { uberstate = empty } plqhexpr(e)}
                 /  {pltsysdll string:s pltend => { uberstate = empty } $pfchecksysdll(s) }
                 /  {pltdll string:s pltend => { uberstate = empty } $pfcheckdll(s) }
                 /  {pltbeg4:pars #invokeparser<pars>:e pltend => plqexpr(e)}
+                /  {pltmetabegin:meta => plqmetaexpr(meta)}
                 ;
 
- nottex := !('\pfcode'/'\pfqode'/'\ppcode'/'\phcode'/'\parse'/'\pfdllref'/'\pfsysdllref') .;
+ nottex := !('\pfcode'/'\pfqode'/'\pfiqode'/'\ppcode'/'\phcode'/'\parse'/'\pfdllref'/'\pfsysdllref'
+             /'\pfdemo'/'\pfinclude') .;
 
  token tex := nottex +;
  term texexpr := tex:v => {screen=none} {state=texcomment} pltexstring($val(v));

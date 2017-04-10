@@ -1,0 +1,208 @@
+\pfinclude{"../misc/header.html"}
+
+<h2>DSLs for building compilers</h2>
+    
+<p> Programming languages implementation is a well defined sequence of very
+specific stages. It may include parsing, followed by a chain of rewrites of an
+AST, interleaved with some analysis passes over the said AST, ending with a code
+generation, which may also be just a rewrite pass. It does not matter if a
+language is <i>domain specific</i>, a small macro extending somewhat a
+functionality of some host language, or a large standalone language - all follow
+the same simple pattern.
+
+<p> In order to simplify this process as much as possible it makes sense to use
+domain-specific languages for each distinct stage. Parsing DSLs are ubiqutous,
+but often all the consequent transformations are written in an ad hoc way and
+result in an unnecessarily complicated code.
+
+<p> Here we're presenting a small experimental language, <a
+href="https://github.com/combinatorylogic/mbase">PFront</a>, demonstrating this
+concept of a pervasive use of DSLs for constructing all stages of a compiler (or
+a language extension, a macro, a eDSL, etc.). It consists of the following eDSLs
+embedded into one simple extensible host language:
+
+<ul>
+<li> A parsing eDSL. Nothing really new here, besides it being very tightly
+integrated and allowing to implement an extensible syntax (thanks to PEG) and
+parser inheritance. A lot of useful parsing components are already defined and
+can can be reused.
+
+<li> A domain-specific type system for defining ASTs and infering visitors over
+  them. This is the key component, allowing to write compiler passes in a mostly
+  declarative way. E.g., if you want to walk over your AST and collect all the
+  identifiers, taking a lexical scope into account, you only have to mention the
+  identifier nodes and nodes introducing new scope (which affects the tree
+  traversing order), no need to write a huge recursive function going through
+  all possible nodes in this AST and no need to write a generic visitor for this
+  AST (remember, the order is not necessarily trivial).
+
+<li> A set of abstract, very generic IRs and predefined passes over them, useful
+  for exctracting an essence of your domain specific AST, doing some transforms
+  in an abstracted way and then reapplying the result back to your specific
+  AST. For example, there is a generic liveness IR that can be used for a
+  liveness analysis and a register allocation.
+
+  There is also a generic SSA IR, with a rich set of transformation and analysis
+  passes (think of LLVM, but without LL).
+
+<li> An embedded Prolog compiler, which is very useful for some compiler
+analysis passes and for implementing type systems seamlessly (especially the
+Hindley-Milner based ones).
+
+<li> Some minor bells and whistles that capture recurring patterns in compiler passes.
+
+<li> Built-in literate programming tools.
+</ul>
+
+<p>
+<i>Be warned. This language is a proof of concept only and not recommended for any
+production use. It's a hack upon a pile of hacks, glued by hacks and shit. The
+good news is that such a language is relatively trivial and anyone can implement
+a similar set of features on top of their host language of a choice.</i>
+
+<h2>Constructing a simple language</h2>
+
+<p>
+For example, a parser for a simple language looks like this:
+
+\phcode{function %peg-function-fval (v)
+  %flt:parse(cdr(v))}
+
+\pfcode{
+parser calc (pfront) {  // Define a new parser, inheriting from the pfront syntax
+   !!Spaces;  // Ignore the whitespace characters and comments
+
+   // Syntax highlighting rules:
+   [lexical:] := [lexical] => {ctoken = lexic};
+   [keyword:] := [keyword] ![IdentRest] => {ctoken = keyword};
+   
+   calc := [calc0]:c [Spaces]* => c; // Toplevel entry parses a single calc0 expression,
+                                     // which may be trailed by some spaces.
+   binary calc0 :=  // Define a binary expression parser (using Pratt algorithm)
+         (200) [calc0] "*" [calc0] => mult(L,R)
+         // Here, (200) is a priority, [calc0] is a recurisve reference to the same entry,
+         // "*" is a literal, and '=> mult(L,R)' is an AST constructor.
+         // By default, left associativity is assumed.
+       | (200) [calc0] "/" [calc0] => div(L,R)
+       | (100) [calc0] "+" [calc0] => plus(L,R)
+       | (100) [calc0] "-" [calc0] => minus(L,R)
+       | [atom]
+       ;
+   // All the other nodes are parsed by Packrat and are defined with a PEG syntax       
+   atom := { "(" [expr]:e ")" => e }
+        /  { let [ident]:nm "=" [calc]:v in [calc]:body
+                  => let(nm, v, body) }
+        /  { [ident]:nm => var(nm) }
+        /  { [double]:v => const(v) }
+        ;
+
+   // This is a lexerless parsing, so "tokens" must be defined with the same PEG
+   double := [tkdouble]:v => {ctoken = const} $fval(v);
+   @tkdouble := ("-"/"+")? [Digit]+ ("." [Digit]+)?;
+}}
+
+<p>A type declaration for the AST generated by this parser is following:
+
+\pfcode{
+ast calc {
+   expr = plus(expr:a, expr:b)
+        | minus(expr:a, expr:b)
+        | mult(expr:a, expr:b)
+        | div(expr:a, expr:b)
+        | let(ident:nm, expr:val, expr:body)
+        | var(ident:nm)
+        | const(number:v);
+}}
+
+<p>Now we can write an interpreter for this simple language:
+
+\pfcode{
+function calc_eval(env, e)
+   visit:calc (expr:e) {
+      once expr {
+           let -> calc_eval([nm;calc_eval(env, val)]:env, body)
+         | deep -> {
+             plus -> %f+(a,b)
+           | minus -> %f-(a,b)
+           | mult -> %f*(a,b)
+           | div -> %f/(a,b)
+           | const -> v
+           | var -> %lookup-env-car(env, nm)
+           | else -> []}}}}
+
+<p>This is an example of a visitor with a nontrivial traversal order. 'visit:calc'
+infers a visitor function for the 'calc' AST, starting with the 'expr' entry
+node. 'once expr' defines a rewrite pattern for a single tree node level,
+without going into sub-nodes. We need this because 'let' is introducing a new
+variable scope.  But, all the other nodes but 'let' can be traversed in a
+depth-first order, therefore they go under 'deep', and a recursive depth-first
+visitor is inferred here. We only had to add an explicit recursion for the 'let'
+nodes.
+
+<p>Writing a compiler for the same language is even easier (translating it to an
+underlying Lisp) - depth-first traversal is sufficient so we do not need any
+explicit recursion here at all:
+
+\pfcode{
+function calc_compile(ex)
+   visit:calc(expr: ex) {
+     deep expr {
+        const -> 'f#'(%->s(v))
+      | var -> nm
+      | let -> 'alet'(nm, val, body)
+      | plus -> 'f+'(a,b)
+      | minus -> 'f-'(a,b)
+      | mult -> 'f*'(a,b)
+      | div -> 'f/'(a,b)}}}
+
+<p>Compiling the same language into a stack machine (namely, .NET IR) is not much
+more difficult:
+
+\pfcode{
+function calc_compile_dotnet(ex)
+  visit:calc(expr:ex) {
+    deep expr {
+       const -> ['Ldc_R8'(v)]
+     | var -> ['Ldloc'('var'(nm))]
+     | let -> ['local'(nm, t_Double);
+               @val;
+               'Stloc'('var'(nm));
+               @body]
+     | plus -> [@a;@b;'Add'()]
+     | minus -> [@a;@b;'Sub'()]
+     | mult -> [@a;@b;'Mul'()]
+  | div -> [@a;@b;'Div'()]}}}
+
+
+<p>And, it's trivial to embed this compiler staight into PFront itself, using its
+extensible syntax:
+
+\pfcode{
+syntax in expr, start (calc): ' "calcnet:" [calc]:c '
+  { return 'lisp'('n.asm'([],@calc_compile_dotnet(c),'Box'(t_Double))) }}
+
+<p>Or, for an immediate interpretation:
+
+\pfcode{
+syntax in expr, start (calc): ' "calc:" [calc]:c '
+  { return 'lisp'(%S<<(calc_eval([],c))) }}
+
+
+<p>And this new syntax can be used straight away, in the same source file, even with syntax highlighing working out of the box:
+
+\pfcode{
+writeline(calcnet: let x = 2 in 2*2+x*3)}
+
+<p>Of course, the language we just implemented is extremely trivial, and
+compilation consists of one stage only, so the example above is not very
+convincing. In a more realistic scenario there must be a long chain of
+transformations, with multiple different (often just slightly different)
+ASTs. And this is exactly what PFront is designed for.
+
+<p>You can see a more complex language implementation (a C-like language translated
+to LLVM directly or an own LLVM-like IR) <a href="https://github.com/combinatorylogic/clike">here</a> (with a
+literate code <a href="https://combinatorylogic.github.io/mbase-docs/clike.pdf">here</a>).
+
+\pfinclude{"../misc/footer.html"}
+
+

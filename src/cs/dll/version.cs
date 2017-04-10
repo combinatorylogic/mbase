@@ -2,7 +2,7 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+// Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 //
 //
 //////////////////////////////////////////////////////////////////////////////
@@ -27,6 +27,6 @@ internal class AssemblyVersion
   public const System.String kProductName = "MBase";
   public const System.String kDescription = "MBase";
   public const System.String kCompanyName = "Meta Alternative Ltd.";
-  public const System.String kFileVersion = "0.2016.12.28";
+  public const System.String kFileVersion = "0.2017.03.24";
 }
 

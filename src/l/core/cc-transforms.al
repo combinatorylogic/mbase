@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -18,6 +18,15 @@
             (ast:mknode (recname rentry))))
        (else node)))))
 
+(define cc:process-local-variable-metadata
+  (mkref (fun (tp id md srcmd) nil)))
+
+(define cc:process-variable-metadata
+  (mkref (fun (tp id md) nil)))
+
+(define cc:process-remark-metadata
+  (mkref (fun (tp md) nil)))
+
 (function cc:scope-transform ( ast )
   (<> ast
     (ast:revisit scopeloop ((substs nil) (rrec nil) (rentry nil))
@@ -26,28 +35,43 @@
       ((SLet
         (let* ((newnames (map (fun (_) (gensym)) defs))
                (ntsubs (mapn
-                          (fun (nn on)
-                               `(,nn ,on loc))
-                          (map car defs) newnames))
+                        (fun (odef on)
+                          (format odef (nn ov . md)
+                                  `(,nn ,on loc ,@md)))
+                        defs
+                        newnames))
                (nsubs
                 (append ntsubs
                         substs))
                (newdefs
                 (map-over (czip newnames defs)
-                   (fmt (nnm onm dfn)
+                   (fmt (nnm onm dfn . md)
                         `(,nnm ,(scopeloop (cc:recentry-fix dfn (Sm<< onm "_" nnm))
-                                           substs rrec onm))))))
+                                           substs rrec onm) ,@md)))))
           `(SLet ,newdefs ,(scopeloop body nsubs rrec nil))))
+
+       (MDAnnot
+        (let* ((tmpht (mkhash)))
+          (foreach (m defs)
+            (format m (v . md)
+              (ohashput tmpht v md)))
+          (let* ((newsubsts
+                  (foreach-map (s substs)
+                    (format s (nn on tp . omd)
+                      `(,nn ,on ,tp ,@omd ,@(ohashget tmpht nn))))))
+            (scopeloop body newsubsts rrec nil))))
+       
 ;= [[SLetRec]] introduces new variables, visible within the scope of all value definitions
 ;= as well as in the body scope.
        (SLetRec ; TODO:::: Remove redundant closures here!!!!
         (let* ((newnames (map (fun (_) (gensym)) defs))
                (nsubs1
                 (append (mapn
-                          (fun (nn on)
-                               `(,nn ,on loc))
-                          (map car defs) newnames
-                          )
+                         (fun (odef on)
+                           (format odef (nn ov . md)
+                                   `(,nn ,on loc ,@md)))
+                         defs
+                         newnames)
                         substs))
                (nrrec
                 (append (map car defs) rrec))
@@ -60,9 +84,9 @@
                         substs))
                (newdefs
                 (map-over (czip newnames defs)
-                   (fmt (nnm onm dfn)
+                   (fmt (nnm onm dfn . md)
                         `(,nnm ,(scopeloop (cc:recentry-fix dfn onm)
-                                           nsubs1 nrrec onm))))))
+                                           nsubs1 nrrec onm) ,@md)))))
           `(SLetRec ,newdefs ,(scopeloop body nsubs2 rrec nil))))
 ;= Lambda abstraction introduces new variables (arguments), visible inside
 ;= function body only.
@@ -78,22 +102,22 @@
                          (alet fnd (find (fmt (onm) (eqv? onm rrecname))
                                          substs)
                                (p:match fnd
-                                 (($n1 $nn loc) nn) ; do not catch recs here
+                                 (($n1 $nn loc . $md) nn) ; do not catch recs here
                                  (else (gensym)))
                                )
                          (Sm<< recname '_ (gensym)))
                      'rec)
                     nil))
                (nsubsa (map-over (czip args newnames)
-                           (fmt (nn . on)
-                             `(,nn ,on arg))))
+                           (fmt ((_ nn . md) . on)
+                             `(,nn ,on arg ,@md))))
                (nsubsb (map-over substs
                            (fun (x)
-                             (format x (nn on tp)
+                             (format x (nn on tp . md)
                                (case tp
                                  ((rec)
                                   (if (memq nn rrec) x
-                                      `(,nn ,on loc)))
+                                      `(,nn ,on loc ,@md)))
                                  (else x))))))
                (nsubs0
                 (append nsubsa nsubsb))
@@ -101,7 +125,8 @@
                           nsubs0))
                (nrn (if newrecname (cadr newrecname) nil))
                )
-          `(Fun ,nrn ,newnames ,(scopeloop body nsubs nil nil))))
+          `(Fun ,nrn ,(foreach-map (n newnames) `(var ,n)) ;; losing metadata here
+                ,(scopeloop body nsubs nil nil))))
 ;= [[Var]] is referencing to a local variable ([[SLet]]--defined), an
 ;= argument or a global variable, which is (by definition) any variable not in the local
 ;= substitutions list. No environment is available at this stage, and we can't
@@ -110,17 +135,21 @@
         (let* ((fnd (find (fmt (onm) (eqv? onm id))
                           substs)))
           (if fnd
-           (format fnd (_ nnm tp)
-              `(,(case tp ((loc) 'Var)
-                          ((arg) 'Arg)
-                          ((rec) 'Recref)
-                          ) ,nnm))
-             `(Glob ,(core:lookup-global  id)))))
+           (format fnd (_ nnm tp . srcmd)
+             (let* ((vtp (case tp ((loc) 'Var)
+                               ((arg) 'Arg)
+                               ((rec) 'Recref)
+                               )))
+               (if (and srcmd md) ((deref cc:process-local-variable-metadata) vtp id md srcmd))
+               `(,vtp ,nnm)))
+           (begin
+             (if md ((deref cc:process-variable-metadata) 'glob id md))
+             `(Glob ,(core:lookup-global  id))))))
        (FixLocal
         (let* ((fnd (find (fmt (onm) (eqv? onm id))
                           substs)))
           (if fnd
-           (format fnd (_ nnm tp)
+           (format fnd (_ nnm tp . srcmd)
               `(FixLocal ,nnm ,oldid))
            `(FixLocal ,id ,id))))
 ;= [[BackendAsm]] also can contain some variable references.
@@ -131,7 +160,7 @@
                                    substs)))
                    (list id
                          (if fnd
-                             (format fnd (_ nnm tp)
+                             (format fnd (_ nnm tp . srcmd)
                                      `(,(case tp ((loc) 'Var)
                                               ((arg) 'Arg)
                                               ((rec) 'Var)
@@ -144,7 +173,7 @@
         (let* ((fnd (find (fmt (onm) (eqv? onm nm)) substs))
                (ref
                 (if fnd
-                    (format fnd (_ nnm tp)
+                    (format fnd (_ nnm tp . srcmd)
                       `(,(case tp ((loc) 'Var)
                           ((arg)
                            (cc:comperror `(CC00-ARGM ,nnm))
@@ -245,7 +274,7 @@
                   (nbody (liftloop body
                                    (append
                                     (if recname (list recname) nil)
-                                    (append args bound))
+                                    (append (bootlib:filter-args args) bound))
                                    recname
                                    stickyname
                                    ))
@@ -261,7 +290,7 @@
                  (begin      ; Otherwise it is a closure
                    (add
                     `(Closure ,newname ,(cc:sticky stickyname newname)
-                              ,env (Fun ,(Sm<< newname "_POOP") ,args ,nbody)))
+                              ,env (Fun ,(Sm<< newname "_closure") ,args ,nbody)))
                    `(App (Glob ,newname)
                       ,@(foreach-map (e env)
                           (alet tp (hashget vars e)

@@ -51,6 +51,18 @@ function genssa2_paths_converge(cfg, rev, bbs, f) {
      [one] -> one
    | else -> []}}
 
+There is a common case where a basic block does not contain $\varphi$ nodes, yet it is a destination of more
+than one other basic blocks, including empty ones. Those empty blocks can be eliminated.
+
+\pfcode{
+function genssa2_merge_basic_blocks_backwards(src, chgp) {
+   //TODO.
+   // Remove the basic block if it is empty and if bypassing all of its incoming
+   // edges to its destination bb will not cause any phi conflicts (i.e.,
+   // either no phis at all or none of the incoming edges are already there).
+   src
+}}
+
 \pfcode{
 function genssa2_merge_basic_blocks(src, chgp) {
    // 1. Prepare.

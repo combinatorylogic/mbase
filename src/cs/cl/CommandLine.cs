@@ -2,7 +2,7 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+// Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 //
 //
 //////////////////////////////////////////////////////////////////////////////
@@ -21,7 +21,7 @@ namespace Meta.Scripting
     {
 
       Console.WriteLine(
-                        "MBase (c) by Meta Alternative Ltd., 2005-2015\n" +
+                        "MBase (c) by Meta Alternative Ltd., 2005-2017\n" +
                         "Usage:\n" +
                         "mb0 [opts] /BOOT bootfile.al\n" +
                         "mb0 [opts] /C file.al file.alc : compile to layer0\n" +

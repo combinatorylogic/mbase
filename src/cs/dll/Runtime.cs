@@ -2,7 +2,7 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+// Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 //
 //
 //////////////////////////////////////////////////////////////////////////////
@@ -72,6 +72,9 @@ namespace Meta.Scripting
 
       n("string->list", new SimpleCode(string_to_list), "_string_to_list");
       n("list->string", new SimpleCode(list_to_string), "_list_to_string");
+      n("string-getchar", new SimpleCode(string_getchar), "_string_getchar");
+      n("string-getsubstring", new SimpleCode(string_getsubstring), "_string_getsubstring");
+      n("string-length", new SimpleCode(string_length), "_string_length");
 
 
       n("eval", new SimpleCode(eval));
@@ -92,6 +95,7 @@ namespace Meta.Scripting
       n("ccdefmacro", new SimpleCode(defmacro), "_ccdefmacro");
       n("getmacroenv", new SimpleCode(getmacroenv));
       n("getfuncenv", new SimpleCode(getfuncenv));
+      n("getdochash", new SimpleCode(getdochash));
 
       n("symbol-starts-with", new SimpleCode(symbol_starts_with), "_symbol_starts_with");
       n("string-escape", new SimpleCode(stringescape));
@@ -1188,6 +1192,13 @@ namespace Meta.Scripting
       return Precompiler.symbols;
     }
 
+      public static Hashtable _dochash = new Hashtable();
+      
+    static Object getdochash(Object[] f)
+    {
+      return _dochash;
+    }
+
     static Object defmacro(Object[] f)
     {
       Symbol nm = f[0] as Symbol;
@@ -1353,6 +1364,41 @@ namespace Meta.Scripting
       return c.run(f, null);
     }
 
+    static Object string_length(Object[] f)
+    {
+        return _string_length(f[0]);
+    }
+
+    public static Object _string_length(Object str)
+    {
+        string str0 = (String)str;
+        return (object)str0.Length;
+    }
+
+    static Object string_getchar(Object[] f)
+    {
+        return _string_getchar(f[0], f[1]);
+    }
+
+    public static Object _string_getchar(Object str, Object idx)
+    {
+        string str0 = (String)str;
+        int idx0 = (int)idx;
+        return (object)str0[idx0];
+    }
+
+    static Object string_getsubstring(Object[] f)
+    {
+        return _string_getsubstring(f[0], f[1], f[2]);
+    }
+
+    public static Object _string_getsubstring(Object str, Object i0, Object i1)
+    {
+        string str0 = (String)str;
+        int idx0 = (int)i0;
+        int idx1 = (int)i1;
+        return (object)str0.Substring(idx0, idx1);
+    }
 
     static Object string_to_list(Object[] f)
     {
@@ -1432,6 +1478,19 @@ namespace Meta.Scripting
       comp_hash_f[ntmp] = null;
       Precompiler.symbols[globname] = makedelegate(globname);
     }
+
+      public static Hashtable _macro_docs = new Hashtable();
+      public static Hashtable _function_docs = new Hashtable();
+
+      public static void _doc_register_macro(string id, string txt)
+      {
+          _macro_docs[id] = txt;
+      }
+
+      public static void _doc_register_function(string id, string txt)
+      {
+          _function_docs[id] = txt;
+      }
 
     public static void _register_field(Symbol globname, System.RuntimeFieldHandle hndl, Object value)
     {

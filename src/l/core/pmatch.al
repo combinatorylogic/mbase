@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -41,6 +41,7 @@
       ((S) (x) `(match-symbol ,x))
       (($$ $$1) (a . b)
        (case a
+         ((AAS) `(bind-any-as ,@b))
          ((AS)  `(match-as ,@b))
          ((XXX)  `(match-anybutnext ,@b))
          ((FFF)  `(match-guard ,@b))
@@ -73,10 +74,16 @@
             ,(pm:ptn-process (cdr ptn))))
          ((match-function match-range) rest
           `(,(car ss) ,(if (null? rest) nil (car rest)) ,@(cdr ptn)))
+         ((bind-any-as) rest
+          `(bind-any-as ,(car rest)
+                        ,@(cdr ptn) ;; metadata
+                         ))
          ((match-as) rest
-          (if (null? rest) (pm:ptn-process (cdr ptn))
+          (if (null? rest) (pm:ptn-process (cadr ptn))
               `(match-as ,(car rest)
-                         ,(pm:ptn-process (cdr ptn)))))
+                         ,(pm:ptn-process (cadr ptn))
+                         ,@(cddr ptn) ;; metadata
+                         )))
          ((match-many) rest
           `(match-many ,(if rest (car rest) nil)
                        ,(pm:ptn-process (cadr ptn))
@@ -135,8 +142,8 @@
                       (,lop (cdr ,larg) (append ,bbnd (list (car ,larg)))))
                   ,ltst
                   )))))
-      ((match-as) (bnd pattern)
-       `(let ((,bnd ,pas)) ,(pm:ptn-unroll pattern bnd body)))
+      ((match-as) (bnd pattern . metadata)
+       `(let-metadata (((,bnd ,@metadata) ,pas)) ,(pm:ptn-unroll pattern bnd body)))
       ((match-many) (bnd ptn2 ptnr)
        (let* ((bbnd (if (null? bnd) (gensym) bnd))
               (lop (gensym))
@@ -177,6 +184,8 @@
          `(pm:ptn-try (eqv? ,pas (quote ,sym)) ,body))
       ((match-null) _
          `(pm:ptn-try (null? ,pas) ,body))
+      ((bind-any-as) (bnd . md)
+       `(let-metadata (((,bnd ,@md) ,pas)) ,body))
       ((match-anything) (bnd)
          `(let ((,bnd ,pas)) ,body))
       ((match-any-symbol) x
@@ -247,7 +256,7 @@
 
 (unit-test 1 (p:match '(a b c) (($x $y =x) (list x y)) (else 'nop)) nop)
 
-(unit-test 1 (p:match '(x (y z)) (($a ($$AS:b y $c)) (list c b a)))
+(unit-test 1 (p:match '(x (y z)) (($a ($$AS:b (y $c))) (list c b a)))
            (z (y z) x))
 
 ;(unit-test 1 (p:match '(q 1 2 3) ((($$R:a x y z q v w) . $b)

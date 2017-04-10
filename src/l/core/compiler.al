@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -82,7 +82,6 @@
                           ; and perform tail calls optimisation
 
      cc:after-lift-plugins ; Call post-lifting user code
-
      (fun (e)
        (when (shashget (getfuncenv) 'debug-compiler-postlift)
              (println '-POST-LIFT-)

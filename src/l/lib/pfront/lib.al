@@ -2,14 +2,13 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 (include "./codegen.al")
-
 (net.types Environment GC)
 (define pfront_time_now
    (let* ((tproc (sdotnet "System.Diagnostics.Process"))
@@ -27,12 +26,94 @@
 
 (define **hlevl-file-path** (mkref nil))
 
+(define func-doc-hash  (not.neth () (leave (((Meta # Scripting) # Runtime) # _function_docs))))
+(define macro-doc-hash (not.neth () (leave (((Meta # Scripting) # Runtime) # _macro_docs))))
+
+(function peg:stream-signal (sfn tag first last signal)
+  (sfn tag first last signal))
+
+(define pfront:process-docstring-signal (mkref (fun (tp id md doc) nil)))
+
+(function pfront:process-variable-metadata (tp id md)
+  (let* ((chk1 (ohashget *loc-metadata* id))
+         (chk2 (hashget (if (eqv? tp 'glob)
+                            func-doc-hash
+                            macro-doc-hash) (S<< id))))
+    (if chk2 ((deref pfront:process-docstring-signal) tp id md chk2))
+    (p:match chk1
+      ((toploc $toknid . $_) ; TODO: check it's the same file/buffer
+       (foreach (m md)
+         (p:match m
+           ((useloc (unquote-spec ($fn $sfn $loc $end)))
+            (peg:stream-signal sfn 'reftoken loc end `(reftoken ,toknid)))
+           (else nil))))
+      (else nil))))
+
+(function pfront:process-remark-metadata (tp md)
+  (let* ((locfn (mkref (fun () nil)))
+         (remark (mkref nil)))
+    (foreach (m md)
+      (p:match m
+        ((useloc (unquote-spec ($fn $sfn $loc $end)))
+         (r! locfn
+             (fun (str)
+               ((deref pfront:process-docstring-signal) tp nil (list m) str))))
+        ((remark $str) (r! remark str))
+        (else nil)))
+    ((deref locfn) (deref remark))))
+
+(define locdefs-hash (mkhash))
+
+(function pfront:process-local-variable-metadata (tp id mddst mdsrc)
+  (foreach (d mddst)
+  (p:match d
+    ((useloc (unquote-spec ($fn1 $sfn1 $loc1 $end1)))
+     (foreach (s mdsrc)
+       (p:match s
+         ((useloc (unquote-spec ($fn2 $sfn2 $loc2 $end2)))
+          (let* ((tkn
+                  (let* ((chk (ohashget locdefs-hash loc2)))
+                    (if chk chk
+                        (let* ((ntk (gensym)))
+                          (ohashput locdefs-hash loc2 ntk)
+                          (peg:stream-signal sfn2 'deftokenloc loc2 end2 `(deftokenloc ,ntk))
+                          ntk)))))
+            (peg:stream-signal sfn1 'reftokenloc loc1 end1 `(reftokenloc ,tkn))))
+         ((docstring $str)
+          ((deref pfront:process-docstring-signal) tp nil (list d) str))))))))
+
+(r! cc:process-remark-metadata pfront:process-remark-metadata)
+(r! cc:process-variable-metadata pfront:process-variable-metadata)
+(r! cc:process-local-variable-metadata pfront:process-local-variable-metadata)
+
 (function __peg-function-makeloc (saved source)
   (if (shashget (getfuncenv) 'compiler-debug-enabled)
       (alet chk (deref **hlevl-file-path**)
             (if chk
                 `((loc (,(car chk) ,saved ,source)))
                 nil))))
+
+(function __peg_tokensignal (Env name saved next)
+  (let* ((tkn (gensym)))
+    (peg:env-signal Env name saved (StreamEntry.chknext saved) `(deftoken ,tkn))
+    tkn))
+
+(function __peg-function-makedefloc (Env name saved source)
+  (let* ((deftoken (__peg_tokensignal Env name saved source))
+         (fpos (StreamEntry.idx saved))
+         (tpos (StreamEntry.idx source)))
+    (alet chk (deref **hlevl-file-path**)
+          (if chk
+              `(toploc ,deftoken (,(car chk) ,fpos ,tpos))
+              `(toploc ,deftoken (buffer ,fpos ,tpos))))))
+
+(function mk-spec (l) (cons 'unquote-spec (cons l nil)))
+
+(function __peg-function-makeuseloc (Env name saved source)
+  (alet chk (deref **hlevl-file-path**)
+        (if chk
+            `(useloc ,(mk-spec `(,(car chk) ,(PegEnv.other Env) ,saved ,source)))
+            `(useloc ,(mk-spec `(buffer ,(PegEnv.other Env) ,saved ,source))))))
 
 (function __peg-function-makelocbegin (e saved source)
   (let ((lc (__peg-function-makeloc saved source)))
@@ -43,6 +124,18 @@
 
 (macro peg-function-makelocbegin (e)
   `(__peg-function-makelocbegin ,e (StreamEntry.idx saved) (StreamEntry.idx (deref source))))
+
+(macro peg-function-makedefloc ()
+  `(__peg-function-makedefloc Env peg-node-name saved (deref source)))
+
+(macro peg-function-makeuseloc ()
+  `(__peg-function-makeuseloc Env peg-node-name saved (deref source)))
+
+(define extension-parse-p
+  (<r> ((! ("." (p.alpha +*) <>)) +*) :-> list->string))
+
+(function peg-function-stripextension (str)
+  (car (p-result (extension-parse-p (string->list str)))))
 
 (force-class-flush)
 
@@ -139,6 +232,7 @@
 
 (include "./pftexinclude.al")
 (include "./pftexincludeinv.al")
+(include "./pfhtmlinclude.al")
 
 (macro hlevl-lfile-inner (tp texnm nm)
  (let* ((fp (generic-filepath nm))
@@ -154,9 +248,10 @@
         ,@(begin
             (corelib:set-lookup-path (_getpath fp))
             ((if (eqv? tp 'literate) hlevl-consume1-tex
-                                     hlevl-consume1-texinv)
-                           texpath
-                           (mkref (peg:file->stream fp)))
+                 (if (eqv? tp 'html) hlevl-consume1-html
+                     hlevl-consume1-texinv))
+             texpath
+             (mkref (peg:file->stream fp)))
             )
         (ctimex (corelib:set-lookup-path ,oxpath))
         )
@@ -165,6 +260,7 @@
      )))
 
 (macro hlevl-lfile (texnm nm) `(hlevl-lfile-inner literate ,texnm ,nm))
+(macro hlevl-lfile-html (texnm nm) `(hlevl-lfile-inner html ,texnm ,nm))
 (macro hlevl-lfile-inv (texnm nm) `(hlevl-lfile-inner inv ,texnm ,nm))
 
 (macro inplace (code)
@@ -197,7 +293,7 @@
                                  (fun (x) (if x (cadd x))))
                                ))))
 
-
+(define debug-core-run 1)
 (force-class-flush)
 
 (hlevl-file "./notnet.hl")
@@ -229,6 +325,5 @@
 (unit-test 4 (pfront-expand-string "2*2+1") 5)
 (unit-test 4 (pfront-expand-string "{a=2;b=3;return a*a+b*b;}") 13)
 (unit-test 4 (pfront-expand-string "map a in fromto(1,4) do a*a") (1 4 9))
-
 
 

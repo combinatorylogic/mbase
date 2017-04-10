@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -232,7 +232,8 @@
       (if (symbol? l)
         (if (eqv? l 'unquote) #t
             (if (eqv? l 'unquote-splicing) #t
-                nil))
+                (if (eqv? l 'unquote-spec) #t
+                    nil)))
         (if (list? l)
            (if (unq-check (car l)) #t
                (unq-check (cdr l)))
@@ -266,9 +267,11 @@
                                              (list 'append
                                                    (cadr cl)
                                                    (loop (cdr l))))
-                                           (list 'cons
-                                                 (loop cl)
-                                                 (loop (cdr l)))))
+                                           (if (eqv? (car cl) 'unquote-spec)
+                                               (list 'quote nil)
+                                               (list 'cons
+                                                     (loop cl)
+                                                     (loop (cdr l))))))
                                    (list 'cons (quasiquote-quote cl)
                                          (loop (cdr l)))
                                    ))
@@ -379,6 +382,18 @@
 ;;; Here follows the bootstrap compiler itself,
 ;;;  a port from the original Scheme implementation
 
+
+(function bootlib:filter-args (args)
+  (inner.map (lambda (a)
+               (cond
+                ((list? a) (cadr a))
+                (else a))) args))
+
+(function bootlib:metadataident (id)
+  (if (symbol? id)
+      `(,id)
+      `(,(cadr id) ,@(cddr id))))
+
 (recfunction bootlib:lookup-env (env v)
   (if (null? env) nil
       (if (eqv? (car env) v)
@@ -394,9 +409,9 @@
    ((list? l)
     (cond
      ((eqv? 'lambda (car l))
-      (bootlib:get-free (inner.append (cadr l) env) (cddr l)))
+      (bootlib:get-free (inner.append (bootlib:filter-args (cadr l)) env) (cddr l)))
      ((eqv? 'core.0.reclambda (car l))
-      (bootlib:get-free (inner.append (cons (cadr l) (caddr l)) env) (cdddr l)))
+      (bootlib:get-free (inner.append (cons (cadr l) (bootlib:filter-args (caddr l))) env) (cdddr l)))
      ((eqv? 'quote (car l)) nil)
      (else (inner.append (bootlib:get-free env (car l))
        (bootlib:get-free env (cdr l))))))
@@ -462,6 +477,7 @@
               tst))))
    (else (hashget-mod hl v))))
 
+(function bootlib:inner.identmetadata (f) (cadr f))
 
 (recfunction bootlib:expand0 (compile mcenv l)
   (cond
@@ -479,13 +495,25 @@
         (let ((nenv (cons (cadr l) mcenv))
               (code (caddr l)))
           (bootlib:expand0 compile nenv code)))
+       ((eqv? cl 'lambda)
+        `(lambda ,(bootlib:filter-args (cadr l))
+           ,@(inner.map (lambda (ll) (bootlib:expand0 compile mcenv ll)) (cddr l))))
+       ((eqv? cl 'core.0.reclambda)
+        `(core.0.reclambda ,(cadr l) ,(bootlib:filter-args (caddr l))
+           ,@(inner.map (lambda (ll) (bootlib:expand0 compile mcenv ll)) (cdddr l))))
        ((eqv? cl 'inner-expand-first)
         (bootlib:expand0 compile mcenv
                          (inner.map (lambda (v) (bootlib:expand0 compile mcenv v)) (cdr l))))
        (else
         (let ((sh (if (symbol? cl)
-                      (hashget-seq mcenv cl)
-                      nil)))
+                      (if (eqv? cl 'inner.identmetadata)
+                          bootlib:inner.identmetadata
+                          (hashget-seq mcenv cl))
+                      (if (and (list? cl)
+                               (symbol? (car cl))
+                               (eqv? 'inner.identmetadata (car cl)))
+                          (hashget-seq mcenv (cadr cl))
+                          nil))))
           (if sh
               (try
                (try
@@ -738,6 +766,15 @@
 ;; Generic S-Expression printer.
 (function to-string (l) (outerlist 1 l))
 
+
+(macro let-metadata (args . rest)
+  `(let ,(map (lambda (arg)
+                (let* ((n0 (car arg))
+                       (nm (car n0))
+                       (md (cdr n0))
+                       (vl (cadr arg)))
+                  `(,nm ,vl))) args)
+     ,@rest))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Now the L1->L0 compiler is implemented in L1, so we can add two interface

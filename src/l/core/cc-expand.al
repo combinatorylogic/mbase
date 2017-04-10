@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -27,10 +27,21 @@
      (let ((cl (car l)))
      (cond
       ((eqv? cl 'quote) l)
+      ((eqv? cl 'unquote-spec) l)
       ((eqv? cl 'inner-expand-with)
        (let ((nenv (cons (cadr l) mcenv))
              (code (caddr l)))
-       (cc:expand:inner expenv nstk nenv code)))
+         (cc:expand:inner expenv nstk nenv code)))
+      ((eqv? cl 'inner.lambda)
+       `(inner.lambda ,(cadr l)
+          ,@(map (lambda (ll) (cc:expand:inner expenv nstk amcenv ll)) (cddr l))))
+      ((eqv? cl 'inner.reclambda)
+       `(inner.reclambda ,(cadr l) ,(caddr l)
+          ,@(map (lambda (ll) (cc:expand:inner expenv nstk amcenv ll)) (cdddr l))))
+      ((eqv? cl 'inner.with-added-metadata)
+       `(inner.with-added-metadata ,(cadr l)
+          ,@(map (lambda (ll) (cc:expand:inner expenv nstk amcenv ll)) (cddr l))))
+                                   
       ((eqv? cl 'inner-expand-first)
        (cc:expand:inner expenv nstk mcenv
                 (map (lambda (v) (cc:expand:inner expenv nstk mcenv v)) (cdr l))))
@@ -38,9 +49,14 @@
        (begin (ohashput expenv 'debugpoint (cdr l))
               (return l)))
       (else
-       (let ((sh (if (symbol? cl)
-                     (hashget-seq amcenv cl)
-                     nil)))
+       (let ((sh (p:match cl
+                   ($$M (hashget-seq amcenv cl))
+                   ((inner.identmetadata $id . $md)
+                    (let ((tmp (hashget-seq amcenv id)))
+                      (if tmp ((deref cc:process-variable-metadata)
+                               'macro id md))
+                      tmp))
+                   (else nil))))
          (if sh
              (try
               (let ((res (sh l)))

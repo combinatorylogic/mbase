@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -12,10 +12,12 @@
    ((r_tsbind "System.Globalization.CultureInfo" "get_InvariantCulture"))))
 
 (function flt:parse (s)
+  "Parse a string into a double (using System.Double.Parse method)"
   ((r_tsbind "System.Double" "Parse" string "System.IFormatProvider")
    s flt:format ))
 
 (function flt1:parse (s)
+  "Parse a string into a single precision float (using System.Single.Parse method)"
   ((r_tsbind "System.Single" "Parse" string "System.IFormatProvider")
    s flt:format ))
 
@@ -23,7 +25,8 @@
 
 (macro f.op (nm op)
  `(function ,nm (a b)
-   (n.asm ( a b )
+   ,(S<< "Floating point " op)
+    (n.asm ( a b )
       (expr a)
       (Unbox ,t_Double)
       (Ldind_R8)

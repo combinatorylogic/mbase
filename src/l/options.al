@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -18,6 +18,6 @@
   (#define optimise-cache-threshold 200)
   (#define optimise-cache-length-threshold 3000)
 
-  (#define copyright    "(c) by Meta Alternative Ltd., 2005-2015")
+  (#define copyright    "(c) by Meta Alternative Ltd., 2005-2017")
 
   ))

@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -76,8 +76,8 @@
                 (< (cc:estimate node) 2000)
                 (or (not rn) (cc:notreferenced body rn)))
                (cc:optimise
-                `(SLet ,(zip fnargs args)
-                       ,(cc:arg->var fnargs body)))
+                `(SLet ,(zip (bootlib:filter-args fnargs) args)
+                       ,(cc:arg->var (bootlib:filter-args fnargs) body)))
                node))
           (else node)))
        (Cons
@@ -101,7 +101,7 @@
        (SLet
         (p:match (list defs body)
           (((($name $value))
-            (Var =name)) value)
+            (Var =name . $_)) value)
           (else
            (let* ((mutabs (cc:mutables body))
                   (sthings (filter (cut cc:simple-thing? mutabs <>) defs)))

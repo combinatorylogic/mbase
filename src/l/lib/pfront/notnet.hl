@@ -2,7 +2,7 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+// Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 //
 //
 //////////////////////////////////////////////////////////////////////////////
@@ -119,6 +119,8 @@ ast pfnotnetast {
          ;
 }
 
+-----
+
 // Not.Net parser, with a syntax somewhat similar to C#
 parser pfnotnet ( pfront )
 {
@@ -165,7 +167,7 @@ parser pfnotnet ( pfront )
 
   @@dot := ".";
 
-  @@clsident := [Letter] [IdentRest]*;
+  @@clsident :=  ("_" / [Letter]) [IdentRest]*;
   @tkpfident := [clsident];
   pfident :=
         {"\" [tkpfident]:i "\" => {qstate = unquote} unquote($sval(i))}
@@ -334,6 +336,10 @@ parser pfnotnet ( pfront )
          ;
 }
 
+
+--------
+
+
 // Replace initial sets with uvarinits where appropriate
 function pfnotnet_sets (nn)
 {
@@ -350,6 +356,9 @@ function pfnotnet_sets (nn)
     | else -> node
     }}
 }
+
+
+---------
 
 
 // Transformation from our intermediate AST into the simplified Not.Net form.

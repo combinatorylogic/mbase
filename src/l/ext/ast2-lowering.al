@@ -77,12 +77,12 @@
          (fun (vs vd)
            (let* ((ht (mkhash)))
              (foreach (v vd)
-               (format v (_ tg o pl pr x)
+               (format v (_ tg o pl pr x . _)
                        (ohashput ht tg pr)))
              (foreach-map (v vs)
-               (format v (_ tg o pl pr x)
+               (format v (_ tg o pl pr x . md)
                  (let ((chk (ohashget ht tg)))
-                   `(v ,tg ,o ,pl ,(if chk chk pl) ,x)))))))
+                   `(v ,tg ,o ,pl ,(if chk chk pl) ,x ,@md)))))))
         ;; Fuse user-provided variants into implicit variants,
         ;;   add else handling if necessary
         (fuse-variants
@@ -148,7 +148,7 @@
      (variant DEEP
         ((v (fun (nid o) `(v ,tag ,o ,p ,p (implicit_ctor_tag ,nid ,tag ,p))))))
      (visitorvar DEEP
-        ((v (fun (nid o) `(v ,id ,o (nil) (nil) ,(to-code `(ivar ,nid ,id) e))))))
+        ((v (fun (nid o) `(v ,id ,o (nil) (nil) ,(to-code `(ivar ,nid ,id) e) ,@md)))))
      (noderef DEEP ((id id) (as id)))
      (visitorelse DEEP
         ((velse (to-code nil e))
@@ -201,6 +201,8 @@
       (p:match e
         (($nod $nm) `(,nod ,nm ,(+ i 1))))))))
 
+(function ast2-make-pattern-docstring (tag p)
+  (S<< tag "(" (strinterleave (foreach-map (e (ast-pattern-entries p)) (S<< (cadr e))) ",") ")"))
 
 ;; visitorlang1x -> visitorlang2
 (function visitor-backend-lowering (src)
@@ -234,14 +236,34 @@
               (list   (nodeadd id))
               (vars   (nodeadd id))))
            ))
-
+        ;; Compile simple leaf node
+        (compile-leaf
+         (fun (o p e nid)
+           (let* ((macros
+                     `((ast-node ,nid)
+                       (ast-node-is-top #t)
+                       (ast-node-type 'simple)
+                       (ast-node-format ,p))))
+             `(setup_macros ,macros
+                 (begin
+                   ,e
+                   )))))
         ;; Compile a variant or simple entry
         (compile-pattern
-         (fun (o p e tag nid)
+         (fun (o p e tag nid md)
            (let* ((es (ast-pattern-entries p))
                   (ndref (if (eqv? o 'deep)
                              '(thisnode)
                              '(thisnodesrc)))
+                  (addmetadata (if md
+                                   (alet md1 (append md
+                                                     `((docstring ,(ast2-make-pattern-docstring tag p))))
+                                     (fun (x)
+                                       `(with_added_metadata
+                                         ,(foreach-map (en es)
+                                            `(,(cadr en) ,@md1))
+                                         ,x)))
+                                   (fun (x) x)))
                   (ecode
                    `(bind
                      ,(foreach-map (x es)
@@ -252,9 +274,9 @@
                                `(,nm (get_tuple ,ndref ,num))
                                ))))
                      ,(p:match e
-                        ((goto_with . $rest) e)
+                        ((goto_with . $rest) (addmetadata e))
                         (else
-                         `(pop_stack_with ,e))))))
+                         `(pop_stack_with ,(addmetadata e)))))))
              (let* ((tg (gensym))
                     (macros
                      `((ast-node ,nid)
@@ -338,7 +360,9 @@
                            (pop_stack_with ,e)))))
                `(,id (variant_switch () ,@(foreach-map (v vsrc) (v id)))))
               (simple
-               `(,id ,(compile-pattern o ps e nil id)))
+               (p:match ps
+                 ((entry . $_) `(,id ,(compile-leaf o ps e id))) ;; It's a leaf node, no structure
+                 (else `(,id ,(compile-pattern o ps e nil id nil)))))
               (list
                `(,id ,(compile-listnode id elt)))
               (vars
@@ -354,7 +378,7 @@
                           (pop_stack_with ,e))))))
                `(,id (variant_switch () ,@(foreach-map (v vs) (v id)))))))
            (visitorvar DEEP
-             ((v (fun (nid) `(,id ,(compile-pattern o ps e id nid))))))
+             ((v (fun (nid) `(,id ,(compile-pattern o ps e id nid md))))))
            (visitorcode DEEP
              ((code node)
               (gotoelse `(goto_with ,(Sm<< dst "--else") ,c))

@@ -47,10 +47,15 @@
                 ))))
 
          ;; Translate a compound pattern.
-         (translate-pattern
+         (translate-pattern-inner
           (fun (p0)
-            (let loop ((p p0) (mode 'none) (ctx nil))
+            (let loop ((p p0) (mode 'top) (ctx nil))
               (cond
+               ((eqv? mode 'top)
+                (p:match p
+                  ($$M:v
+                   `(tuple ,@ctx (append ,(loop v 'none nil))))
+                  (else (loop p 'none ctx))))
                ((eqv? mode 'none)
                 (p:match p
                   (($hd . $tl) (loop tl 'tuple (list (loop hd 'none nil))))
@@ -64,6 +69,10 @@
                   (() `(tuple ,@ctx))
                   ))
                ))))
+
+         (translate-pattern (fun (p0)
+                              (let* ((res (translate-pattern-inner p0)))
+                                res)))
 
          ;; Lower non-variant node definition
          (translate-simple-def
@@ -96,13 +105,21 @@
          (translate-defs
           (fun (defn)
             (p:match defn
+              ((varhint $nd $vr $hints)
+               (wrap
+                `(extendvarhint ,nd ,vr ,hints)))
+              ((hint $nd $hints)
+               (wrap
+                `(extendnodehint ,nd ,hints)))
               (($id (| . $vars))
+               (wrap
                (let* ((p (_ast_xnparse (common-check-ident id))))
                  (p:match p
                    (($xid) (translate-extend-def xid (common-check-list vars)))
-                   ($xid (translate-var-def id (common-check-list vars))))))
+                   ($xid (translate-var-def id (common-check-list vars)))))))
               (($id $ptn)
-               (translate-simple-def (common-check-ident id) ptn))
+               (wrap
+                (translate-simple-def (common-check-ident id) ptn)))
               (else (ccerror `(AST-FRONT-NODE-FORMAT ,defn))))))
          )
 
@@ -110,11 +127,12 @@
     (p:match src
       ((def:ast:new $id $incl
          . $defs)
-       `(defast ,(common-check-ident id)
-          ,(map translate-includes (common-check-list incl))
-          () ;; tags
-          () ;; options
-          ,@(map translate-defs (common-check-list defs))))
+       (let* ((ndefs (foreach-mappend (d (common-check-list defs)) (translate-defs d))))
+         `(defast ,(common-check-ident id)
+            ,(map translate-includes (common-check-list incl))
+            () ;; tags
+            () ;; options
+            ,@ndefs)))
       (else (ccerror `(AST-FRONT-FORMAT ,src)))
       )))
 
@@ -158,7 +176,7 @@
                          (r! el `(vdelse (begin ,@x)))
                          (r! el `(velse (begin ,@x)))))
                     (($tag . $c)
-                     (add `(v ,(common-check-ident tag) (begin ,@c))))
+                     (add `(v ,(common-check-ident (_get_md_id tag)) ,(_get_md_rest tag) (begin ,@c))))
                     (else (ccerror `(AST-VISITOR-VARIANT-FORMAT ,c))))))
               `(vars
                 ,(getvars)
@@ -171,7 +189,7 @@
          (translate-entry-body
           (fun (srcid os ntag nref code tp)
             (let* ((n (if (eqv? ntag nref) `(id ,ntag) `(as ,ntag ,nref))))
-              (if (varfunc srcid ntag)
+              (if (varfunc srcid nref)
                   `(,tp ,n ,os ,(p:match code
                                ((forall . $rest)
                                 `(forall (begin ,@rest)))

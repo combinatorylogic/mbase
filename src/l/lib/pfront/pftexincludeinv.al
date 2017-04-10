@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -29,7 +29,8 @@
                                  __tex_pfrontcolours
                                  outenv
                                  (deref str)
-                                 (cdr res))
+                                 (cdr res)
+                                 rle-tex)
                (fprint outfile "\\pfcodeblockend{}")
                )))
           (if (peg-alldead? (cdr res)) nil
@@ -58,7 +59,7 @@
                     (cc:flush-bypass-from-macro `(top-begin ,@code))
                     t_MBaseException
                     (fun (e)
-                      (writeline `(MBaseExecption ,(mbaseerror e) in ,@code))))
+                      (writeline `(MBaseException ,(mbaseerror e) in ,@code))))
                    t_Exception
                    (fun (e)
                      (writeline `(Exception ,(->s e) in ,@code)))

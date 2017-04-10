@@ -73,7 +73,7 @@
 
 (function peg-constr-compile-recform-loop ( constr target-node target-ast )
   (let* ((asrc (ast2:default-ifun target-ast))
-         (asth (ast-make-cache asrc)))
+         (asth (ast-make-cache asrc nil)))
     (let loop ((c constr) (nd target-node))
       (let* ((dovarnode
               (fun (nd cname ars)

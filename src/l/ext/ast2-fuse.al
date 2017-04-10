@@ -13,11 +13,35 @@
        (nodeident _ (add node)))
     (return (unifiq (get)))))
 
+(function ast-add-renames (srcast renames)
+  (let* ((nodes-map (mkhash))
+         (add (fun (id v) (ohashput nodes-map id v))))
+    (astlang:visit topdef srcast
+      (astnode DEEP
+        ((simple   (add id node))
+         (varnode  (add id node))
+         (else (ccerror `(IMPOSSIBLE))))))
+    (let* ((added (foreach-map (i renames)
+                    (format i (t f)
+                      (let* ((old (ohashget nodes-map f))
+                             (nw (astlang:visit astnode old
+                                   (astnode _
+                                    ((simple (ast:mknode (id t)))
+                                     (varnode (ast:mknode (id t)))
+                                     (else nil))))))
+                        nw)))))
+      
+      (astlang:visit topdef srcast
+         (topdef _
+            ((defast
+               (ast:mknode (ns (append added ns))))))))))
 
-(function ast-make-cache (srcast)
+              
+(function ast-make-cache (srcast0 renames)
   (let* ((nexts-map (mkhash))
          (prevs-map (mkhash))
          (nodes-map (mkhash))
+         (srcast    (ast-add-renames srcast0 renames))
          (node!     (fun (nm n)
                       (ohashput nodes-map nm n)))
          (vars-map  (mkhash))
@@ -86,12 +110,13 @@
 (function ast-get-simple-node-pattern (ast ni)
   (format ast (nm p d v)
      (let* ((n (ohashget d ni)))
-       (if (not n) (ccerror `(MISSING-NODE2 ,ni)))
-       (astlang:visit astnode n
+       (if (not n)
+        `(entry *dummy* *dummy* ref)
+        (astlang:visit astnode n
           (astnode _
-            ((simple p)
-             (else (ccerror `(NOT-A-SIMPLE-NODE ,n)))))))))
-
+           ((simple p)
+            (else (ccerror `(NOT-A-SIMPLE-NODE ,n))))))))))
+  
 (function ast-get-variant-node-body (ast ni)
   (format ast (nm p d v)
     (let* ((n (ohashget d ni)))
@@ -130,7 +155,7 @@
   (visitorlang:visit visitorexpr vis
      (visitorentry DEEP
         ((deep (add n)) (once (add n))))
-     (noderef DEEP ((id id) (as id)))
+     (noderef DEEP ((id id) (as rn)))
      )
   (return (get))))
 
@@ -235,13 +260,13 @@
               ,(foreach-map (v vs)
                  (astlang:visit variant v
                     (variant _ ((v
-                       `(v ,tag
+                       `(v ,tag ()
                            (implicit_ctor_tag ,id ,tag ,p)
                            ))))))
               ,(foreach-map (v vs)
                  (astlang:visit variant v
                     (variant _ ((v
-                       `(v ,tag
+                       `(v ,tag ()
                            (implicit_ctor_tag ,id ,tag ,p)
                            ))))))
               (none))))
@@ -255,13 +280,22 @@
       (let* ((ndef (ast-cache-nodedef astS n)))
         (visitor-compile-nodedef astS astD ndef)))))
 
+(function visitor-get-renames (vis)
+  (collector (add get)
+    (visitorlang:visit visitorexpr vis
+      (noderef DEEP
+       ((as (add `(,id ,rn)))
+        (else nil))))
+    (get)))
+
 (function visitor-fuse (srcast dstast vis)
   "Fuse srcast and dstast into a visitor code"
   (let* ((get-id (fun (n)
                    (visitorlang:visit noderef n
                      (noderef _ ((id id) (as id))))))
-         (astS (ast-make-cache srcast))
-         (astD (ast-make-cache dstast))
+         (renames (visitor-get-renames vis))
+         (astS (ast-make-cache srcast renames))
+         (astD (ast-make-cache dstast nil))
          (tgtnode (fun (n os)
                     (let* ((chk (find (fun (k) (eqv? (car k) 'dstnode)) os)))
                       (if os (cadr chk) n))))

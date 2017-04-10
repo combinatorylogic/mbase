@@ -2,7 +2,7 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+// Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 //
 //
 //////////////////////////////////////////////////////////////////////////////
@@ -43,10 +43,10 @@ syntax in expr, start:
 /* A very typical gensym wrapper */
 
 syntax in expr, start:
-  'symbols "(" cslist<[qident],",">:args ")" [expr]:body'
+  'symbols "(" cslist<[mdqvarident],",">:args ")" [expr]:body'
 {
    ('begin':(map a in args do
-               `\a\ = gensym()`)) :: [body]
+               `::varid \a\ = gensym()`)) :: [body]
 }
 
 /* Simple format macro on top of match ... construction */
@@ -206,7 +206,7 @@ macro pfront_rewrite_rules(rep,l,mb)
 
 
 syntax in expr, start:
-  ' [qident]:nm "(" ecslist<[qident],",">:args ")" "=" [expr]:i '
+  ' [mdqvarident]:nm "(" ecslist<[mdqvarident],",">:args ")" "=" [expr]:i '
 {
         'def'(nm, 'lambda'(args,i));
 }
@@ -443,10 +443,6 @@ function error_hook(stream, res)
 #(r! pfront-report-syntax-error-hook error_hook)
 
 endmodule.
-
-----------------------
-
-
 
 syntax in expr, start: ' "." bitpack "(" [number]:bits "|" cslist<[bitentry],",">:es ")" '
  + {

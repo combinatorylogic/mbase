@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -39,7 +39,7 @@
       (Chr <char:c>)
       (Bool <bool:b>)
       (Symbol <symbol:s>)
-      (Var <ident:id>)
+      (Var <ident:id> . <*metadata:md>)
       (Nil)
 
 ;= The following terminal variants appears only after local transforms and
@@ -53,7 +53,7 @@
 ;= More complex variants with recursion:
       (Quote <any:l>)
       (If <expr:e> <expr:iftr> <expr:iffl>)
-      (Fun <ident:recname> <*ident:args> <expr:body>)
+      (Fun <ident:recname> <*fnarg:args> <expr:body>)
       (App <expr:fn> . <*expr:args>)
       (Set <ident:nm> <expr:vl>)
       (XSet <ident:tp> <ident:nm> <expr:vl>)
@@ -61,6 +61,8 @@
       (SLet <*letarg:defs> <expr:body>)
 ;= Generic letrec, to be specialised later for closures and non--closures.
       (SLetRec <*letarg:defs> <expr:body>)
+
+      (MDAnnot <*mdannot:defs> <expr:body>)
 
 ;= Special stuff:
       (TryBlock <expr:body> <ctype:tcatch> <expr:actionfun>)
@@ -116,10 +118,13 @@
 
       ))
 
+;= Function argument
+  (fnarg (| (var <ident:nm> . <*metadata:md>)))
+
 ;= Utility nodes
 
   (captcharg (<number:n> <ident:ref>))
-  (letarg (<ident:nm> <expr:value>))
+  (letarg (<ident:nm> <expr:value> . <*metadata:md>))
   (useident (<ident:old> <expr:new>))
   (lblexpr (<ident:label> <expr:e>))
   )

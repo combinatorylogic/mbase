@@ -46,10 +46,10 @@ function genssa2_make_depgraph(src, termp) {
                 refs = collect_term_refs(t);
                 addedges(%Sm<<(name, "__TERM"), refs)}};
      deep oppair: op(name);
-     deep iop(dst) {
+     deep iop(dstn) {
         else -> {
            refs = collect_refs(node);
-           addedges(dst, refs);
+           addedges(dstn, refs);
            return node}}};
            
   depgraph1 = mkhash();

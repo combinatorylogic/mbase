@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -488,12 +488,12 @@
         (Funref node)
         (Simple
          (format e ("Fun" _ fargs cd)
-            `(Simple ,name ,usename ,fargs
+            `(Simple ,name ,usename ,(bootlib:filter-args fargs)
                      ,(cc:expr->flat2 cd))))
         (Closure
          (format e ("Fun" _ fargs cd)
                  `(Closure
-                   ,name ,usename ,args ,fargs
+                   ,name ,usename ,args ,(bootlib:filter-args fargs)
                    ,(cc:expr->flat2 cd))))))
     (expr _
           (forall

@@ -88,6 +88,7 @@
                           (ast2:set_target_simple ,dstid ,pos ,src)))))
 
      (setup_macros `(ast2:setup_macros ,ps (begin ,@e)))
+     (with_added_metadata `(with-added-metadata ,ps (begin ,@c)))
      (debugmessage `(println ,c))
      (set `(n.stloc! ,id ,v))
      (get_tagged_tuple `(ast2:get_tagged_tuple ,e ,f))
@@ -356,12 +357,13 @@
     (pattern DEEP
       ((tuple (let loop ((v vs))
                 (p:match v
-                  (($hd (append $tl))
+                  (((slice-append $hd) . $tl) hd)
+                  (($hd (slice-append $tl))
                    (cons hd tl))
                   (($hd) (list hd))
                   (($hd . $tl) (cons hd (loop tl)))
                   (() nil))))
-       (append `(append ,p))
+       (append `(slice-append ,p)) ;; TODO!
        (entry (Sm<< "$" name))
        (nil '$_)))
     ))
@@ -416,12 +418,13 @@
      (pattern DEEP
       ((tuple (let loop ((v vs))
                 (p:match v
-                  (($hd (append $tl))
+                  (((slice-append $hd) . $tl) hd)
+                  (($hd (slice-append $tl))
                    `(cons ,hd ,tl))
                   (($hd) `(list ,hd))
                   (($hd . $tl) `(cons ,hd ,(loop tl)))
                   (() 'nil))))
-       (append `(append ,p))
+       (append `(slice-append ,p))
        (entry name)
        (nil 'nil)))))
 
@@ -478,16 +481,19 @@
 
 ;; Make a node of a current destination AST format, with a current tag
 (macro ast2:mknode args
-  `(inner-expand-first
-    ast2:mknode-inner (quote ,args)
-    (ast-node)
-    (ast-node-type)
-    (ast-node-format)
-    (ast-variant)
-    (ast-dst-tags)
-    (ast-visitor-to)
-    ))
-
+  (let* ((xy (p:match args
+               (((@md $x) . $rest) (cons x rest))
+               (else (cons nil args)))))
+    `(inner-expand-first
+      ast2:mknode-inner (quote ,(cdr xy))
+      (ast-node)
+      (ast-node-type)
+      (ast-node-format)
+      (ast-variant)
+      (ast-dst-tags)
+      (ast-visitor-to)
+      (quote ,(car xy))
+      )))
 
 (function ast2:ast-var-name (id) (Sm<< "ast2::" id "::src"))
 
@@ -510,11 +516,26 @@
           ))
       args))
 
+(function ast2:annotate-implicit-args (args nf)
+  (if (not (ast2:unnamed-only args))
+  (let* ((entries (ast-pattern-entries nf))
+         (ht (mkhash)))
+    (foreach (a args)
+      (p:match a
+        (($nm . $rest)
+         (ohashput ht (_get_md_id nm) 1))))
+    (let* ((iargs (foreach-mappend (e entries)
+                    (format e (a n i)
+                     (if (not (ohashget ht n)) `(,(S<< n)) nil)))))
+      (if iargs
+          (S<< "\n   with implicit arguments: " (strinterleave iargs ", ") "\n")
+          ""))) ""))
+
 (macro ast2:mknode-inner (qargs nd ndtype ndformat ndvar
-                                ndtags astdst)
+                                ndtags astdst . qmdata)
   (let* ((args0 (cadr qargs))
          (ast (ast2:default-ifun astdst))
-         (asth (ast-make-cache ast))
+         (asth (ast-make-cache ast nil))
          (tpl  (gensym))
          (fd (ast-pattern-entries ndformat))
          (args (ast2:fix-mknode-args args0 fd))
@@ -527,6 +548,12 @@
          (tplalloc (if (eqv? ndtype 'variant)
                        `(ast2:allocate_tagged_tuple ,ndvar ,tagid ,fd)
                        `(ast2:allocate_tuple ,fd))))
+    (if (and qmdata (cadr (car qmdata)))
+        (let* ((md (cadr (car qmdata)))
+               (remark `((remark ,(S<< astdst ":" nd ":" (ast2-make-pattern-docstring ndvar ndformat)
+                                       (ast2:annotate-implicit-args (cadr qargs) ndformat)
+                                       )))))
+          ((deref cc:process-remark-metadata) 'mknode (append md remark))))
     `(let ((,tpl ,tplalloc)
            ,@(foreach-mappend (a args)
                (format a (nm v)

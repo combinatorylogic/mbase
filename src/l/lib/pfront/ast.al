@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -20,9 +20,9 @@
       (begin . <*topexpr:es>)
 
       (using <*ident:lst> . <*topexpr:es>)
-      (topfunction <ident:nm> <*ident:args> <expr:body>)
-      (lispmacro <ident:nm> <*ident:args> <expr:body>)
-      (topdefine <ident:nm> <expr:val>)
+      (topfunction <dlocation:loc> <ident:nm> <*fnarg:args> <expr:body>)
+      (lispmacro <ident:nm> <*fnmcarg:args> <expr:body>)
+      (topdefine <dlocation:loc> <ident:nm> <expr:val>)
       (ast3 <astopt:opt> <ident:nm> <*astpar:ps> <*astbody:defs>)
       (ast2 <astopt:opt> <ident:nm> <*astbody:defs>)
       (topsyntax <identpair:nm> <*ident:bor> <sytaxcode:c> <expr:body>)
@@ -33,6 +33,7 @@
       (macroext <ident:id> <any:code>)
       (hlinclude <string:s>)
       (litinclude <string:texnm> <string:s>)
+      (htmlinclude <string:texnm> <string:s>)
       (lispinclude <string:s>)
       (topflush)
 
@@ -54,6 +55,8 @@
    (| (alt <ident:nm> . <*astalt:alts>)
       (struct <ident:nm> <aststruct:s>)
       (addalt <ident:nm> . <*astalt:alts>)
+      (pphintvar <ident:nd> <ident:var> <*ident:hints>)
+      (pphintnd  <ident:nd> <*ident:hints>)
       ))
 
   (astalt
@@ -82,6 +85,7 @@
       (quote <symbol:s>)
       (alist <ident:hd> . <*lmpattern:args>)
       (binding <ident:id>)
+      (mdbinding <mdvarident:id>)
       (eq <ident:id>)
       (any)
       (number <number:n>)
@@ -106,7 +110,7 @@
    (| (velse <expr:ee>)
       (elsedeep <*visitp:ps> <*visitelse:es>)))
 
-  (visitp (<ident:v> <expr:e>))
+  (visitp (<mdident:v> <expr:e>))
 
   (ecexpr
    (| (normal <expr:e>)
@@ -116,7 +120,7 @@
   (casepair (<*symbol:l> <expr:e>))
 
   (identptn
-   (| (var <ident:nm>)
+   (| (var <ident:nm> . <*metadata:md>)
       (ptn <mpattern:f>)))
 
   (visitopt
@@ -144,20 +148,20 @@
       (match <expr:e> . <*matchpattern:ps>)
       (visit <*visitopt:os> <ident:ast> <ident:top> <expr:e> . <*visitptn:ps>)
       (viter <*visitopt:os> <ident:ast> <ident:top> <expr:e> . <*visitptn:ps>)
-      (collector <ident:addname> <ident:getname> <expr:body>)
+      (collector <mdvarident:addname> <mdvarident:getname> <expr:body>)
       (withast <ident:nm> <expr:e>)
       (withmacros <*lmacrodef:ds> <expr:e>)
       (withmetadata <expr:m> <expr:e>)
-      (mknode . <*llpair:args>)
+      (mknode <metadata:md> . <*llpair:args>)
       (mksnode <ident:nd> . <*xllpair:args>)
-      (mkvnode <ident:nd> <ident:tag> . <*xllpair:args>)
-      (mkxnode <ident:tag> . <*xllpair:args>)
+      (mkvnode <ident:nd> <mdvarident:tag> . <*xllpair:args>)
+      (mkxnode <mdvarident:tag> . <*xllpair:args>)
 
       (if3 <expr:e> <expr:tr> <expr:fl>)
       (if2 <expr:e> <expr:tr>)
       (cond <*condpair:es> <*expr:els>)
       (case <expr:e> <*casepair:es> <*expr:els>)
-      (lambda <*ident:args> <expr:body>)
+      (lambda <*fnarg:args> <expr:body>)
       (letloop <ident:nm> <*llpair:args> <expr:b>)
       (filter <identptn:n> <expr:e> <expr:b>)
       (mappend <identptn:n> <expr:e> <expr:b> <*ident:cn>)
@@ -169,10 +173,10 @@
       (vquote <qexpr:e>)
       (qquote <qexpr:e>)
       (unquote <ident:v>)
-      (def <ident:v> <expr:e>)
+      (def <mdvarident:v> <expr:e>)
       (defformat <mpattern:f> <expr:e>)
       (let <ident:v> <expr:e> <*expr:rest>)
-      (var <ident:v>)
+      (var <ident:v> . <*metadata:md>)
       (char <char:ch>)
       (number <number:v>)
       (string <string:v>)
@@ -185,7 +189,11 @@
 
       ))
 
-  (llpair (<ident:nm> <expr:v>))
+  (fnarg (| (var <ident:v> . <*metadata:md>)
+            (annotated <any:a> <fnarg:a>)))
+  (fnmcarg (| (a <fnarg:a>) (i <fnarg:a>)))
+  (mdvarident (| (var <ident:v> . <*metadata:md>)))
+  (llpair (<fnarg:nm> <expr:v>))
   (xllpair (| (p <ident:nm> <expr:v>) (e <expr:v>)))
   (lmacrodef (| (def <ident:nm> <expr:v>)))
 

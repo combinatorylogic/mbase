@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -201,6 +201,13 @@
    (foreach (l lst) (hashput hh l #t))
    hh))
 
+(function _get_md_id (i)
+  (if (list? i) (cadr i) i))
+
+(function _get_md_rest (i)
+  (if (list? i) (cddr i) nil))
+
+
 ;; Makes a list of transitional visitor entries (no terminals yet!)
 (function _ast_make_visitor0 (buld? depgraph defs mnods)
   (let* ((hh (_list->hash mnods))
@@ -212,7 +219,7 @@
           (let ((defx (hashget defs t)))
             `(,t ,(_ast_comp_visitorptn buld? defx ch)))))))
 
-(function _ast_make_accessmacros0 (name fdefz defz)
+(function _ast_make_accessmacros0 (name fdefz defz mdata)
   (collector (vars gvars)
     (let collect ((d defz) (f fdefz))
       (p:match d
@@ -232,11 +239,12 @@
              (list 'ast:access:element ,name
                    (quote ,(cadr v)) (quote ,(car v)) (cdr ll)))))))
 
-(function _ast_make_accessmacros (tp defs node)
+(function _ast_make_accessmacros (tp0 defs node)
   (let* ((name (hashget defs "  (DEFNAME)"))
          (defx (hashget defs node))
          (fdef0 (hashget defs (S<< "  " node ":format")))
-         )
+         (tp (_get_md_id tp0))
+         (md (_get_md_rest tp0)))
     (if (null? defx) nil
      (fccase defx
       ((VAR) defs
@@ -247,13 +255,21 @@
                                (fun (x) (eqv? (car x) tp))
                                (cdr fdef0))))
                   (defz (cadr en)))
-             (_ast_make_accessmacros0 name defz fdefz))))
+             (_ast_make_accessmacros0 name defz fdefz md))))
       ((VAL) (defz)
        (if tp
            nil
-           (_ast_make_accessmacros0 name defz (cadr fdef0))))
+           (_ast_make_accessmacros0 name defz (cadr fdef0) md)))
       (else nil)
       ))))
+
+(function _get_entry_vars (lst)
+  (collector (add get)
+  (let loop ((l lst))
+    (p:match l
+      ($$M (add l))
+      (($hd . $tl) (loop hd) (loop tl))))
+  (get)))
 
 ;; compiles the term processing function
 (recfunction _ast_term_code (defs entry code buld? ch)
@@ -262,7 +278,7 @@
       ((VAR) opts
        (if (eq? 'forall (car code))
         `(fun (node) ,@(cdr code))
-        (let* ((d1 (map car code))
+        (let* ((d1 (map _get_md_id (map car code)))
                (d2 (map car opts))
                (dif (if (not (or (memq 'else d1) (memq 'else-deep d1)))
                      (foldl (fun (acc v) (filter (fun (av) (not (eqv? av v))) acc)) d2 d1))))
@@ -272,7 +288,8 @@
          `(fun (node)
            (fccase node
             ,@(map-over code
-                (fmt (cent . cde)
+                (fmt (cent0 . cde)
+                  (alet cent (_get_md_id cent0)
                   (case cent
                     ((else)
                      `(else (begin ,@cde)))
@@ -283,15 +300,32 @@
                                                     ch)
                               node))))
                     (else
-                     (let ((fent (cadr (car (filter (fun (x) (eq? (car x) cent)) opts)))))
+                     (let* ((fent (cadr (car (filter (fun (x) (eq? (car x) cent)) opts))))
+                            (entvars (_get_entry_vars fent)))
+                       (alet mdt (let* ((md (_get_md_rest cent0)))
+                                   (if md
+                                       (alet md1 (append md `((docstring ,(S<< cent "("
+                                                                               (strinterleave (map ->s entvars) ",")
+                                                                               ")"))))
+                                         (fun (v)
+                                           `(with-added-metadata
+                                             ,(foreach-map (v entvars)
+                                                `(,v ,@md1))
+                                             ,v)))
+                                       (fun (v) v)
+                                       ))
+                                       
+                       
                        `((,cent) ,fent
-                         (with-macros
-                          ((this-node-var (fun (_) '(quote ,cent)))
-                           ,@(_ast_make_accessmacros cent defs entry)
-                           )
-                          (begin ,@cde))
-                         )))))))
-           ))))
+                         ,(mdt
+                           `(with-macros
+                             ((this-node-var (fun (_) '(quote ,cent)))
+                              ,@(_ast_make_accessmacros cent0 defs entry)
+                              )
+                             (begin ,@cde))
+                           )))))))))
+            ))
+         )))
       ((VAL) (fomt)
        `(fun (node)
           (format node ,fomt ,code))))))
@@ -560,7 +594,7 @@
 (macro draw:ast:graph (name fo)
   `(ctimex
     (__drawgraph (car
-                  (hashget ,(string->symbol (S<< "AST:" name ":DEF"))
+                  (hashget ,(string->symbol (S<< "AST:" (_get_md_id name) ":DEF"))
                            "  (DEPGRAPH)"))
                  ,fo)))
 
@@ -613,7 +647,7 @@
          (astdef (bootlib:hashget-mod (getfuncenv)
                           (Sm<< "AST:" astname ":DEF")))
          (src (hashget astdef "  (DEFSRC)"))
-         (values (cadr qvalues))
+         (values (filter (fmt (n . v) (not (eqv? n '@md))) (cadr qvalues)))
          (nodedef (cadr (find (fmt (a . _) (eqv? nodename a)) src))))
     (build-constructor nodedef varname values)))
 

@@ -32,9 +32,18 @@ string chunks. Commands passed onto an output line are following:
 
 \begin{itemize}
 \item \verb|NB|: never break here
-\item \verb|WEAK<pos>|: potential break, with the next line indentation set to \verb|pos|.
+\item \verb|WEAK<pos,npos>|: potential break, with the next line indentation set to \verb|pos|.
 \item \verb|TABBACK|: if the first command in the line, reduce the indentation
 \end{itemize}
+
+\pfcode{
+function smallest_weak(lst)
+  do loop(l = lst, min = 9999, minpos = [], acc = []) {
+     match l with
+        ['WEAK';[npos;pos];@rest] -> if (pos<=min) loop(rest, pos, l:acc, acc)
+                            else loop(rest, min, minpos, acc)
+     |  hd:rest -> loop(rest, min, minpos, hd:acc)
+     |  else -> if (min<9999) min:minpos else []:[]}}
 
 \pfcode{
 function pprint(lst, pfun)
@@ -50,7 +59,7 @@ function pprint(lst, pfun)
       iter i in [0..n] do pfun(" ");
     };
     getpos() = if (stk) car(stk) else 0;
-    flush_string() = {
+    flush_string_inner(str) = {
       if (cdr(str)) {
       do fsloop(s = cdr(str), ind = car(str)) {
         if (s) {
@@ -60,15 +69,24 @@ function pprint(lst, pfun)
           | 'NB' -> fsloop(cdr(s), ind)
           | x -> {
                if (ind) print_spaces(ind);
-               pfun(x); fsloop(cdr(s), 0)}
+               pfun(x); fsloop(cdr(s), [])}
         } else pfun("\n")}}};
+    flush_string() = flush_string_inner(str);
     splitthisstring(nw) = {
       //TODO: if string ends with NB, carry on.
       //TODO: find the last WEAK marker, flush the string before the marker,
       //  carry on with the remaining string + nw
-      flush_string();
-      cont([getpos();nw], getpos(), stk)
-    };
+     <min:minpos> = smallest_weak(cdr(str));
+      if(not(min)) {
+         flush_string();
+         cont([getpos();nw], getpos(), stk)
+      } else {
+        <rest:rprev> = minpos;
+         prev = reverse(rprev);
+        <xstate:pos:nn> = (match rest with ['WEAK';[xstate;pos];@nn] -> xstate:pos:nn);
+         flush_string_inner(car(str):prev);
+         xstate()
+         }};
     match l with
       hd:tl -> loop(hd, str, pos, stk, tl:cnt)
     | [] -> cont(str, pos, stk)
@@ -78,7 +96,10 @@ function pprint(lst, pfun)
          | 'PUSHSTOP' -> cont(str, pos, pos:stk)
          | 'PUSHTAB' -> cont(str, pos, (getpos()+tab_width):stk)
          | 'POP' -> cont(str, pos, cdr(stk))
-         | 'WEAK' -> cont(str::['WEAK';getpos()], pos, stk)
+         | 'WEAK' -> {
+              state = fun() cont([getpos()], getpos(), stk);
+              cont(str::['WEAK';[state;getpos()]], pos, stk)
+           }
          | 'NB' -> cont(str::['NB'], pos, stk)
          | 'TABBACK' -> cont(str::['TABBACK'], pos, stk)
          // ignore the unknown commands
@@ -86,7 +107,7 @@ function pprint(lst, pfun)
        }} else { //it's a proper string
          len = notnet(string l) {leave l.get_Length();};
          ipos = car(str);
-         if ((pos + len - ipos) > 120) splitthisstring(l)
+         if ((pos + len - ipos) > 75) splitthisstring(l)
          else cont(str::[l], pos + len, stk)
        }
     }

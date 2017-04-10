@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -653,7 +653,7 @@
        (p:match p
          ((any) (Sm<< "$" nm))
          (else
-          `(,(Sm<< "$$AS:" nm) ,@p))))
+          `(,(Sm<< "$$AS:" nm) ,p))))
       (constr
        (if (eqv? nm 'Deref)
            `($$FF ml-deref-force ,@(car args))

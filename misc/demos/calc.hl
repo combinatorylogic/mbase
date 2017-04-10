@@ -36,6 +36,20 @@ function calc_compile(ex)
       | mult -> 'f*'(a,b)
       | div -> 'f/'(a,b)}}
 
+function calc_compile_dotnet(ex)
+  visit:calc(expr:ex) {
+    deep expr {
+       const -> ['Ldc_R8'(v)]
+     | var -> ['Ldloc'('var'(nm))]
+     | let -> ['local'(nm, t_Double);
+               @val;
+               'Stloc'('var'(nm));
+               @body]
+     | plus -> [@a;@b;'Add'()]
+     | minus -> [@a;@b;'Sub'()]
+     | mult -> [@a;@b;'Mul'()]
+     | div -> [@a;@b;'Div'()]}}
+
 // PEG parser
 function %peg-function-fval (v)
   %flt:parse(cdr(v))
@@ -71,6 +85,14 @@ syntax in expr, start (calc): ' "calc:" [calc]:c '
    return 'lisp'(calc_compile(c))
 }
 
+// Compiled version, wrapped into a syntax extension:
+syntax in expr, start (calc): ' "calcnet:" [calc]:c '
+{
+   return 'lisp'('n.asm'([],@calc_compile_dotnet(c),'Box'(t_Double)))
+}
+
 -------------
 
 writeline(calc: let x = 2 in 2*2+x*3)
+println("=======")
+writeline(calcnet: let x = 2 in 2*2+x*3)

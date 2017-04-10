@@ -2,7 +2,7 @@
 //
 //   OpenMBase
 //
-// Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+// Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 //
 //
 //////////////////////////////////////////////////////////////////////////////
@@ -31,6 +31,7 @@ namespace Meta.Scripting
     static Symbol begin = Symbol.make("begin");
     static Symbol theif = Symbol.make("if");
     static Symbol thetb = Symbol.make("top-begin");
+    static Symbol thedowhile = Symbol.make("do-while");
 
     // non-bootstrap stuff: .net-specific
     static Symbol thetry = Symbol.make("try");
@@ -131,6 +132,9 @@ namespace Meta.Scripting
                             compile(p1),
                             compile(p2),
                             (p3 == null) ? NIL : compile(p3), p);
+        }
+      else if (p.caris(thedowhile)) {
+          return new MakeDoWhile(compile(p.cadr()));
         }
       else if (p.caris(thetry))
         {
@@ -310,6 +314,22 @@ namespace Meta.Scripting
       return res;
     }
   }
+  class MakeDoWhile : Code
+  {
+    Code _body;
+    public MakeDoWhile(Code body)
+    {
+        _body = body;
+    }
+    public Object run(Object[] fr, Object[] envframe)
+    {
+      Object res = null;
+      do {
+          res = _body.run(fr, envframe);
+      } while (res != null);
+      return null;
+    }
+  }  
   class MakeArgRef : Code
   {
     int i;

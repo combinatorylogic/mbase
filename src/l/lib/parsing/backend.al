@@ -2,7 +2,7 @@
 ;;
 ;;   OpenMBase
 ;;
-;; Copyright 2005-2015, Meta Alternative Ltd. All rights reserved.
+;; Copyright 2005-2017, Meta Alternative Ltd. All rights reserved.
 ;;
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -186,6 +186,7 @@
       ;;   3) Otherwise, backtrack to the beginning of the infix expr
       ;;      entry
       (let* ((saved (__peg:get-position_ source))
+             (peg-node-name (quote ,name))
              (_lrstk (__peg:get-hack-lrstk _lrstk_hack))
              (L ,lr))
         (if (peg-success? L)
@@ -261,6 +262,7 @@
                                   ))))
        ,(rchk
           `(let* ((saved (__peg:get-position_ source))
+                  (peg-node-name (quote ,name))
               ,@struc
               (finalresult nil)
               (result
@@ -301,8 +303,11 @@
            (let* ((last (__peg:get-position_ source)))
              ,@(map-over acode
                 (fmt (n l)
-                     `(peg:env-signal Env (quote ,name) saved last
-                                      (quote (,n ,l))))
+                     (if (eqv? l 'LOCTOKEN)
+                         `(peg:env-signal Env (quote ,name) saved last (list (quote ,n)
+                                                                             (gensym)))
+                         `(peg:env-signal Env (quote ,name) saved last
+                                          (quote (,n ,l)))))
                 )))
       nil
       ))
@@ -334,7 +339,10 @@
  (alet varshash (peg-constr-fmtvars srcfmt)
   (packrat:visit code constr
     (code DEEP
-       ((var (if (ohashget varshash name) name (ccerror `(PEG:UNKNOWN-CONSTRUCTOR-VARIABLE ,name IN ,constr))))
+       ((var (if (ohashget varshash name) name
+                 (if (eqv? name 'pegenv)
+                     'Env
+                     (ccerror `(PEG:UNKNOWN-CONSTRUCTOR-VARIABLE ,name IN ,constr)))))
         (const (list 'quote s))
         (fcall `(,(Sm<< "peg-function-" fname) ,@ars))
         (constr `(cons (quote ,cname) (quasiquote ,ars)))

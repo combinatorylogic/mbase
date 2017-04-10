@@ -1,4 +1,4 @@
 #!/bin/sh
 
-pfront /dbg /dumpal ssa.al ./bootstrap.hl
+pfront /dumpal ssa.al ./bootstrap.hl
 
