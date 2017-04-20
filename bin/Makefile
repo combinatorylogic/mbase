@@ -19,7 +19,7 @@ MBASE = $(MONO) ./mb0.exe
 
 all: repl.exe mbweave.exe pfront.exe pfrepl.exe pfprint.exe pftexprint.exe \
 	mlrepl.exe mlcomp.exe pfhighlight.exe prologrepl.exe MBaseLogic.dll \
-	doc MBaseExtra.dll
+	MBaseExtra.dll
 
 clean:
 	rm -f *.dll *.alc *.exe
