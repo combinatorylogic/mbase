@@ -46,14 +46,16 @@ function smallest_weak(lst)
      |  else -> if (min<9999) min:minpos else []:[]}}
 
 \pfcode{
+#(macro pprint_cont (str pos stk)
+     `(if cnt (loop (car cnt) ,str ,pos ,stk (cdr cnt))))}
+
+\pfcode{
 function pprint(lst, pfun)
   do loop(l = lst,
           str = [0],
           pos = 0,
           stk = [],
           cnt = []) {
-    cont(str1, pos1, stk1) =
-      if (cnt) loop(car(cnt), str1, pos1, stk1, cdr(cnt)) else [];
     tab_width = 2;
     print_spaces(n) = {
       iter i in [0..n] do pfun(" ");
@@ -79,7 +81,7 @@ function pprint(lst, pfun)
      <min:minpos> = smallest_weak(cdr(str));
       if(not(min)) {
          flush_string();
-         cont([getpos();nw], getpos(), stk)
+         pprint_cont([getpos();nw], getpos(), stk)
       } else {
         <rest:rprev> = minpos;
          prev = reverse(rprev);
@@ -89,26 +91,26 @@ function pprint(lst, pfun)
          }};
     match l with
       hd:tl -> loop(hd, str, pos, stk, tl:cnt)
-    | [] -> cont(str, pos, stk)
+    | [] -> pprint_cont(str, pos, stk)
     | else -> if(%symbol?(l)) {// this is a command
        case l {
-         | 'FORCECR' -> {flush_string(); cont([getpos()], getpos(), stk)}
-         | 'PUSHSTOP' -> cont(str, pos, pos:stk)
-         | 'PUSHTAB' -> cont(str, pos, (getpos()+tab_width):stk)
-         | 'POP' -> cont(str, pos, cdr(stk))
+         | 'FORCECR' -> {flush_string(); pprint_cont([getpos()], getpos(), stk)}
+         | 'PUSHSTOP' -> pprint_cont(str, pos, pos:stk)
+         | 'PUSHTAB' -> pprint_cont(str, pos, (getpos()+tab_width):stk)
+         | 'POP' -> pprint_cont(str, pos, cdr(stk))
          | 'WEAK' -> {
-              state = fun() cont([getpos()], getpos(), stk);
-              cont(str::['WEAK';[state;getpos()]], pos, stk)
+              state = fun() pprint_cont([getpos()], getpos(), stk);
+              pprint_cont(str::['WEAK';[state;getpos()]], pos, stk)
            }
-         | 'NB' -> cont(str::['NB'], pos, stk)
-         | 'TABBACK' -> cont(str::['TABBACK'], pos, stk)
+         | 'NB' -> pprint_cont(str::['NB'], pos, stk)
+         | 'TABBACK' -> pprint_cont(str::['TABBACK'], pos, stk)
          // ignore the unknown commands
-         | else -> cont(str, pos, stk)
+         | else -> pprint_cont(str, pos, stk)
        }} else { //it's a proper string
          len = notnet(string l) {leave l.get_Length();};
          ipos = car(str);
          if ((pos + len - ipos) > 75) splitthisstring(l)
-         else cont(str::[l], pos + len, stk)
+         else pprint_cont(str::[l], pos + len, stk)
        }
     }
   }

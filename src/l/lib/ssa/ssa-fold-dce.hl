@@ -61,7 +61,8 @@ function genssa2_remove_dead_regs(env, src, reghash, chgref) {
         <k:v> = op(name);
          if(not(k)) {kill(); []} else [mk:node(op = v)]};
       deep iop(dstreg) {
-         phi -> if (isdead(dstreg)) []:node else true:node
+         phi -> {if (isdead(dstreg)) []:[] else
+                 if (not(args)) []:[] else true:node}
        | select -> if (isdead(dstreg)) []:node else true:node
        | call -> if (isdead(dstreg) && genssa2_is_pure(env, dst)) []:node
                  else true:node}}}}

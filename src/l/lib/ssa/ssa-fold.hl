@@ -81,6 +81,7 @@ ast genssa2 {
   term = br(labident:dst)
        | brc(expr:c, labident:tr, labident:fl)
        | switch(expr:v, labident:d, .*switchdst:ns)
+       | indirect(*any:orig, .*labident:dsts)
        | none()
        ;
   expr = var(varident:id)
@@ -276,38 +277,49 @@ It would make more sense to define a DSL for populating such an environment.
 \pfcode{
 %"All the abstract SSA steps together"
 function genssa2_process_iter(modenv, src0) {
-   do loop(src = src0) {
+   times = mkhash();
+
+   if (ohashget(modenv, '*debug-compiler-ssa*')) {
+         println("STEP0");
+         printgenssa2(src0);
+         println("--------------")};
+
+
+   ret = do loop(src = src0, count = 0) {
       chgp = mkref([]);
 
       // 1. Iterative fold and kill.
-      src1 = genssa2_fold_and_kill(modenv, src, chgp);
+      src1 = swbenchmark1(times, "fold-and-kill", genssa2_fold_and_kill(modenv, src, chgp));
       // 2. Handle the loose phi loops
-      src2 = genssa2_dce_phi(modenv, src1, chgp);
+      src2tmp = swbenchmark1(times, "dce-phi", genssa2_dce_phi(modenv, src1, chgp));
+      src2 = swbenchmark1(times, "fold-and-kill-2", genssa2_fold_and_kill(modenv, src2tmp, chgp));
       // 3. Rewrite eligible phis as selects
-      src3 = genssa2_detect_selects(modenv, src2, chgp);
+      src3 = swbenchmark1(times, "detect-selects", genssa2_detect_selects(modenv, src2, chgp));
       // 4. Clean up CFG
-      src4x = genssa2_merge_basic_blocks(src3, chgp);
-      src4  = genssa2_merge_basic_blocks_backwards(src4x, chgp);
+      src4x = swbenchmark1(times, "merge-basic-blocks", genssa2_merge_basic_blocks(src3, chgp));
+      src4tmp  = swbenchmark1(times, "merge-basic-blocks-backwards",
+                                  genssa2_merge_basic_blocks_backwards(src4x, chgp));
 
+      src4 = swbenchmark1(times, "fold-and-kill-3", genssa2_fold_and_kill(modenv, src4tmp, chgp));
       // 5. Move loop invariants
-      src5 = genssa2_loop_invariants(modenv, src4, chgp);
-
+      src5 = swbenchmark1(times, "loop-invariants", genssa2_loop_invariants(modenv, src4, chgp));
      <[cache;inds]> = genssa2_induction(modenv, src5);
       src5x = if (inds) {
-         exits = genssa2_loop_exits(modenv, cache, inds, src5);
-         cnds = genssa2_loop_bounds(modenv, inds, exits);
-         cnds = genssa2_loop_bounds_static(modenv, cnds);
+         exits = swbenchmark1(times, "loop-exits", genssa2_loop_exits(modenv, cache, inds, src5));
+         cnds = swbenchmark1(times, "loop-bounds", genssa2_loop_bounds(modenv, inds, exits));
+         cnds = swbenchmark1(times, "loop-bounds-static", genssa2_loop_bounds_static(modenv, cnds));
          if(cnds) {
                     // TODO: only unroll if hinted
-                    return genssa2_loop_unroll(modenv, src5, cache,
-                                               car(cnds), chgp)
+                    return swbenchmark1(times, "loop-unroll",
+                                               genssa2_loop_unroll(modenv, src5, cache,
+                                                   car(cnds), chgp))
                   }
          else return src5
       } else src5;
-      src6 = genssa2_analyse_conditions(modenv, src5x, chgp);
+      src6 = swbenchmark1(times, "analyse-conditions", genssa2_analyse_conditions(modenv, src5x, chgp));
 
       // 6. CSE
-      src7 = genssa2_cse(modenv, src6, chgp);
+      src7 = swbenchmark1(times, "CSE", genssa2_cse(modenv, src6, chgp));
 
       // TODO:
       //
@@ -324,16 +336,43 @@ function genssa2_process_iter(modenv, src0) {
       //   - Strength reduction
       // - Instcombine
       // 
+      userpass = aif(chk = ohashget(modenv, '*userpasses*')) chk else
+                 fun(modenv, src, chgp) src;
+
+      src8 = swbenchmark1(times, "user-passes", userpass(modenv, src7, chgp));
+      
+      if (not(^chgp) && ohashget(modenv, '*debug-compiler-ssa*')) {
+         println("STEP7");
+         printgenssa2(src7);
+         println("--------------")};
 
       // 7. Rince and repeat
-      if (^chgp) loop(src7) else src7}}}
+      if (^chgp) {
+        if (count < 100)
+          loop(src8, count + 1)
+        else src8
+      } else src8};
+
+   if (ohashget(modenv, '*debug-compiler-ssa-timing*')) {
+      iter [k;v] in swgetbenchmarks(times) do
+         println(%S<<("Pass: '",k,"': ", v))
+   };
+   return ret
+   }}
 
 
 \pfcode{
 function genssa2_process(modenv, env, src) {
-   ret = genssa2_process_iter(modenv, src);
-   teq = genssa2_type_equations(modenv, env, ret);
-   th = genssa2_solve_type_equations(modenv, env, teq);
+   times = mkhash();
+   ret = swbenchmark1(times, "iter-passes", genssa2_process_iter(modenv, src));
+   teq = swbenchmark1(times, "type-equations", genssa2_type_equations(modenv, env, ret));
+   th = swbenchmark1(times, "type-equations-solv", genssa2_solve_type_equations(modenv, env, teq));
+
+   if (ohashget(modenv, '*debug-compiler-ssa-timing*')) {
+      iter [k;v] in swgetbenchmarks(times) do
+         println(%S<<("Pass1: '",k,"': ", v))
+   };
+
    return th:ret;
 }}
 

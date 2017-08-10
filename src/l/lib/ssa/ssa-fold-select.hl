@@ -99,7 +99,7 @@ function genssa2_find_paths(domtree, cfg, d, a, b, c) {
      //    other one goes to B)
      dexits = ohashget(cfg, d);
      a0 = car(dexits); // we'll look for this one
-     if (memq(a, p1)) return [true;p1;p2]
+     if (memq(a0, p1)) return [true;p1;p2]
                        else return [[];p1;p2]
    }}}
 

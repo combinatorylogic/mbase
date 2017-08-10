@@ -142,15 +142,25 @@ function genssa2_move_loop_invariants(src, invariants) {
    newedges = mkhash();
    killed = mkhash();
 
-   injected =
-     hashmap(fun(name, ops) {
+   injht = mkhash();
+   hashiter(fun(name, ops) {
        <[f;t]> = ohashget(edges, name);
         iter [dst;op] in ops do {
            ohashput(killed, dst, dst)};
-        edg = gensym();
-        ohashput(newedges, %Sm<<(f,'--',t), edg);
-        return 'b'(edg, ops, 'br'(t))}, invariantsht);
-     
+        nnm = %Sm<<(f,'--',t);
+        chk0 = ohashget(newedges, nnm);
+        bb1 = if (chk0) {
+                tmp1 = ohashget(injht, nnm);
+                match tmp1 with
+                   'b'(edg, ops1, term) -> 'b'(edg, ops1::ops, term)
+                 | else -> ccerror('OOPS'())
+              } else {
+                edg = gensym();
+                ohashput(newedges, %Sm<<(f,'--',t), edg);
+                return 'b'(edg, ops, 'br'(t))};
+        ohashput(injht, nnm, bb1);
+        }, invariantsht);
+   injected = hashmap(fun(k,v) v, injht);
 
    rewrite_edge(f, t) = ohashget(newedges, %Sm<<(f, '--', t));
    delete_op(id) = ohashget(killed, id);
@@ -313,7 +323,7 @@ collector(add, get) {
       match chk with
         [[f;t]] -> f
         //TODO!
-      | else -> ccerror('NOENTRYEDGE'(L))};
+      | else -> ccerror('NOENTRYEDGE'(L, chk))};
 
    initvalue(L, reg) = {
       edge = getloopentryedge(L);
@@ -713,7 +723,7 @@ function genssa2_loop_unroll_inner(env, src, bbsh, loop, loopbackedge, loopexite
    <(nextname:(bht:rht)):newbbs> = rewriteloop(loopbbs, entrybb, count, backedge, exitedge, et);
     renamereg(id) = aif(chk = ohashget(rht, id)) chk else id;
     renamebb(id)  = aif(chk = ohashget(bht, id)) chk else id;
-    chgp := true; // TODO - there must be bail out conditions, right?    
+    chgp := true; // TODO - there must be bail out conditions, right?
     (map append bb in src do
       visit:genssa2(bblock: bb) {
         deep bblock {
@@ -727,10 +737,29 @@ function genssa2_loop_unroll_inner(env, src, bbsh, loop, loopbackedge, loopexite
 
 
 \pfcode{
+function genssa2_loop_unroll_pragma(env, src, cache, lid) {
+  <[[_;_]; loops; @_]> = cache;
+   getloopentryedge(L) = {
+      chk = ohashget(loops, %Sm<<("entryedge-", L));
+      match chk with
+        [[f;t]] -> f
+      | else -> ccerror('NOENTRYEDGE'(L))};
+   entry = getloopentryedge(lid);
+  <[cfg;bbs]> = genssa2_cache_cfg(src);
+   entrydef = ohashget(bbs, entry);
+   collector(add, get) {
+     visit:genssa2(bblock: entrydef) {
+        deep iop {
+           call -> 
+              if (dst === '_pragma_unroll_all') add(true)
+         | else -> []}};
+     if (get()) return true else []}}}
+
+\pfcode{
 function genssa2_loop_unroll(env, src, cache, lr, chgp) {
  <[[_;_]; loops; @_]> = cache;
  <constloop(Lp, V, initc, istep, blimit, count)> = lr;
-  if (count > 16) src else
+  if (genssa2_loop_unroll_pragma(env, src, cache, Lp) || (count < 16))
   {
     loopbackedge = genssa2_get_loop_backedge(loops, Lp);
     loopexitedge = genssa2_get_loop_exitedge(loops, Lp);
@@ -743,6 +772,7 @@ function genssa2_loop_unroll(env, src, cache, lr, chgp) {
   
     nbody = genssa2_loop_unroll_inner(env, srcc, bbsh, loop, loopbackedge, loopexitedge, count, chgp);
     genssa2_kill_dangling(visit:genssa2 (top:src) {
-      once top { f -> mk:node(body = nbody) }})}}}
+      once top { f -> mk:node(body = nbody) }})}
+   else src}}
 
 %%%%%%%

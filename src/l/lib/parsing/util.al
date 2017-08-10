@@ -102,6 +102,15 @@
   (not.neth ((System.Diagnostics.Stopwatch sw))
             (leave ((sw@get_Elapsed)@ToString))))
 
+(function stopwatch-elapsed-raw (sw)
+  (not.neth ((System.Diagnostics.Stopwatch sw))
+            (leave (sw@get_Elapsed))))
+
+(function stopwatch-addtime (t1 t2)
+  (not.neth ((System.TimeSpan t1)
+             (System.TimeSpan t2))
+            (leave (t1@Add t2))))
+
 (macro swbenchmark (msg code)
     (with-syms (sw ret)
        `(let* ((,sw (mkstopwatch))
@@ -110,6 +119,28 @@
           (stopwatch-stop ,sw)
           (println (S<< "Elapsed time (" ,msg "): " (stopwatch-elapsed ,sw)))
           (return ,ret))))
+
+(macro swbenchmark1 (ht msg code)
+    (with-syms (sw ret)
+       `(let* ((,sw (mkstopwatch))
+               (_ (stopwatch-start ,sw))
+                      (,ret ,code))
+          (stopwatch-stop ,sw)
+          (swbenchmark-addtime ,ht ,msg (stopwatch-elapsed-raw ,sw))
+          (return ,ret))))
+
+(function swgetbenchmarks (ht)
+  (hashmap (fun (k v)
+             `(,k ,(->s v))) ht))
+
+(function swbenchmark-addtime (ht txt t)
+  (let* ((chk (hashget ht txt)))
+    (if chk
+        (let* ((nt (stopwatch-addtime chk t)))
+          (hashput ht txt nt))
+        (begin
+          (hashput ht txt t))
+        )))
 
 (macro swbenchmark0 (msg code)
   (if (shashget (getfuncenv) 'debug-compiler-benchmarks)
