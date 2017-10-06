@@ -19,7 +19,7 @@ MBASE = $(MONO) ./mb0.exe
 
 all: repl.exe mbweave.exe pfront.exe pfrepl.exe pfprint.exe pftexprint.exe \
 	mlrepl.exe mlcomp.exe pfhighlight.exe prologrepl.exe MBaseLogic.dll \
-	MBaseExtra.dll
+	MBaseExtra.dll FlowCharts.dll flowcharts.exe
 
 clean:
 	rm -f *.dll *.alc *.exe
@@ -144,3 +144,9 @@ pfhighlight.exe: repl.exe MBasePackrat.dll MBaseFront.dll pfront.exe
 	./mbfixbin ./pfhighlight.exe
 
 
+flowcharts.exe: FlowCharts.dll
+	$(MONO) ./pfront.exe /c flowcharts ../misc/flowtop.hl
+
+-include FlowCharts.dll.d
+FlowCharts.dll: ../misc/flowdll.hl MBaseExtra.dll
+	$(MONO) ./pfront.exe ../misc/flowdll.hl

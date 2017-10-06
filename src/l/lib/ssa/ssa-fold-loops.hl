@@ -363,7 +363,7 @@ collector(add, get) {
            if(npurep) add('maybeinductive'(L, reg, depl))}}};
 
    refineinduct(lst) =
-      do loop(l = lst) collector(iadd, iget) {
+      do loop(l = lst, level = 0) collector(iadd, iget) {
          chgp = mkref([]); rev = mkhash();
          todo = map append l in lst do {
             match l with
@@ -384,7 +384,13 @@ collector(add, get) {
                                        genssa2_to_algebraic(env, makestep(L, reg, depg, rev))));
                       return []}
                    else return [t]}};
-         if (nxt && ^chgp) loop(iget()::nxt) else iget()};
+          // Check if we're not trying to introduce potential induction variables from different
+         // loop levels that depend on each other:
+         // TODO....
+         if (level > 19) {
+            println('CANNOT-REFINE-INDUCTION'(iget(), nxt));
+         };
+         if (nxt && ^chgp && level > 20) loop(iget()::nxt, level + 1) else iget()};
            
    visit:genssa2(top: src) {
      deep iop(bb, dstreg) {

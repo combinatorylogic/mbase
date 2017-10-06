@@ -1,0 +1,10 @@
+#(include "../src/l/version.al")
+#(sysdll MBaseExtra)
+#(n.module FlowCharts)
+
+include "./extra.hl"
+htmlinclude  "./flowchart.hl"
+
+#(force-class-flush)
+#(n.save)
+

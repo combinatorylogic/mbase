@@ -1,0 +1,354 @@
+\pfinclude{"./header.html"}
+
+<h1>Pseudocode to flowchart DSL</h1>
+
+<p>Sometimes it can be useful to embed a flowchart <a href="#svgexample">like this one</a> into your literate code,
+but drawing it by hand can be tedious. Instead, we can generate a passable Graphviz flowchart out of a pure text
+pseudocode lightly decorated with some control flow.
+
+<h2>Pseudocode AST</h2>
+
+<p>Our pseudocode must support simple structured control flow features - sequence, if, do, while, and
+to a limited extend labels and gotos (mainly for escaping from nested loops).
+
+<p>Expressions are only allowed as conditionals (in if, while and do-while), and we have a special syntax for
+"not". Everything else in this pseudocode is just plain text.
+
+\pfcode{
+ast flowlang recform {
+stmt = block(text:t)
+     | seq(.*stmt:es)
+     | namedseq(text:lbl, *stmt:es)
+     | if(expr:e, stmt:tr, stmt:fl)
+     | while(expr:e, stmt:body)
+     | dowhile(expr:e, stmt:body)
+     | label(lblident:id)
+     | goto(lblident:id)
+     | nop()
+     ;
+expr = eblock(text:t)
+     | not(expr:e)
+     ;
+}}
+
+<h2>Pseudocode parser</h2>
+
+Here is a syntax definition for the pseudocode language in PEG:
+
+\pfcode{
+parser pflowlang (pfront) {
+  target flowlang;
+  !!Spaces;
+  [lexical:] := [lexical] => {ctoken = lexic};
+  [keyword:] := [keyword] ![IdentRest] => {ctoken = keyword};
+  @@flowkwords := "begin"/"end"/"if"/"while"/"else"/"then"/"do"/"goto";
+  @@flowsymbols := "@"/";"/"!"/"("/")";
+  @@flowkword := ([flowkwords]/[flowsymbols]) ![IdentRest];
+  @@flowspace := [Space]/[flowsymbols];
+  @@flowchar := ("\" .) / .;
+  @@anyword := ![flowkword] (![flowspace] [flowchar])+;
+  @anywordtk := [anyword];
+  pflowlang := slist<[flowstmt]>:ts [Spaces]* => ts;
+  flowstmt := { "@" [ident]:l ":" => label(l) }
+           /  { goto [ident]:l => goto(l) }
+           /  { begin "(" [flowblock]:lbl ")" eslist<[flowstmt]>:ts end => namedseq(lbl, ts) }
+           /  { begin eslist<[flowstmt]>:ts end => seq(@ts) }
+           /  { if [flowexpr]:e then [flowstmt]:tr else [flowstmt]:fl => if(e,tr, fl) }
+           /  { if [flowexpr]:e then [flowstmt]:tr => if(e, tr, nop()) }
+           /  { while [flowexpr]:e do [flowstmt]:b => while(e, b) }
+           /  { do [flowstmt]:s while [flowexpr]:e => dowhile(e, s) }
+           /  { [flowblock]:b ";"? => block(b) }
+           ;
+  flowexpr := { "!" [flowexpr]:e => not(e) }
+           /  { "(" [flowexpr]:e ")" => e }
+           /  { [flowblock]:b => eblock(b) }
+           ;
+  anywordv := [anywordtk]:v => $val(v);
+  flowblock := slist<[anywordv]>;
+}}
+
+<h3 id="example">A syntax example</h3>
+
+\phcode{
+#(ctimex (define pp_example_str
+"begin (Main loop)
+ while More input items? do begin
+   Prompt for input;
+   Read line
+   if !(Input is valid) then begin
+      Display error message
+      begin (Wait)
+        while !(Key pressed?) do begin end
+        goto End
+      end
+   end else
+      Process the input
+ end
+ @End:
+end"))}
+
+\phcode{
+define pprint_pflowlang = gen_pprint_ast(flowlang, stmt);
+
+#(ctimex
+   (define pp_example =pf: parse pp_example_str as pflowlang))}
+
+
+\pfdemo{pp_example_str}[pflowlang:pflowlang]
+
+<p>The example above is parsed into the following AST:
+
+\pfdemo{pprint_pflowlang(car(pp_example))}[mbsexp:sxnde]
+
+<h2>Lowering to CFG</h2>
+
+The next AST will only contain named basic blocks of different shapes:
+
+\pfcode{
+ast flowlow recform {
+   bblock = entry(text:bl, ident:name, nxtident:next)
+          | simple(text:bl, ident:name, text:code, nxtident:next)
+          | branch(text:bl, ident:name, text:cnd, nxtident:tr, nxtident:fl)
+          | point(text:bl, ident:name, nxtident:next)
+          | exit(text:bl, ident:name)
+          ;
+}}
+
+<p>We'll directly translate the source AST into a set of basic blocks, in one pass. Not conditionals are resolved
+here as well, which is a bit clumsy, but we don't have that many places where conditionals can appear.
+
+Some nodes can expand via proxy point basic blocks, which we'll eliminate in the next pass.
+
+\pfcode{
+function compile_flowlang(src)
+collector(add, get) {
+   bl = mkref([]);
+   compile = visit:flowlang /rec, dst flowlow/ (stmt:src) {
+      deep stmt(next) {
+         block -> symbols(n) { add(mk:bblock:simple(^bl, n, t, next)); return n }
+       | label -> {add(mk:bblock:point(^bl, id, next)); return id }
+       | goto -> symbols(n) {add(mk:bblock:point(^bl, n, id)); return n }
+       | seq -> { res = reverse(es);
+                  return foldl(fun(nxt, f) f(nxt), next, res) }
+       | namedseq -> { blbck = ^bl; bl := lbl;
+                       res = reverse(es);
+                       ret = foldl(fun(nxt, f) f(nxt), next, res);
+                       bl := blbck; return ret}
+       | if -> symbols(n) {
+            match e with
+              'not'(e) -> add(mk:bblock:branch(^bl, n, e, fl(next), tr(next)))
+             | else -> add(mk:bblock:branch(^bl, n, e, tr(next), fl(next)));
+            return n}
+       | while -> symbols(n) {
+            match e with
+              'not'(e) -> add(mk:bblock:branch(^bl, n, e, next, body(n)))
+            | else -> add(mk:bblock:branch(^bl, n, e, body(n), next));
+            return n}
+       | dowhile -> symbols(n) {
+           bd = body(n);
+           match e with
+              'not'(e) -> add(mk:bblock:branch(^bl, n, e, next, bd))
+            | else -> add(mk:bblock:branch(^bl, n, e, bd, next));
+           return bd}
+       | nop -> return next};
+      deep expr { eblock -> t | not -> 'not'(e) }};
+   nbegin = compile('EXIT');
+   with target (flowlow) {
+      add(mk:bblock:entry([], 'START', nbegin));
+      add(mk:bblock:exit([], 'EXIT'));
+      return get()}}}
+
+<h2>CFG cleanup</h2>
+
+<p>We created some redundant points in the previous pass, let's clean them up before we start inserting the useful
+points. Since points have only one exit, it's ok to fuse them directly into their destination basic blocks.
+
+\pfcode{
+function flowlang_delete_points(src) {
+  rewrites = mkhash();
+  prep() =
+    iter b in src do
+      visit:flowlow /rec/ (bblock: b) {
+        deep bblock {
+          point -> ohashput(rewrites, next, name)
+        | else -> []}};
+  prep();
+  rewritefn(id) = do loop(id = id) aif(chk = ohashget(rewrites, id)) loop(chk) else id;
+  map append b in src do
+    visit:flowlow /rec/ (bblock: b) {
+      deep bblock {
+         point -> []
+       | else -> [node()]};
+      once nxtident: rewritefn(thisnodesrc());
+      once ident: rewritefn(thisnodesrc())}}}
+
+<p>The flow chart will look better if we insert points before the basic blocks with multiple incoming arrows.
+
+\pfcode{
+function getcfg(bb)
+     visit:flowlow /rec/ (bblock:bb) {
+        deep bblock {
+           entry -> [bl;name;next]
+         | simple -> [bl;name;next]
+         | branch -> [bl;name;tr;fl]
+         | point -> [bl;name;next]
+         | exit -> [bl;name]}}
+
+function flowlang_insert_points(src) {
+  cntr = mkhash(); labels = mkhash();
+  addcntr(id) = {tmp = ohashget(cntr, id); tmp = if(tmp) tmp else 0;
+                 ohashput(cntr, id, tmp+1)};
+  iter b in src do {
+     c = getcfg(b);
+     if (car(c)) ohashput(labels, cadr(c), car(c));
+     iter nxt in cddr(c) do
+       addcntr(nxt)};
+  getlabel(id) = ohashget(labels, id);
+  collector(add, get) {
+    rewrites = mkhash();
+    rewritefn(id) = aif(chk = ohashget(rewrites, id)) chk else id;
+    hashiter(fun(k,n)
+               if (n>1) symbols(nn) {
+                   ohashput(rewrites, k, nn);
+                   add(with target (flowlow) {
+                         mk:bblock:point(getlabel(k), nn, k)})}, cntr);
+    return get()::map b in src do
+       visit:flowlow /rec/ (bblock: b) {
+          once nxtident: rewritefn(thisnodesrc())}}}}
+
+<h2>Graphviz backend</h2>
+
+<p>Now we can simply sort the basic blocks into clusters (by their <b>bl</b>
+values) and pretty-print them in a Graphviz dot syntax.
+
+\pfcode{
+function display_flowlow(src, addnode, addarrow) {
+   xxx(str) = strinterleave(str, " ");
+   visit:flowlow /rec/ (bblock: src) {
+     deep bblock {
+        entry ->
+          {addnode(bl, $'${name} [shape="box", style="rounded", label="START"];');
+           addarrow($'${name} -> ${next};')}
+      | exit ->
+          {addnode(bl, $'${name} [shape="box", style="rounded", label="END"];')}
+      | simple ->
+          {addnode(bl, $'${name} [shape="parallelogram", style="", label="${xxx(code)}"];');
+           addarrow($'${name} -> ${next};')}
+      | point ->
+          {addnode(bl, $'${name} [width=0 shape=point label=""];');
+           addarrow($'${name} -> ${next};')}
+      | branch ->
+          {addnode(bl, $'${name} [shape="diamond", style="filled", fillcolor="lightgrey", label="${xxx(cnd)}"];');
+           addarrow($'${name} -> ${tr} [taillabel="YES"];');
+           if (fl) addarrow($'${name} -> ${fl} [taillabel="NO"];')}}}}}
+
+\pfcode{
+function display_all(pfun, src)
+collector(addtopnode, getnodes)
+collector(addarrow, getarrows) {
+   nodes = mkhash();
+   xxx(str) = strinterleave(str, " ");
+   addnode(bl0, txt) = {
+     if (not(bl0)) addtopnode(txt)
+     else {
+       bl = xxx(bl0);
+      <add:get> = 
+        aif(chk = hashget(nodes, bl)) chk
+        else collector(add,get) {
+           hashput(nodes, bl, add:get); add:get};
+       add(txt)}};
+   iter i in src do display_flowlow(i, addnode, addarrow);
+   pfun("digraph G { graph [splines=ortho, nodesep=1, overlap=false];");
+   iter i in getnodes() do {print("    "); pfun(i)};
+   hashiter(fun(bl, ns) {
+       <add:get> = ns;
+       pfun($'    subgraph cluster_${gensym()} {');
+       pfun($'        label="${bl}"; style=filled; fillcolor=grey92;');
+       iter i in get() do {print("        "); pfun(i)};
+       pfun("    }");
+     }, nodes);
+   iter i in getarrows() do {print("    "); pfun(i)};
+   pfun("}")}}
+
+<h2>Embedded driver</h2>
+
+<p>Our main goal is to be able to embed the flowcharts into literate code. For this we'd have to define a syntax
+extension (to be used inside <b>pfout</b> nodes) and a driver that will call Graphviz in background and produce
+an SVG output to be embedded into HTML. Same thing can be done for the TeX output as well.
+
+\pfcode{
+function htmlembed_flow_dsl(perc, code) {
+      x = flowlang_insert_points(
+             flowlang_delete_points(compile_flowlang(code)));
+      fnm = $'${gensym()}.dot';
+      %call-with-output-file(fnm,
+         fun(fo) {display_all(fun(str) fprintln(fo, str), x)});
+      collector(add, get) {
+         system("dot", $'-Tsvg ${fnm}', add);
+         out = cddddr(cdddr(get()));
+         out = $'<svg width="${perc}" height="${perc}"':out;
+         body = strinterleave(out, "\n");
+         return body}}}
+
+\pfcode{
+syntax in expr, start (pflowlang): ' ".flowchart" "(" [string]:perc ")" ":" [flowstmt]:s ' 
+{
+   return 'lisp'('quote'(htmlembed_flow_dsl(perc, s)))
+}}
+
+<h3 id="svgexample">Output example</h3>
+
+<p>Here is the output generated from <a href="#example">our example</a>:<br>
+
+<p>
+\phcode{#(ctimex (define pp_example_svg (htmlembed_flow_dsl "60%" (car pp_example))))}
+\pfout{pp_example_svg}
+
+<h3>Embedding example</h3>
+
+<p>And this is an output from an embedded <b>pfout</b> code:
+
+<div>
+\pfout{.flowchart("30%"): begin A; while (XXX) do B; C end}
+</div>
+
+<p>The code was:
+\pfqode{.flowchart("30%"): begin A; while (XXX) do B; C end}
+
+<h2>Standalone driver</h2>
+
+<p>To recap, the compilation pipeline is:
+
+<p>
+\pfout{.flowchart("20%"):
+   begin
+      parse as pflowlang;
+      compile_flowlang;
+      flowlang_delete_points;
+      flowlang_insert_points;
+      For all entries: display_all
+   end}
+
+<p>We may also want to use this flowchart compiler standalone. This is the
+<b>main</b> function to be used:
+
+\pfcode{
+function fc_main()
+{
+  match %a->l( %*CMDLINE* ) with
+   [fname] -> {
+     strm = %peg:file->stream(fname);
+     res = %peg:easyparse3(%peg:makeenv(), peg_pflowlang, strm);
+     match car(res) with
+        'FAIL:'(@x) -> %pfront-report-syntax-error(strm, res)
+      | code ->
+         iter i in code do {
+           x = flowlang_insert_points(
+                 flowlang_delete_points(compile_flowlang(i)));
+           display_all(println, x)}}
+   | else -> println("Usage: flowchart.exe <filename>")
+}}
+
+\pfinclude{"./footer.html"}
+
+

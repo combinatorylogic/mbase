@@ -303,7 +303,7 @@ function genssa2_process_iter(modenv, src0) {
       src4 = swbenchmark1(times, "fold-and-kill-3", genssa2_fold_and_kill(modenv, src4tmp, chgp));
       // 5. Move loop invariants
       src5 = swbenchmark1(times, "loop-invariants", genssa2_loop_invariants(modenv, src4, chgp));
-     <[cache;inds]> = genssa2_induction(modenv, src5);
+     <[cache;inds]> = swbenchmark1(times, "loop-induction", genssa2_induction(modenv, src5));
       src5x = if (inds) {
          exits = swbenchmark1(times, "loop-exits", genssa2_loop_exits(modenv, cache, inds, src5));
          cnds = swbenchmark1(times, "loop-bounds", genssa2_loop_bounds(modenv, inds, exits));

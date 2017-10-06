@@ -1,0 +1,8 @@
+#(sysdll MBaseExtra)
+#(sysdll FlowCharts)
+
+function main() {
+   fc_main()
+}
+
+

@@ -487,3 +487,39 @@ syntax in expr, start: ' aif "(" [qident]:id "=" [expr]:e ")" [expr]:tr
        return `{ \id\ = \e\; if (\vid\) \tr\}`
     }
 }
+
+// String interpolation:
+
+parser pfinter (pfront) {
+  @@DQUOTE := 34;
+  @@QUOTE := 39;
+  @@escapebegin := "${";
+
+  escape := [escapebegin] [expr]:e "}" => e;
+
+  @@text1 := (![DQUOTE] ((![escapebegin] .)/("\\$")))+;
+  @tktext1 := [text1];
+  stringinterp1 := eslist<[stringiatom1]>:es => es;
+  stringiatom1 := { [escape]:e => escape(e) }
+               /  { [tktext1]:t => text($val(t)) }
+              ;
+
+  @@text2 := (![QUOTE] ((![escapebegin] .)/("\\$")))+;
+  @tktext2 := [text2];
+  stringinterp2 := eslist<[stringiatom2]>:es => es;
+  stringiatom2 := { [escape]:e => escape(e) }
+               /  { [tktext2]:t => text($val(t)) }
+              ;
+  pfinterstr := {"$" [DQUOTE] [stringinterp1]:v [DQUOTE] => v}
+             /  {"$" [QUOTE]  [stringinterp2]:v [QUOTE]  => v}
+             ;
+}
+
+syntax in expr, start (pfinter):
+   '[pfinterstr]:s'
+{ return 'call'('var'('S<<'),@map s do match s with
+                                 escape(e) -> e | text(s) -> 'string'(s)
+                               | else -> ccerror('WHAT?'(s))) }
+
+
+

@@ -1,0 +1,142 @@
+#(include "../src/l/ext/ast2-ast.al")
+
+function get_pattern_printer(tag, src, varhints) {
+  isempty(s) =
+    visit:astlang (pattern: s) {
+       once pattern {
+          nil -> true
+        | tuple -> %null?(vs)
+        | else -> []}};
+  inner = visit:astlang (pattern: src) {
+     deep pattern {
+        entry -> {match tp with
+                    'ref' -> 'make_entry'(ref, name, hs)
+                  | 'mul' -> 'make_list'(ref, name, hs)
+                  | 'opt' -> 'make_optional'(ref, name, hs)}
+     |  append -> 'suppress_brackets'(p)
+     |  nil    -> 'make_nil'()
+     |  tuple  -> 'tuple_list'(@(interleave(vs, 'make_opt_break'())))
+     }};
+  if (tag)
+     if (isempty(src))
+          return 'make_named_tuple'(tag, [], varhints)
+     else return 'make_named_tuple'(tag, inner, varhints)
+  else return inner}
+
+function get_ast_nodes(src)
+collector(addentry, getentries) {
+
+  ret = visit:astlang (topdef: src) {
+     deep topdef { defast -> ns };
+     deep variant { v -> [tag; p(tag, hs)] };
+     once pattern(tag, ths) { else -> get_pattern_printer(tag, node, ths) };
+     deep astnode {
+       simple -> {addentry(id); 'S'(id, p([]))}
+     | varnode -> {addentry(id); 'V'(id,@vs)}
+     | extend -> ccerror('IMPOSSIBLE'())}};
+  return getentries():ret}
+
+function make_pprint_ast(srcid, entry, val)
+{
+   src = %ast2:default-ifun(srcid);
+  <nlist:nodes> = get_ast_nodes(src);
+   body = map n in nodes do {
+      match n with
+         'V'(id,@vs) ->
+           [id; 'DEEP'; [@vs]]
+       | 'S'(id, p) ->
+           [id; 'DEEP'; p]};
+   return
+     #`(make_with_nodes ,nlist
+        (ast:visit:new ,srcid ((dst ,srcid))
+            ,entry
+            ,val
+            ,@body))}
+
+
+#(macro make_named_tuple (tag code varhints)
+    (let* ((nl (if (memq 'newline varhints) '('FORCECR) nil))
+           (itab (memq 'itab varhints)))
+      (if code
+        `(list ,@nl "(" 'NB ,(S<< tag) ,@(if itab '('PUSHSTOP))
+             'PUSHTAB " " ,code 'POP ,@(if itab '('POP)) ")")
+        `(list ,@nl "(" 'NB ,(S<< tag) 'NB ")")
+        )))
+
+#(macro tuple_list rest
+    `(with-macros ((do_suppress_brackets (fun (_) nil)))
+        (list ,@rest)))
+
+#(macro suppress_brackets (body)
+    `(with-macros ((do_suppress_brackets (fun (_) #t)))
+        ,body))
+
+function make_string(v) {
+   if(%string?(v)) %S<<("\"", v, "\"")
+   else %S<<(v)}
+
+function make_list_fun (br, nodep, v0)
+{
+   v = if(nodep) v0 else map v in v0 do make_string(v);
+   inner = interleave(v, [" ";'WEAK']);
+   if (br) inner
+   else ["("; 'PUSHSTOP'; inner; 'POP'; ")"]
+}
+
+#(macro make_with_nodes (nlist body)
+   `(with-macros ((make_nodelist (fun (_) (quote (quote ,nlist)))))
+      ,body))
+
+function checknode (l, tp) {
+   if (memq(tp, l)) true else []
+}
+
+#(macro make_entry_inner (qnodelist qndtp qnm qhs)
+   (let* ((legit (checknode (cadr qnodelist) (cadr qndtp))))
+      (if legit (cadr qnm)
+          `(make_string ,(cadr qnm)))))
+
+#(macro make_entry (ndtp nm hs)
+   `(inner-expand-first make_entry_inner (make_nodelist) (quote ,ndtp) (quote ,nm) (quote ,hs)))
+
+#(macro make_list_inner (br qnodelist qndtp qv qhs)
+   `(make_list_fun ,br ,(checknode (cadr qnodelist) (cadr qndtp)) ,(cadr qv)))
+
+#(macro make_list (ndtp v hs)
+    `(inner-expand-first make_list_inner (do_suppress_brackets) (make_nodelist) (quote ,ndtp) (quote ,v) (quote ,hs)))
+
+#(macro do_suppress_brackets rest nil)
+
+#(macro make_opt_break ()
+    ''(" " WEAK))
+
+#(macro make_nil ()
+    ''("()"))
+
+#(macro make_optional (ndtp v hs)
+    ; TODO!
+    `(make_list ,ndtp ,v ,hs))
+
+#(macro gen_pprint_ast (srcid0 entry0)
+   (let* ((srcid (getrawident srcid0))
+          (entry (getrawident entry0)))
+     `(fun (val)
+         (collector (acc get)
+         (let* ((ret ,(make_pprint_ast srcid entry 'val)))
+           (generic_pprint:pprint (list ret 'FORCECR) acc)
+           (foldl string-append "" (get)))))))
+
+
+
+function save_graph(fnm, gr)
+{
+   l = hashmap(fun(k,vs) k:vs, gr);
+   #(call-with-output-file fnm
+       =pf: fun(fo) {
+              fprintln(fo, "digraph ast {");
+              fprintln(fo, "node [shape=record];");
+              iter [f;@ts] in l do {
+                 iter t in ts do
+                    fprintln(fo, %S<<(f," -> ", t, ";"))};
+              fprintln(fo, "}");
+             })}

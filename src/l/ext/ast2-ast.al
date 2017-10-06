@@ -147,6 +147,7 @@
                   (listnode_complete)
                   (make_label     <labelident:dst>)
                   (pop_stack_with <visitorcode:ret>)
+                  (set_target_simple <visitorcode:ret>)
                   (goto_with <labelident:dst> <visitorcode:ret>) ;; set thisnode to ret and jump
                   (make_move_record         <ident:nodeid>
                                             <number:pos>
@@ -239,6 +240,8 @@
                     <expr:stk> <expr:target> <expr:targetslot>
                     <expr:n> <expr:t> <*expr:deep> <expr:cnt> <label:runner>)
     (set_target     <expr:dst> <expr:slot> <expr:v>)
+    (set_target_simple
+                    <expr:dst> <expr:slot> <expr:v>)
     (goto           <labelident:dst>)
 
     (code <any:c>) ; fallthrough

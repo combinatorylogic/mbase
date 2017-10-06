@@ -98,6 +98,7 @@
      (allocate_tuple `(ast2:allocate_tuple ,fs))
      (allocate_tagged_tuple `(ast2:allocate_tagged_tuple ,tg ,tagid ,fs))
      (set_target `(ast2:set_target ,dst ,slot ,v))
+     (set_target_simple `(ast2:set_target_simple ,dst ,slot ,v))
 
      (allocate_list_collector
       `(ast2:allocate_list_collector))

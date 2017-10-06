@@ -245,9 +245,7 @@
                        (ast-node-type 'simple)
                        (ast-node-format ,p))))
              `(setup_macros ,macros
-                 (begin
-                   ,e
-                   )))))
+                 (set_target_simple ,e)))))
         ;; Compile a variant or simple entry
         (compile-pattern
          (fun (o p e tag nid md)
@@ -552,6 +550,7 @@
      (make_list_collector `(allocate_list_collector))
      (listnode_complete   `(listnode_complete (var ,thisnode)))
 
+     (set_target_simple `(set_target_simple (var ,target) (var ,targetslot) ,ret))
      (pop_stack_with   `(begin
                           ,@(if (ast2-debug-p)
                                 `((debugmessage (list 'POP-STACK-WITH))))

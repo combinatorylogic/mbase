@@ -29,6 +29,9 @@ parser pliter extends pfront (
  term pltmetabegin := 'pfdemo' '{' expr:v '}' '[' ident:p ':' ident:e ']'
      => {uberstate = empty} [[pfdemo]](v,p,e);
                       
+ term pltsimplemeta := 'pfout' '{' expr:v '}'
+     => {uberstate = empty} v;
+                      
 
  term pliter := texexpr /  pltopexpr0 ;
 
@@ -47,10 +50,11 @@ parser pliter extends pfront (
                 /  {pltdll string:s pltend => { uberstate = empty } $pfcheckdll(s) }
                 /  {pltbeg4:pars #invokeparser<pars>:e pltend => plqexpr(e)}
                 /  {pltmetabegin:meta => plqmetaexpr(meta)}
+                /  {pltsimplemeta:meta => plmetaexpr(meta)}
                 ;
 
  nottex := !('\pfcode'/'\pfqode'/'\pfiqode'/'\ppcode'/'\phcode'/'\parse'/'\pfdllref'/'\pfsysdllref'
-             /'\pfdemo'/'\pfinclude') .;
+             /'\pfdemo'/'\pfout'/'\pfinclude') .;
 
  token tex := nottex +;
  term texexpr := tex:v => {screen=none} {state=texcomment} pltexstring($val(v));
