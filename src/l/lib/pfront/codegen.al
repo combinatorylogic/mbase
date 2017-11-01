@@ -13,12 +13,12 @@
 ; (leftass (- a (leftass (- b (leftass (- c (leftass (- d e))))))))
 ;   =>
 ; (- (- (- (- a b) c) d) e)
-(function fixleft (leftass n)
+(recfunction fixleft (leftass n)
   (hlevel:visit expr n
     (expr _
       ((leftass (leftass node))
        (unleft (leftass node))
-       (stopfix a)
+       (stopfix (fixleft leftass a))
        (else-deep ((else node)))))))
 
 (recfunction leftass (node)
@@ -28,6 +28,7 @@
      (leftass `(leftass (binop ,opr (stopfix (binop ,op ,(fixleft leftass a) ,(fixleft leftass b)))
                                ,c))))
     ((leftass $x) x)
+    ((stopfix $x) (leftass x))
     (else node)))
 
 (function fixleft_outer (n)
