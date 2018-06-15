@@ -9,11 +9,13 @@ ast genssa2tree : genssa2 () {
         |  rec();}}
 
 \pfcode{
-function genssa2_describe_simple(env, defs, e) {
+function genssa2_describe_simple(env, defs, indvars, e) {
    vis = mkhash();
    subst(r0) =
       do loop(r = r0) {
-           if (ohashget(vis, r)) 'var'(r)
+           aif (iv = ohashget(indvars, r)) {
+             'indvar'(r, iv)
+           } else if (ohashget(vis, r)) 'var'(r)
            else {
              ohashput(vis, r, r);
              df = ohashget(defs, r);
@@ -78,7 +80,7 @@ ast genssa2alg {
 
          // Atoms
          | var(ident:id)
-         | indvar(ident:id)
+         | indvar(ident:id, loopident:l)
          | rec()
          | const(any:c)
          ;
@@ -98,7 +100,7 @@ function genssa2_to_algebraic(env, v) {
       deep expr {
          op -> e
        | var -> 'var'(id)
-       | indvar -> 'indvar'(id)
+       | indvar -> 'indvar'(id, l)
        | rec -> 'rec'()
        | const -> 'const'(node)
        | else -> 'fail'(node)}}}}

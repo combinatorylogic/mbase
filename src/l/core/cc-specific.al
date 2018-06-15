@@ -304,11 +304,11 @@
 
 )
 
-;(cmacro set-car! (xp xv)
-;  `(inner.set-car! ,xp ,xv))
+(cmacro set-car! (xp xv)
+  `(inner.set-car! ,xp ,xv))
 
-;(cmacro set-cdr! (xp xv)
-;  `(inner.set-cdr! ,xp ,xv))
+(cmacro set-cdr! (xp xv)
+  `(inner.set-cdr! ,xp ,xv))
 
 (cmacro ageto (ar id)
   (with-syms (a i)

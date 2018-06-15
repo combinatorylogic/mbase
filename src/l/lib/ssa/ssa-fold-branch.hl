@@ -69,7 +69,7 @@ collector(cndadd, cndget) {
           | else true}};
    check_condition(bb, c, dsts) = {
       // TODO:
-      e0 = genssa2_describe_simple(env, defs, c);
+      e0 = genssa2_describe_simple(env, defs, /*TODO*/ mkhash(), c);
       ae = genssa2_to_algebraic(env, e0);
       if (genssa2_algebraic_eligible(env, ae))
       iter [d;lb] in dsts do {

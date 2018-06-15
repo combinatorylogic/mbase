@@ -50,8 +50,8 @@ function smallest_weak(lst)
      `(if cnt (loop (car cnt) ,str ,pos ,stk (cdr cnt))))}
 
 \pfcode{
-function pprint(lst, pfun)
-  do loop(l = lst,
+function pprint(lst, pfun) {
+  sq = do loop(l = lst,
           str = [0],
           pos = 0,
           stk = [],
@@ -87,35 +87,36 @@ function pprint(lst, pfun)
          prev = reverse(rprev);
         <xstate:pos:nn> = (match rest with ['WEAK';[xstate;pos];@nn] -> xstate:pos:nn);
          flush_string_inner(car(str):prev);
-         xstate()
+         xstate
          }};
     match l with
       hd:tl -> loop(hd, str, pos, stk, tl:cnt)
-    | [] -> pprint_cont(str, pos, stk)
+    | [] -> fun() pprint_cont(str, pos, stk)
     | else -> if(%symbol?(l)) {// this is a command
        case l {
-         | 'FORCECR' -> {flush_string(); pprint_cont([getpos()], getpos(), stk)}
-         | 'PUSHSTOP' -> pprint_cont(str, pos, pos:stk)
-         | 'PUSHTAB' -> pprint_cont(str, pos, (getpos()+tab_width):stk)
-         | 'POP' -> pprint_cont(str, pos, cdr(stk))
+         | 'FORCECR' -> {flush_string(); fun() pprint_cont([getpos()], getpos(), stk)}
+         | 'PUSHSTOP' -> fun() pprint_cont(str, pos, pos:stk)
+         | 'PUSHTAB' -> fun() pprint_cont(str, pos, (getpos()+tab_width):stk)
+         | 'POP' -> fun() pprint_cont(str, pos, cdr(stk))
          | 'WEAK' -> {
               state = fun() pprint_cont([getpos()], getpos(), stk);
-              pprint_cont(str::['WEAK';[state;getpos()]], pos, stk)
+              fun() pprint_cont(str::['WEAK';[state;getpos()]], pos, stk)
            }
-         | 'NB' -> pprint_cont(str::['NB'], pos, stk)
-         | 'TABBACK' -> pprint_cont(str::['TABBACK'], pos, stk)
+         | 'NB' -> fun() pprint_cont(str::['NB'], pos, stk)
+         | 'TABBACK' -> fun() pprint_cont(str::['TABBACK'], pos, stk)
          // ignore the unknown commands
-         | else -> pprint_cont(str, pos, stk)
+         | else -> fun() pprint_cont(str, pos, stk)
        }} else { //it's a proper string
          len = notnet(string l) {leave l.get_Length();};
          ipos = car(str);
-         if ((pos + len - ipos) > 75) splitthisstring(l)
-         else pprint_cont(str::[l], pos + len, stk)
+         if ((pos + len - ipos) > 75) fun() splitthisstring(l)
+         else fun() pprint_cont(str::[l], pos + len, stk)
        }
-    }
-  }
-}
-
+    };
+  do iloop(s = sq) {
+    nxt = s();
+    if (nxt) iloop(nxt)
+  }}}
 
 \pfcode{
 endmodule.

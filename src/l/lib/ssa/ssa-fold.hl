@@ -309,6 +309,7 @@ function genssa2_process_iter(modenv, src0) {
          cnds = swbenchmark1(times, "loop-bounds", genssa2_loop_bounds(modenv, inds, exits));
          cnds = swbenchmark1(times, "loop-bounds-static", genssa2_loop_bounds_static(modenv, cnds));
          if(cnds) {
+                    println('CNDS'(cnds));
                     // TODO: only unroll if hinted
                     return swbenchmark1(times, "loop-unroll",
                                                genssa2_loop_unroll(modenv, src5, cache,
@@ -316,7 +317,12 @@ function genssa2_process_iter(modenv, src0) {
                   }
          else return src5
       } else src5;
-      src6 = swbenchmark1(times, "analyse-conditions", genssa2_analyse_conditions(modenv, src5x, chgp));
+     <[cache;inds]> = swbenchmark1(times, "loop-induction1", genssa2_induction(modenv, src5x));
+      src5y =
+        if (inds)
+          swbenchmark1(times, "strength-reduction", genssa2_strength_reduction([cache;inds], modenv, src5x, chgp))
+        else src5x;
+      src6 = swbenchmark1(times, "analyse-conditions", genssa2_analyse_conditions(modenv, src5y, chgp));
 
       // 6. CSE
       src7 = swbenchmark1(times, "CSE", genssa2_cse(modenv, src6, chgp));
@@ -333,7 +339,6 @@ function genssa2_process_iter(modenv, src0) {
       //     - Constant-bound loop unrolling
       //     - Dead loop elimination (reducible loop with only
       //       pure actions and no external uses)
-      //   - Strength reduction
       // - Instcombine
       // 
       userpass = aif(chk = ohashget(modenv, '*userpasses*')) chk else

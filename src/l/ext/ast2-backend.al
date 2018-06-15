@@ -27,6 +27,9 @@
 
 ;; MBase-specific codegen
 (function visitor-backend-mbase (lfsrc? lfdst? src)
+(let* ((pfx (gensym))
+         (mklbl (fun (id) (%Sm<< pfx "_" id))))
+         
   (visitorbackend:visit expr src
    (expr DEEP
     ((let
@@ -36,10 +39,10 @@
       `(let* ,ds ,b)) ;; TODO!!!! annotate bindings
      (label
       `(begin
-         (n.label ,id)
+         (n.label ,(mklbl id))
          ,e))
      (goto
-      `(n.goto ,dst))
+      `(n.goto ,(mklbl dst)))
      (make_label
       ;; TODO: check it's a number, check it is correct
       dst
@@ -78,7 +81,7 @@
                                   ,n ,tplid ;; TODO: goto to cnt if ndeep is
                                   ,ndeep    ;; empty, without visiting runner
                                   ,cnt)
-                      (n.goto ,runner)))))))
+                      (n.goto ,(mklbl runner))))))))
      (listnode_complete `(ast2:listnode_complete ,src)) ;; get
      ;; Move entries must be separated from the real continuation entries,
      ;; for optimisation primarily (we can move everything at once, no need
@@ -117,9 +120,9 @@
            (if ,rst ;; more to be done
                (begin
                  (n.stloc! ,stackid ,rst)
-                 (n.goto   ,runner))
+                 (n.goto   ,(mklbl runner)))
                (begin ;; done already
-                 (n.goto   ,retlabel))))))
+                 (n.goto   ,(mklbl retlabel)))))))
 
      ;; Runner machine:
      (make_runner ;; a new record is on the stack
@@ -146,10 +149,10 @@
                                    (ast2:list_continuation_record
                                     ,dst (cdr ,tnsrc)))))
                             (n.stloc! ,nextnodevar ,dst)
-                            (n.goto   ,nodeentry)
+                            (n.goto   ,(mklbl nodeentry))
                             )
                           (begin
-                            (n.goto ,runner)
+                            (n.goto ,(mklbl runner))
                             )
                           ))
                     (begin
@@ -157,7 +160,7 @@
                       (n.stloc! ,target      (ast2:stackrecord-tpl      ,hd))
                       (n.stloc! ,targetslot  (ast2:cntrecord-targetslot ,nx))
                       (n.stloc! ,nextnodevar ,dst)
-                      (n.goto   ,nodeentry)
+                      (n.goto   ,(mklbl nodeentry))
                       )))
               ;; no more continuations
               (begin
@@ -166,7 +169,7 @@
                 (n.stloc! ,nextnodevar (ast2:stackrecord-cnt ,hd))
                 (n.stloc! ,target      (ast2:stackrecord-target      ,hd))
                 (n.stloc! ,targetslot  (ast2:stackrecord-targetslot  ,hd))
-                (n.goto   ,nodeentry)))
+                (n.goto   ,(mklbl nodeentry))))
           )))
 
      (return v)
@@ -192,7 +195,7 @@
 
      ;; TODO:
      (else node)
-     ))))
+     )))))
 
 
 ;;;;;; MBase-backend supporting macros and functions

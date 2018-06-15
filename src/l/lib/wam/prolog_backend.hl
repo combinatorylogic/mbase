@@ -218,8 +218,8 @@ function prolog_is_weak(a) match a with 'weak':x -> true | else -> []
 function prolog_unify_inner(env, a, b) {
    da = prolog_deref(a); db = prolog_deref(b);
    if (da === db) true
-   else if (prolog_is_var(da)) {prolog_set_var(env, da, db);true}
-   else if (prolog_is_var(db)) {prolog_set_var(env, db, da);true}
+   else if (prolog_is_var(da)) {prolog_set_var(env, da, b);true}
+   else if (prolog_is_var(db)) {prolog_set_var(env, db, a);true}
    else if (prolog_is_struct(da) && prolog_is_struct(db)) {
      prolog_unify_structs(env, da,db)
    } else if (prolog_is_const(da) && prolog_is_const(db)) {

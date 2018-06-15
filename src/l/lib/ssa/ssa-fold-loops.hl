@@ -419,6 +419,125 @@ function genssa2_induction(env, src) {
    return [[loops; loopsht; defs; origs; deps]; l]
 }}
 
+\section{Strength reduction}
+
+An expression $I * C$, where $I$ is an induction variable in form of $I_n \leftarrow I_{n-1} + C_I$, can be
+replaced with a new induction variable $Y_n \leftarrow Y_{n-1} + C_I * C, Y_0 \leftarrow I_0 * C$.
+
+TODO: strength reduction can result in multiple equivalent induction variables, and  CSE is not smart enough
+to see the equivalence of phi nodes. We have to do it separately, by comparing the induction variable briefs
+instead.
+
+%example:
+%%(inductive L2 Z1079358 ... ... (init (const (const (ir2const) (integer 327 i32)))) (add ir2-binop:Add (rec) (const (const (ir2const) (integer 327 i32)))))
+%%(inductive L2 Z1079351 ... ... (init (const (const (ir2const) (integer 327 i32)))) (add ir2-binop:Add (rec) (const (const (ir2const) (integer 327 i32)))))
+
+
+\pfcode{
+function genssa2_get_inductive_increment(step) {
+   match step with
+     'add'(op, 'rec'(), 'const'(c)) -> [op;c]
+   | 'add'(op, 'const'(c), 'rec'()) -> [op;c]
+   | else -> []}}
+
+\pfcode{
+function genssa2_is_strength_reducible(add, env, defs, indvars, inds, loopsht, origs, bb) {
+   isincrement(nm) = {
+      <'inductive'(Lnm, Vnm, E0, E1, I0e, S0)> = ohashget(inds, nm);
+       return genssa2_get_inductive_increment(S0)};
+   isinvariant(c,L) = {
+      // Check if a variable is defined outside of the loop body
+      lbody = ohashget(loopsht, %Sm<<("body-", L));
+      match c with
+         'const'(x) -> true
+       | 'var'(id) -> {
+           o = ohashget(origs, id);
+           if (not(o))  true
+           else if (memq(o, lbody)) [] else true
+         }
+       | else  -> []};
+   visit:genssa2(bblock: bb) {
+      deep oppair: op(name);
+      deep iop(dstreg) {
+        call -> {
+           t = genssa2_describe_simple(env, defs, indvars, 'var'(dstreg));
+           s = genssa2_to_algebraic(env, t);
+           match s with
+             'mul'(op, 'indvar'(v1,l1), c1) ->
+                if(isincrement(v1) && isinvariant(c1, l1)) add('mul'(dstreg, op, v1, c1, l1))
+           | 'mul'(op, c1, 'indvar'(v1,l1)) ->
+                if(isincrement(v1) && isinvariant(c1, l1)) add('mul'(dstreg, op, v1, c1, l1))
+           | else -> []
+        }
+      | else -> []}}}}
+
+\pfcode{
+function genssa2_strength_reduction(icache, env, src, modp) {
+  <[cache; ind]> = icache;
+  iter i in ind do  println('INDUC'(i));
+  <[loops; loopsht; defs; origs; deps]> = cache;
+   indvars = mkhash(); inds = mkhash();
+   iter [_;L;V;@_] in ind do ohashput(indvars, V, L);
+   iter i in ind do {
+    <'inductive'(Lnm, Vnm,@_)> = i;
+     ohashput(inds, Vnm, i);
+   };
+   
+   // 1. Go through all the loop bodies that have induction variables, and check if
+   // there are expressions that can be strength-reduced
+   rewrites = collector(add, get) {
+     visit:genssa2(top:src) {
+       deep  bblock { b -> if (genssa2_is_in_a_loop(loopsht, name)) {
+          genssa2_is_strength_reducible(add, env, defs, indvars, inds, loopsht, origs, node)
+       }}};
+     return get()};
+   // 2. Insert the lifted strength-reduced phis into corresponding loop entry BBs
+   if (rewrites) {
+       modp := true;
+       lh_ht = mkhash(); le_ht = mkhash(); rw_ht = mkhash();
+       // Fill the tables:
+       iter [xop;dstreg;op;iv;cv;L] in rewrites do {
+          lh = car(ohashget(loopsht, %Sm<<("entry-", L)));
+          le = car(car(ohashget(loopsht, %Sm<<("entryedge-", L))));
+          initvar = gensym();
+          newnm = gensym();
+         <'inductive'(Lnm, Vnm, E0, E1, I0e, S0)> = ohashget(inds, iv);
+         <[addop;C]> = genssa2_get_inductive_increment(S0);
+          nnm1 = gensym();
+          cvx = genssa2_from_algebraic(env, cv);
+          // S + C_I * C
+          stepexprs = [[nnm1;'call'([], op, C, cvx)];
+                       [newnm;'call'([], addop, 'var'(dstreg), 'var'(nnm1))]];
+          I0 = genssa2_from_algebraic(env, cadr(I0e));
+          initexpr = 'call'([], op, I0, cvx);
+          ohashput(lh_ht, lh, [dstreg;initvar;newnm;stepexprs;L] : ohashget(lh_ht, lh));
+          ohashput(le_ht, le, [initvar; initexpr] : ohashget(le_ht, le));
+          ohashput(rw_ht, dstreg, true);
+       };
+       /////////////////
+       is_a_loop_header(name) = ohashget(lh_ht, name);
+       is_a_loop_entry(name) = ohashget(le_ht, name);
+       is_a_rewrite(name) = ohashget(rw_ht, name);
+       visit:genssa2(top:src) {
+         deep bblock {
+           b -> {
+              preposts = aif(chk = is_a_loop_header(name)) {
+                map chk do {
+                <[nm;init;newnm;stepentries;L]> = chk;
+                 entry = car(car(ohashget(loopsht, %Sm<<("entryedge-",L))));
+                 backedge = caar(ohashget(loopsht, %Sm<<("backedge-",L)));
+                 newentry = [nm; 'phi'('a'(entry, 'var'(init)), 'a'(backedge, 'var'(newnm)))];
+                 [[newentry]; stepentries]}} else [[[];[]]];
+              pre = map append [p;_] in preposts do p;
+              post = map append [_;p] in preposts do p;
+              post = aif(chk = is_a_loop_entry(name)) {
+                 post :: chk
+              } else post;
+              mk:node(ops = pre::((map append o in ops do o)::post))}};
+         deep oppair: if(is_a_rewrite(name)) [] else [node]}
+   } else src
+}}
+
 \section{Loop exit conditions analysis}
 
 If a loop exit condition is a function of loop induction variables and loop invariants (or constants) only,
@@ -556,9 +675,9 @@ collector(addcandidate, getcandidates) {
        }};
    iter e in exits do {
       match e with
-         'exit'(bb,ex, L, neg, [op;op1;'indvar'(V);'const'(c)]) ->
+         'exit'(bb,ex, L, neg, [op;op1;'indvar'(V,Lv);'const'(c)]) ->
              check(L, neg, 'lr', op, V, 'const'(c))
-      |  'exit'(bb,ex, L, neg, [op;op1;'const'(c);'indvar'(V)]) ->
+      |  'exit'(bb,ex, L, neg, [op;op1;'const'(c);'indvar'(V,Lv)]) ->
              check(L, neg, 'rl', op, V, 'const'(c))};
    return getcandidates();
 }}
