@@ -28,7 +28,7 @@
 ;; MBase-specific codegen
 (function visitor-backend-mbase (lfsrc? lfdst? src)
 (let* ((pfx (gensym))
-         (mklbl (fun (id) (%Sm<< pfx "_" id))))
+         (mklbl (fun (id) (Sm<< pfx "_" id))))
          
   (visitorbackend:visit expr src
    (expr DEEP
