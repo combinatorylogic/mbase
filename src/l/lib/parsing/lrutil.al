@@ -270,7 +270,7 @@
     (cons lnum col)))
 
 
-(nrec:def PegEnv failure other ctrp signals termstack)
+(nrec:def PegEnv failure other ctrp signals termstack storage)
 
 (nrec:def PegSignal tag first last signal)
 
@@ -287,10 +287,10 @@
   nil)
 
 (function peg:makeenv ()
-  (PegEnv.new nil peg:dummy-slot #t nil nil))
+  (PegEnv.new nil peg:dummy-slot #t nil nil (mkhash)))
 
 (function peg:makeenv-noctr ()
-  (PegEnv.new nil peg:dummy-slot nil nil nil))
+  (PegEnv.new nil peg:dummy-slot nil nil nil (mkhash)))
 
 (function peg:construct? (Env)
   (PegEnv.ctrp.M Env))

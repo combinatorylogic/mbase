@@ -151,6 +151,8 @@
                         (make-accept-signal-arlist outenv pp-mymerge)
                         #t
                         nil
+                        nil
+                        (mkhash)
                         ))
          (res (peg:easyparse3 env p (deref str)))
          (s (p:match (car res)

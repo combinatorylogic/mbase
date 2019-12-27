@@ -135,6 +135,7 @@
                         #t
                         nil
                         nil
+                        (mkhash)
                         ))
          (res (peg:easyparse3 env p (deref str)))
          (s (p:match (car res)
@@ -170,6 +171,7 @@
                                       #t
                                       nil
                                       nil
+                                      (mkhash)
                                       ))
                     (str1s (mkref (peg:str->stream str1)))
                     (ret (if parser

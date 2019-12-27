@@ -85,7 +85,7 @@ parser minipeg extends pfcommon (
     term miniatomx :=
        { tIdent:i '<' cslist<miniatomx,','>:args '>'
           => {state=pattern}  macroapp($sval(i),@args) }
-    /  { '~' ident:nm  '(' ecslist<miniast,','>:args ')' => [[action]](nm, args) }
+    /  { '~' ident:nm  '(' ecslist<miniast,','>:args ')' => [[action]](nm, @args) }
     /  { '#' ident:nm '<' cslist<ident,','>:args '>' => [[highorder]](args,nm) }
     /  { '(' '?' ':' tIdent:i ')' => [[check]]($sval(i)) }
     /  { '[' tIdent:i ']' => {state=pattern} {ctoken = keyword} terminal($sval(i)) }

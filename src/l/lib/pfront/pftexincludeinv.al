@@ -13,6 +13,8 @@
                         (make-accept-signal-1 outenv pp-defaultmerge)
                         #t
                         nil
+                        nil
+                        (mkhash)
                         ))
          (res (peg:easyparse3 env p (deref str)))
          (s (p:match (car res)

@@ -75,9 +75,18 @@
                                     (__peg:get-position_ source)))))
         (if (peg-success? ,tmp) (peg-dummy) (peg-fail)))))
 
+(function peg-action-ctor (v)
+  (packrat:visit code v
+                 (code DEEP ((const `(quote ,s))
+                             (var name)
+                             (list `(list ,@ars))
+                             (else (ccerror `(UNSUPPORTED ,v)))))))
+
 (macro peg-call-action (nm args)
-  `(begin ;TODO
-     ))
+  (with-syms (pars)
+     `(let ((,pars (,(Sm<< "peg-actionfunction-" nm)
+                   ,@(map peg-action-ctor args))))
+        (,pars Env _lrstk source))))
 
 (macro peg-call-highorder (args maker)
   (with-syms (pars)

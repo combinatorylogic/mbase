@@ -89,7 +89,7 @@
       (rule <id:name> <str:body>)
       (macroapp <id:name> . <*expr:args>)
 
-      (action <id:name> <any:args>) ; Action over environment,
+      (action <id:name> . <*code:args>) ; Action over environment,
                                     ; does not affect parsing
 
       (highorder <*id:args> <id:maker>)

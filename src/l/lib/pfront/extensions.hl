@@ -476,15 +476,14 @@ macro bitpack_macro(bits, es) {
 -----------------
 
 
-syntax in expr, start: ' aif "(" [qident]:id "=" [expr]:e ")" [expr]:tr
+syntax in expr, start: ' aif "(" [mdqvarident]:id "=" [expr]:e ")" [expr]:tr
                          (else [expr]:fl)? '
 {
-    vid = 'var'(id);
     if (fl) {
        cfl = car(fl);
-       return `{ \id\ = \e\; if (\vid\) \tr\ else \cfl\}`
+       return `{ ::varid \id\ = \e\; if (\id\) \tr\ else \cfl\}`
     } else {
-       return `{ \id\ = \e\; if (\vid\) \tr\}`
+       return `{ ::varid \id\ = \e\; if (\id\) \tr\}`
     }
 }
 
